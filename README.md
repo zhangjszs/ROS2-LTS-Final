@@ -127,6 +127,8 @@ ros2 launch fsac_viz rviz.launch.py
 
 - 📘 [构建与编译优化指南 (BUILD_OPTIMIZATION.md)](docs/BUILD_OPTIMIZATION.md)
 - 🚀 [C++20 重构推进路线图 (CPP20_REFACTORING_ROADMAP.md)](docs/CPP20_REFACTORING_ROADMAP.md)
+- 🤖 [Claude Code 开发与架构指南 (CLAUDE.md)](CLAUDE.md)
+
 
 ---
 

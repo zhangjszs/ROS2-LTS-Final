@@ -100,3 +100,6 @@ Thumbs.db
 .gemini/
 .mimocode/
 .workbuddy/
+.omc/
+.worktrees/
+
