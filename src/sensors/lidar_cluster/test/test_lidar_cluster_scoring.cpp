@@ -3,6 +3,7 @@
 #include <cmath>
 
 #include "lidar_cluster_scoring.h"
+#include "preprocessor/point_cloud_preprocessor.h"
 #include "profiler/frame_profiler.h"
 #include "string_utils.h"
 
@@ -312,6 +313,74 @@ TEST(StringUtilsTest, FormatCsvDoubles) {
     std::vector<double> vals = {1.2, 3.456, 7.891};
     std::string formatted = lidar_cluster::formatCsvDoubles(vals);
     EXPECT_EQ(formatted, "1.20, 3.46, 7.89");
+}
+
+// ── PointCloudPreprocessor Span Tests (C++20 std::span & subspan) ──────────
+
+TEST(PointCloudPreprocessorSpanTest, SlicePointCloudEvenDivision) {
+    std::vector<PointType> pts(100);
+    for (size_t i = 0; i < pts.size(); ++i) {
+        pts[i].x = static_cast<float>(i);
+        pts[i].y = 0.0f;
+        pts[i].z = 0.0f;
+    }
+
+    auto slices = PointCloudPreprocessor::slicePointCloud(pts, 4);
+    ASSERT_EQ(slices.size(), 4u);
+    EXPECT_EQ(slices[0].size(), 25u);
+    EXPECT_EQ(slices[1].size(), 25u);
+    EXPECT_EQ(slices[2].size(), 25u);
+    EXPECT_EQ(slices[3].size(), 25u);
+
+    // 验证零拷贝连续性与内容正确
+    EXPECT_FLOAT_EQ(slices[0].front().x, 0.0f);
+    EXPECT_FLOAT_EQ(slices[0].back().x, 24.0f);
+    EXPECT_FLOAT_EQ(slices[3].back().x, 99.0f);
+}
+
+TEST(PointCloudPreprocessorSpanTest, SlicePointCloudWithRemainder) {
+    std::vector<PointType> pts(10);
+    for (size_t i = 0; i < pts.size(); ++i) {
+        pts[i].x = static_cast<float>(i);
+        pts[i].y = 0.0f;
+        pts[i].z = 0.0f;
+    }
+    // 10 分为 3 份: 4, 3, 3
+    auto slices = PointCloudPreprocessor::slicePointCloud(pts, 3);
+    ASSERT_EQ(slices.size(), 3u);
+    EXPECT_EQ(slices[0].size(), 4u);
+    EXPECT_EQ(slices[1].size(), 3u);
+    EXPECT_EQ(slices[2].size(), 3u);
+    EXPECT_FLOAT_EQ(slices[0].front().x, 0.0f);
+    EXPECT_FLOAT_EQ(slices[1].front().x, 4.0f);
+    EXPECT_FLOAT_EQ(slices[2].front().x, 7.0f);
+}
+
+TEST(PointCloudPreprocessorSpanTest, SlicePointCloudEmpty) {
+    std::vector<PointType> pts;
+    auto slices = PointCloudPreprocessor::slicePointCloud(pts, 4);
+    EXPECT_TRUE(slices.empty());
+
+    std::vector<PointType> pts_non_empty(10);
+    auto zero_slices = PointCloudPreprocessor::slicePointCloud(pts_non_empty, 0);
+    EXPECT_TRUE(zero_slices.empty());
+}
+
+TEST(PointCloudPreprocessorSpanTest, CountValidPointsInRoi) {
+    std::vector<PointType> pts(5);
+    pts[0].x = 5.0f; pts[0].y = 0.0f; pts[0].z = 0.0f;   // inside
+    pts[1].x = -5.0f; pts[1].y = 0.0f; pts[1].z = 0.0f;  // outside x
+    pts[2].x = 10.0f; pts[2].y = 2.0f; pts[2].z = 0.5f;  // inside
+    pts[3].x = 10.0f; pts[3].y = 10.0f; pts[3].z = 0.0f; // outside y
+    pts[4].x = 1.0f; pts[4].y = 0.0f; pts[4].z = 2.0f;   // outside z
+
+    PointCloudPreprocessor::RoiBounds roi;
+    roi.x_min = 0.0; roi.x_max = 20.0;
+    roi.y_min = -5.0; roi.y_max = 5.0;
+    roi.z_min = -1.0; roi.z_max = 1.0;
+
+    size_t count = PointCloudPreprocessor::countValidPointsInRoi(pts, roi);
+    EXPECT_EQ(count, 2u);
 }
 
 int main(int argc, char** argv) {

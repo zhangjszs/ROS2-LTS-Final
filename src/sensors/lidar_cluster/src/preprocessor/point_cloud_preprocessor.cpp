@@ -46,6 +46,42 @@ static void FilterCloudAabb(pcl::PointCloud<PointType>::Ptr cloud, const PointCl
     CompactPoints(cloud);
 }
 
+std::vector<PointCloudPreprocessor::PointSpan> PointCloudPreprocessor::slicePointCloud(PointSpan points,
+                                                                                       size_t num_segments) {
+    std::vector<PointSpan> slices;
+    if (points.empty() || num_segments == 0) {
+        return slices;
+    }
+    slices.reserve(num_segments);
+    const size_t total = points.size();
+    const size_t base_chunk = total / num_segments;
+    const size_t remainder = total % num_segments;
+    size_t offset = 0;
+
+    for (size_t i = 0; i < num_segments; ++i) {
+        const size_t chunk_len = base_chunk + (i < remainder ? 1 : 0);
+        if (chunk_len > 0 && offset < total) {
+            slices.push_back(points.subspan(offset, chunk_len));
+            offset += chunk_len;
+        }
+    }
+    return slices;
+}
+
+size_t PointCloudPreprocessor::countValidPointsInRoi(PointSpan points, const RoiBounds& roi) {
+    const float x_min = static_cast<float>(roi.x_min);
+    const float x_max = static_cast<float>(roi.x_max);
+    const float y_min = static_cast<float>(roi.y_min);
+    const float y_max = static_cast<float>(roi.y_max);
+    const float z_min = static_cast<float>(roi.z_min);
+    const float z_max = static_cast<float>(roi.z_max);
+
+    return static_cast<size_t>(std::count_if(points.begin(), points.end(), [&](const PointType& p) {
+        return std::isfinite(p.x) && std::isfinite(p.y) && std::isfinite(p.z) &&
+               p.x >= x_min && p.x <= x_max && p.y >= y_min && p.y <= y_max && p.z >= z_min && p.z <= z_max;
+    }));
+}
+
 void PointCloudPreprocessor::LoadZParams(rclcpp::Node::SharedPtr node) {
     node->declare_parameter("road_type", 2);
     node->declare_parameter("z_up", 0.7);
@@ -175,8 +211,9 @@ void PointCloudPreprocessor::adaptiveVoxelGrid(pcl::PointCloud<PointType>::Ptr& 
     if (cloud->empty())
         return;
 
-    const auto& ranges = voxel_ranges_;
-    const auto& leaf_sizes = voxel_leaf_sizes_;
+    std::span<const double> ranges(voxel_ranges_);
+    std::span<const double> leaf_sizes(voxel_leaf_sizes_);
+    PointSpan point_span(cloud->points.data(), cloud->points.size());
 
     std::vector<float> ranges_sq(ranges.size());
     for (size_t i = 0; i < ranges.size(); i++) {
@@ -185,13 +222,13 @@ void PointCloudPreprocessor::adaptiveVoxelGrid(pcl::PointCloud<PointType>::Ptr& 
 
     size_t num_bins = leaf_sizes.size();
     std::vector<pcl::PointCloud<PointType>::Ptr> bins(num_bins);
-    const size_t n = cloud->points.size();
+    const size_t n = point_span.size();
     for (size_t i = 0; i < num_bins; i++) {
         bins[i].reset(new pcl::PointCloud<PointType>());
         bins[i]->points.reserve(n);
     }
 
-    for (const auto& p : cloud->points) {
+    for (const auto& p : point_span) {
         float d2 = p.x * p.x + p.y * p.y;
         size_t bin = num_bins - 1;
         for (size_t i = 0; i < ranges_sq.size(); i++) {

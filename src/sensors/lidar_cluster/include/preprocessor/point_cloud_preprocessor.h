@@ -2,11 +2,16 @@
 
 #include <pcl/point_cloud.h>
 #include <rclcpp/rclcpp.hpp>
+#include <span>
+#include <vector>
 
 #include "point_type.h"
 
 class PointCloudPreprocessor {
    public:
+    using PointSpan = std::span<const PointType>;
+    using MutablePointSpan = std::span<PointType>;
+
     explicit PointCloudPreprocessor(rclcpp::Node::SharedPtr node);
 
     void process(pcl::PointCloud<PointType>::Ptr& cloud, bool frp_active, double current_pitch, double current_speed);
@@ -14,6 +19,12 @@ class PointCloudPreprocessor {
     struct RoiBounds {
         double x_min = 0, x_max = 0, y_min = 0, y_max = 0, z_min = 0, z_max = 0;
     };
+
+    // C++20 std::span 零拷贝点云切片：利用 subspan() 将点云缓冲区切分为多个连续子视图
+    static std::vector<PointSpan> slicePointCloud(PointSpan points, size_t num_segments);
+
+    // C++20 std::span 零拷贝统计：无须拷贝或分配新内存，直接遍历统计 ROI 范围内的有效点数
+    static size_t countValidPointsInRoi(PointSpan points, const RoiBounds& roi);
 
    private:
     void splitString(const std::string& in_string, std::vector<double>& out_array);
