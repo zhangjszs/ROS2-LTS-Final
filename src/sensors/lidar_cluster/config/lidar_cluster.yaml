@@ -1,0 +1,160 @@
+# topic settings
+filtered_topic_name: /debug/lidar_cluster/skidpad_detection
+input_topic: /velodyne_points
+point_cloud_queue_size: 1 # latest-only input; drop stale LiDAR frames instead of accumulating delay
+enable_debug_topics: false # set true to publish debug point clouds and markers
+use_distortion_adjust: false # enable IMU-based motion distortion compensation (P0)
+scan_period: 0.1 # LiDAR scan period in seconds (VLP-32: 0.1s = 10Hz)
+imu_topic: /sensors/imu/data # IMU/INS topic for distortion adjustment
+
+# Adaptive VoxelGrid (P1)
+enable_adaptive_voxel: true # enable distance-adaptive voxel downsampling
+voxel_ranges: "5,15" # distance thresholds (m) for voxel bins
+voxel_leaf_sizes: "0.03,0.05,0.10" # leaf size (m) for each bin (ranges+1 items)
+
+# Statistical Outlier Removal (P1) — KD-tree kNN, often the slowest preprocess step after voxel
+enable_sor: true # enable true SOR after voxel downsampling; set false if frame time exceeds ~80ms
+sor_mean_k: 10 # number of nearest neighbors for mean/stddev
+sor_stddev: 1.0 # standard deviation multiplier threshold
+
+no_ground_point_topic: /debug/lidar_cluster/no_ground
+ground_point_topic: /debug/lidar_cluster/ground
+all_points_topic: /debug/lidar_cluster/all_points
+
+inverse_flag: 0 # 1: inverse matrix; 0: DO NOT inverse. inverse means car need turn right a little
+clip_height: 2.0 # ?
+min_distance: 0.1 # unit?
+max_distance: 100.0 # default: 100.0      seems no use
+
+#地面分割模块参数
+sensor_height: 0.135 # 0.18   0.135        这里存在的意义是把低于这个-sensor_height的点都先剔除掉  对地面点云进行第一次的排序删减
+num_iter: 10 # iteration num 3  5   拟合平面次数   越高越精准 同时消耗越高
+num_lpr: 5 # seeds num           地面种子数选取5    越大精度越高
+th_seeds:
+  0.03 # seeds to the plane threshold   0.03
+  #大可能会导致过多的非接地点被错误地识别为接地点，这样模型建立的就不一定准确。从而导致地面分割不准确或者漏分割一些非地面点
+  #加上th_seeds_是为了确保提取的种子点不仅仅是LPR的高度，而是在LPR的基础上再加上一个偏差。这样做的目的是为了确保提取的种子点不仅仅是地面点，还包括一些高度略高于地面的点，
+  #以便更好地覆盖地面的形状。如果只使用LPR作为阈值，可能会漏掉一些地面点。
+th_dist:
+  0.03 # points to the plane threshold  0.03         如果你希望更少的点被认为是属于平面的点，你可以减小`th_dist`的值。这将要求点到平面的距离更接近于阈值，才会被归类为平面上的点。
+  # 变大这将允许更大的点到平面的距离被认为是属于平面的点。这可以有助于将更多的点归类为平面上的点，从而更好地分割出平面区域。
+
+#直通滤波参数
+# PassThrough settings
+# general
+z_up: 0.7 # clip z up threshold (clip 截断)
+z_down: -2.0 # clip z down threshold (default: -1.0)
+# accelerate
+accel_x_max: 50
+accel_x_min: 0.5
+accel_y_max: 2
+accel_y_min: -2
+# track
+track_x_max: 50 # forward
+track_x_min: 0.1 # backward
+track_y_max: 10 # left
+track_y_min: -10 # right
+# skidpad (not in use)  （这里建议加上去）  这是个弧形 要加上去。
+skid_max: 30
+skid_min: 0.1
+skid_y_max: 70 #用不上
+skid_y_min: -70 # #用不上
+
+#通用选项
+road_type: 3 # {1:八字, 2:直线, 3:track_drive}
+vis: 0 # 可视化选项（包括：euc 和 bbox）；比赛时关闭以减少 CPU/网络开销
+
+#置信度
+# confidence settings
+# 以下都为开区间
+# skidpad mode ignores this
+# cone detection threshold
+cone_confidence_threshold: 0.5
+# max tilt angle for PCA verticality check (deg)
+max_tilt_angle: 25.0
+# cone height limits
+min_height: 0.05
+max_height: 0.35
+# area size limits
+min_area: 0.02
+max_area: 0.2025
+# bbox limits
+max_box_altitude: 0.05
+
+# P2-10: Dynamic ROI
+enable_dynamic_roi: true # enable speed/pitch adaptive ROI boundaries
+pitch_compensation: true # adjust z bounds by INS pitch
+speed_compensation: true # adjust x/y bounds by vehicle speed
+z_pitch_scale: 0.1 # z offset (m) per degree of pitch
+speed_x_scale: 0.5 # x_max extension (m) per m/s of speed
+speed_y_shrink: 0.1 # y range reduction (m) per m/s of speed
+min_roi_x_max: 20.0 # minimum x_max bound (m)
+max_roi_x_max: 60.0 # maximum x_max bound (m)
+
+# P2-12: Ground segmentation auto-tune
+enable_ground_autotune: true # dynamic th_dist/num_iter based on point cloud density
+dense_pc_threshold: 15000 # point count threshold for dense vs sparse
+dense_th_dist: 0.025 # th_dist for dense point clouds
+sparse_th_dist: 0.05 # th_dist for sparse point clouds
+dense_num_iter: 5 # num_iter for dense point clouds
+sparse_num_iter: 3 # num_iter for sparse point clouds
+
+# P2-13: Frame-level performance profiling
+enable_profiling: true # publish timing breakdown per frame
+
+# P1-2: Profiling auto-alarm thresholds
+profiling_warn_ms: 80.0 # WARN threshold for single-frame total time (ms)
+profiling_error_ms: 100.0 # ERROR threshold for single-frame total time (ms)
+profiling_warn_consecutive_threshold: 3 # consecutive WARN frames before persistent alarm
+
+# P3-1: Temporal accumulation for far cones
+enable_temporal_accumulation: true # merge far points from recent N frames before clustering
+accumulation_frames: 3 # number of frames to accumulate
+accumulation_min_distance: 15.0 # distance threshold (m) for accumulation
+accumulation_voxel_size: 0.1 # voxel leaf size (m) for downsampling after accumulation (0=disabled)
+
+# P3-3: Ground slope compensation
+enable_ground_slope_compensation: true # adjust th_seeds by INS pitch for slope roads
+slope_th_seeds_scale: 0.002 # th_seeds offset per degree of pitch
+slope_pitch_max: 15.0 # max abs(pitch) considered (deg)
+
+# P3-4: Frame-rate protection
+enable_frame_rate_protection: true # auto-reduce quality when frame time exceeds threshold
+frp_time_threshold_ms: 80.0 # total ms threshold to trigger protection
+frp_coarse_leaf_size: 0.08 # coarse voxel leaf size during protection
+frp_skip_sor: true # skip SOR during protection
+frp_reduce_num_iter: 2 # reduced num_iter during protection
+
+# P3-5: Cone type classification
+enable_cone_type_classification: true # classify cones as large/small/unknown
+large_min_height: 0.25 # minimum height for large cone
+large_min_area: 0.12 # minimum area for large cone
+small_max_height: 0.20 # maximum height for small cone
+small_max_area: 0.08 # maximum area for small cone
+
+# P4-1: Single-frame near-neighbor dedup (merge split clusters from distance-bin boundaries)
+enable_single_frame_dedup: true  # merge cones closer than radius in the same frame
+single_frame_dedup_radius: 0.5   # merge radius in meters (conservative: typical cone spacing > 1.5m)
+
+# GetConfidence penalty coefficients (tunable)
+conf_penalty_aspect: 2.0        # penalty for length/width exceeding height
+conf_penalty_over_max_accel: 0.05  # accel track: oversize penalty
+conf_penalty_height_over: 7.0   # track: height over max penalty coefficient
+conf_penalty_area_over: 2.0     # track: area over max penalty coefficient
+conf_penalty_height_under: 1.5  # height under min penalty coefficient
+conf_penalty_area_under: 2.0    # area under min penalty coefficient
+conf_penalty_tilt: 0.5          # tilt angle over max penalty coefficient
+
+# model settings  雷达线数
+sensor_model: 32 # velodyne product type
+ground_segmentation_strategy: svd
+
+# vlp16
+# str_range: "5,10,15,20"
+# str_seg_distance: "0.18,0.35,0.53,0.6,0.6"
+
+# vlp32    自适应欧时聚类 (P1 simplified: 3 bins instead of 5)
+str_range: "8,20" # distance thresholds (m)
+str_seg_distance: "0.15,0.4,0.6" # cluster tolerance for each bin
+length:
+  circle2lidar: 15.0

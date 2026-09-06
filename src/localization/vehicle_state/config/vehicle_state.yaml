@@ -1,0 +1,5 @@
+# 车辆状态参数
+ins_topic: /INS/ASENSING_INS
+vehicle_state_topic: /localization/vehicle_state
+# P1-E: 方位角初始化帧数（circular mean 采样），增大可减少首帧漂移影响
+azimuth_init_frames: 5

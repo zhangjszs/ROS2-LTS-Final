@@ -1,0 +1,39 @@
+# 锥桶融合参数
+# LiDAR 到 IMU/INS 的安装距离（沿车体 x 轴，单位 m）
+lidar_to_imu_dist: 1.87
+
+# 用于离群值剔除的车辆状态跳变检测阈值
+enable_vehicle_state_jump_check: true
+vehicle_state_base_jump_threshold: 2.0
+vehicle_state_speed_margin: 2.0
+vehicle_state_min_dt: 0.02
+vehicle_state_max_dt: 1.0
+vehicle_state_heading_threshold: 0.5
+
+# vehicle_state 环形缓存大小（用于最近邻时间匹配）
+max_buffer_size: 50
+
+# 视觉颜色注入（F4-P1-04）
+# 激活前提：
+#   1. 完成相机-LiDAR 联合标定，填入下方 cam_fx/fy/cx/cy/k1/k2 及 cam_offset_*
+#   2. vision_node 正常发布 /perception/vision/detections（autodrive_msgs::HUAT_VisionDetections）
+#   3. 将 enable_vision_color_injection 改为 true
+# 当 cam_fx/fy <= 0 时 InjectVisionColor 自动跳过，不影响正常运行
+enable_vision_color_injection: false
+vision_detections_topic: "/perception/vision/detections"
+vision_max_age_sec: 0.2        # vision 消息最大有效年龄（秒）
+vision_max_quality: 1          # 仅在 image_quality <= 此值时注入（0=GOOD, 1=DEGRADED）
+vision_match_pixel_dist: 80.0  # bbox 中心像素距离匹配阈值
+
+# 相机内参（针孔模型）：标定前保持为 0，为 0 时自动跳过投影
+cam_fx: 0.0   # 水平焦距（pixels）
+cam_fy: 0.0   # 垂直焦距（pixels）
+cam_cx: 0.0   # 主点 x（pixels）
+cam_cy: 0.0   # 主点 y（pixels）
+cam_k1: 0.0   # 径向畸变 k1（Brown-Conrady），标定后填入
+cam_k2: 0.0   # 径向畸变 k2，标定后填入
+
+# 相机相对 base_link 的安装偏移（m）；x=前向，y=左向，z=上向
+cam_offset_x: 0.0
+cam_offset_y: 0.0
+cam_offset_z: 1.2

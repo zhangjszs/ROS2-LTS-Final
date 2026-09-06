@@ -1,0 +1,39 @@
+# Colcon 默认配置 for FSAC 2026
+# 文件名: colcon_defaults.yaml (固定)
+# 位置: 工作空间根目录 (跟 src/ 同级)
+#
+# === 重要事实 (colcon_cmake 源码 line 312) ===
+# colcon 的包内 make 并行度 (-j N) 直接取自:
+#   - os.cpu_count() = nproc = 24  (你的机器)
+#   - 或者 MAKEFLAGS 环境变量
+# colcon 命令行 / defaults.yaml 没有 --make-args 这种参数
+# → 唯一降 -j 的方法: 临时设 MAKEFLAGS
+#
+# 本配置能控制:
+#   1. parallel-workers: 同时跑几个 colcon 包 (包级并发, colcon 自己加的)
+#   2. event-handlers:   日志格式
+#   3. packages-ignore:  跳过某些包
+#
+# 本配置不能控制:
+#   - 单包内 -j  (只能用 MAKEFLAGS 环境变量)
+
+build:
+  # 包级并发: 推荐 4 个包同时构建，避免 24 线程 * 6 包 = 144 进程争抢 19GB 物理内存
+  parallel-workers: 4
+
+  # 全局编译配置
+  cmake-args:
+    - -DCMAKE_BUILD_TYPE=Release
+    - -DCMAKE_CXX_STANDARD=20
+    - -DBUILD_TESTING=OFF
+    - -DCMAKE_LINKER_TYPE=MOLD
+    - -DCMAKE_C_COMPILER_LAUNCHER=ccache
+    - -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+
+  # 日志直接输出 (而不是 json), 方便实时看
+  event-handlers:
+    - console_direct+
+
+  # 不构建 hello_world 这种 demo 包
+  packages-ignore:
+    - hello_world

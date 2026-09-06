@@ -1,0 +1,7 @@
+# 安全监控配置
+planner_timeout: 0.5          # 超过此秒数未收到 pathlimits 则触发紧急停车
+pathlimits_topic: "/planning/pathlimits"
+vehicle_state_topic: "/localization/vehicle_state"
+stop_topic: "/system/stop"
+stop_request_topic: "/planning/track/stop_request"
+reset_stop_topic: ""          # 留空则禁用人工复位；设为话题名（如 /system/stop_reset）可启用 REQUEST_STOP 恢复

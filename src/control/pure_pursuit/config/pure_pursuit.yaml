@@ -1,0 +1,65 @@
+# pure_pursuit 控制器配置
+# =====================================
+
+# I/O 话题
+topics:
+  path: "/planning/pathlimits"
+  vehicle_state: "/localization/vehicle_state"
+  stop: "/system/stop"
+  vehicle_command: "/control/vehicle_command"
+  latency: "/debug/pure_pursuit/latency"
+  dropped_commands: "/debug/pure_pursuit/dropped_commands"
+
+# 系统设置
+system:
+  control_rate: 50.0
+  startup_delay: 0.0
+  racing_num: 1
+
+# 输入保护超时（秒）
+safety:
+  path_timeout: 0.5
+  state_timeout: 0.3
+
+# 转向/油门算法参数
+algorithm:
+  steering:
+    delta_max: 0.4
+    lookahead_base: 2.1
+    lookahead_speed_gain: 0.15
+    lookahead_curvature_gain: 0.5
+    lookahead_min: 1.0
+    pure_pursuit_gain: 3.1
+    filter_threshold: 0.2
+    filter_blend_ratio: 0.8
+    mapping:
+      deg_per_rad: 3.73
+      center_offset: 110
+      clamp_min: 0
+      clamp_max: 220
+
+  throttle:
+    target_speed: 2.0
+    pid_kp: 0.5
+    pid_ki: 0.1
+    pid_integral_max: 20.0
+    speed_low_threshold: 0.5
+    current_low_speed: 30
+    speed_high_threshold: 2.0
+    current_high_speed: 15
+    current_clamp_max: 30
+    speed_blend_zone: 0.3  # 速度边界过渡带宽度（m/s），0 = 硬切换
+    pedal_min: 0
+    pedal_max: 100
+
+  path_search:
+    # 前向搜索窗口大小（索引数）；首帧自动全量扫描
+    search_window: 50
+    # 大曲率时动态扩展的窗口上限
+    search_window_max: 150
+    # 允许向后回看的索引数（吸收定位跳变）
+    backtrack_window: 15
+    # 距路径末尾多少个点时触发减速停车
+    end_decel_points: 10
+    # 最近点横向/欧氏距离超过此值则硬刹，不跟踪飞点
+    max_crosstrack_m: 6.0

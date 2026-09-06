@@ -1,0 +1,39 @@
+# 锥桶去重与时序跟踪参数
+# 由 sensor_stack.launch 加载
+
+# 匹配
+cone_match_radius: 1.5          # 增加到 1.5m 以容忍 INS 漂移
+
+# 时序跟踪
+ema_alpha: 0.3
+max_miss_frames: 6              # TENTATIVE 锥桶允许丢失 0.6s
+min_track_frames: 2
+
+# Track Confirmation (N-out-of-M)
+confirmation_frames: 3          # 连续匹配 3 次确认（减少误确认）
+max_miss_frames_confirmed: 30   # CONFIRMED 锥桶允许丢失 3s（原 6 帧太短）
+
+# P1-5: 自适应 alpha
+enable_adaptive_alpha: true
+alpha_min: 0.1
+alpha_max: 0.5
+speed_ref: 15.0
+
+# P2-11: 滑动窗口
+enable_sliding_window: true
+sliding_window_radius: 30.0
+sliding_window_rear_radius: 60.0     # 后方半径: 保留身后锥桶更久，防止直线规划器后段断裂
+
+# P3-2: 卡尔曼滤波
+enable_kalman: true
+kf_q: 0.01
+kf_r: 0.1
+
+# P4-2: 新增锥桶近邻去重（防止未匹配输入被重复新增为tracked_cone）
+enable_insert_dedup: true
+
+# 空间门限：超过此距离的观测和 Track 将被忽略（米）
+max_tracking_distance: 20.0
+
+# 状态话题
+status_topic: /debug/cone_tracker/status

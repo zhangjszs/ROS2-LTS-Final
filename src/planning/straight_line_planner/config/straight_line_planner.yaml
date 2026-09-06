@@ -1,0 +1,47 @@
+# 直线规划器参数
+input_cone_map_topic: "/sensors/cones/fused"
+output_pathlimits_topic: "/planning/straight_line/pathlimits"
+
+# 赛道类型: 1=八字绕环, 2=直线/加速, 3=赛道行驶
+road_type: 2
+
+# 聚类: 丢弃在 base_link y 轴 +/- kCenterMargin 范围内的锥桶
+kCenterMargin: 0.3
+
+# RANSAC 直线拟合（含退化门控）
+ransac_inlier_threshold: 0.3
+ransac_max_iterations: 200
+ransac_min_x_spread: 0.5          # 拒绝 x 方向距离过近的 2 点采样（米）；稀疏锥桶场景 1.0 太严导致 200 次迭代全失效
+ransac_max_abs_slope: 0.3         # 拒绝 |dy/dx| 大于此值的"直线"赛道（实测积累缓冲侧向漂移会产生假斜率~0.4，需收紧）
+ransac_min_inliers: 3             # 良好拟合所需的绝对最小内点数
+ransac_min_inlier_ratio: 0.5      # 良好拟合所需的内点/总数比例
+
+# 霍夫变换（默认禁用；设为 true 可启用作为主要拟合器）
+enable_hough: false
+hough_threshold: 10
+hough_rho_resolution: 0.30        # rho 分辨率（米）；越大对噪声越宽容
+hough_min_inlier_ratio: 0.5       # 自适应投票阈值 = max(3, ceil(比例 * 锥桶数))
+
+# 时序滤波（EMA + 每侧跳变抑制）
+enable_temporal_filter: true
+temporal_filter_alpha: 0.3        # EMA 混合因子（0..1，越大越信任当前值）
+temporal_filter_jump_threshold: 0.4    # |斜率变化| 超过此值则拒绝当前帧，保持上一帧
+temporal_filter_intercept_jump: 2.5    # |截距变化|（米）超过此值则拒绝当前帧；假斜率已由 ransac_max_abs_slope=0.3 拦截，此处设 2.5 允许锥桶正常进出视野
+prev_max_age_frames: 10           # 连续保持上一帧拟合结果的最大帧数
+
+# 路径生成
+path_station_spacing: 0.5
+path_lookahead_distance: 30.0
+single_side_lookahead_distance: 10.0   # 仅检测到一侧时使用更短的前视距离
+lane_half_width: 1.5                   # 用于从单侧检测推导出中心线
+
+# 边界合理性门控（节点层）
+plausibility_max_abs_slope: 0.3
+plausibility_max_intercept_diff: 3.0   # 限制 width_at_origin <= 2 * 此值（FSAC 直线赛道实测约 4.5m，上限 6m）
+
+# 回退
+max_empty_messages_before_warn: 5
+
+# 锥桶积累（稀疏场景）
+accumulate_max_cones: 20          # 最大积累锥桶数
+accumulate_max_age_sec: 0.5       # position_base_link 坐标在车辆移动后失效，0.5s 内漂移约 1-3m 可接受

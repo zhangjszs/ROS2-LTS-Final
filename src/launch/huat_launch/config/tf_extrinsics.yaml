@@ -1,0 +1,9 @@
+# Pose of the Velodyne frame in base_link (INS / vehicle_state origin).
+# Must stay in sync with cone_fusion lidar_to_imu_dist (x) and lidar_cluster sensor_height (z).
+# Launch args on sensor_stack.launch override these numbers; this file is the documented source.
+lidar_x: 1.87
+lidar_y: 0.0
+lidar_z: 0.135
+lidar_yaw: 0.0    # rad
+lidar_pitch: 0.0  # rad
+lidar_roll: 0.0   # rad

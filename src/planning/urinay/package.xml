@@ -1,0 +1,22 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>urinay</name>
+  <version>1.0.0</version>
+  <description>使用 Delaunay 三角剖分和 Oriol 的魔法实现的终极赛道边界 + 中心线。</description>
+  <license>GPLv3</license>
+  <maintainer email="origovi2000@gmail.com">Oriol Gorriz</maintainer>
+  <author email="origovi2000@gmail.com">Oriol Gorriz</author>
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <depend>ament_index_cpp</depend>
+  <depend>common_msgs</depend>
+  <depend>rclcpp</depend>
+  <depend>sensor_msgs</depend>
+  <depend>std_msgs</depend>
+  <depend>tf2</depend>
+  <depend>tf2_geometry_msgs</depend>
+  <test_depend>ament_lint_auto</test_depend>
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

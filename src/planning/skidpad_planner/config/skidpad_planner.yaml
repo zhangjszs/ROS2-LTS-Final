@@ -1,0 +1,29 @@
+# Skidpad 规划器参数
+input_cone_map_topic: "/sensors/cones/fused"
+output_pathlimits_topic: "/planning/skidpad/pathlimits"
+vehicle_state_topic: "/localization/vehicle_state"
+
+# 赛道类型: 1=八字绕环, 2=直线/加速, 3=赛道行驶
+road_type: 1
+
+# 聚类
+center_margin: 0.3
+
+# ICP
+icp_max_iterations: 20
+icp_convergence_threshold: 0.001
+icp_rmse_limit: 0.3      # ICP rmse 超过此值时拒绝对齐，回退原始中心线
+
+# APF
+k_a: 0.5        # 吸引力增益
+k_r: 2.0        # 排斥力增益
+d_0: 2.0        # 排斥力场距离阈值
+apf_max_iterations: 10   # APF 每点最大迭代次数
+apf_step_limit: 0.2      # APF 每步最大位移（米）
+
+# 路径生成
+path_station_spacing: 0.5
+path_lookahead_distance: 20.0
+
+# 回退
+max_empty_messages_before_warn: 5

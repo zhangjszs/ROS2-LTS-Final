@@ -1,0 +1,24 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>huat_launch</name>
+  <version>0.0.0</version>
+  <description>HUAT 自动驾驶系统的集中式启动文件</description>
+  <maintainer email="huat@todo.todo">huat</maintainer>
+  <license>MIT</license>
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <exec_depend>cone_fusion</exec_depend>
+  <exec_depend>cone_tracker</exec_depend>
+  <exec_depend>fsac_viz</exec_depend>
+  <exec_depend>lidar_cluster</exec_depend>
+  <exec_depend>pure_pursuit</exec_depend>
+  <exec_depend>safety_monitor</exec_depend>
+  <exec_depend>skidpad_planner</exec_depend>
+  <exec_depend>straight_line_planner</exec_depend>
+  <exec_depend>urinay</exec_depend>
+  <exec_depend>vehicle_state</exec_depend>
+  <exec_depend>tf2_ros</exec_depend>
+  <exec_depend>topic_tools</exec_depend>
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

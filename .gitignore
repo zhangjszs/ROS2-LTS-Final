@@ -1,0 +1,102 @@
+# ============================================================
+# ROS 2 / Colcon Build Artifacts
+# ============================================================
+build/
+install/
+log/
+logs/
+.built_by
+COLCON_IGNORE
+
+# ROS 2 bag files & recorded data
+*.bag
+*.bag.active
+*.db3
+*.mcap
+
+# ============================================================
+# C++ / CMake Artifacts
+# ============================================================
+*.o
+*.so
+*.dylib
+*.a
+*.out
+*.exe
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+compile_commands.json
+Testing/Temporary/
+CTestTestfile.cmake
+
+# ============================================================
+# Python
+# ============================================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build_tmp/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+
+# Python virtual environments
+.env
+.venv/
+venv/
+env/
+
+# ============================================================
+# IDEs and Editors
+# ============================================================
+.vscode/
+.idea/
+.claude/
+.codex
+.trae/
+*.swp
+*.swo
+*~
+*.user
+*.pro.user
+*.sublime-project
+*.sublime-workspace
+*.code-workspace
+.history/
+
+# ============================================================
+# OS Files
+# ============================================================
+.DS_Store
+.DS_Store?._
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# ============================================================
+# Archives and Backups
+# ============================================================
+*.zip
+*.tar.gz
+*.tgz
+*.bak
+*.backup
+*.orig
+*.tmp
+*.temp
+
+# ============================================================
+# Agent / AI local workspace artifacts
+# ============================================================
+.antigravity/
+.gemini/
+.mimocode/
+.workbuddy/
