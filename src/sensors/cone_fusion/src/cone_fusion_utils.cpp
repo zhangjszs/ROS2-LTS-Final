@@ -3,9 +3,10 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <format>
+#include <iterator>
 #include <limits>
 #include <numbers>
-#include <sstream>
 #include <string>
 
 namespace cone_fusion_utils {
@@ -39,12 +40,10 @@ bool IsVehicleStateJumpAbnormal(const VehicleState& last_state, const VehicleSta
 
     if (distance_jump > allowed_distance_jump || heading_jump > heading_threshold) {
         if (reason) {
-            std::ostringstream oss;
-            oss << "dt=" << dt << "s"
-                << " distance_jump=" << distance_jump << "m"
-                << " allowed_distance_jump=" << allowed_distance_jump << "m"
-                << " heading_jump=" << heading_jump << "rad";
-            *reason = oss.str();
+            reason->clear();
+            std::format_to(std::back_inserter(*reason),
+                           "dt={}s distance_jump={}m allowed_distance_jump={}m heading_jump={}rad",
+                           dt, distance_jump, allowed_distance_jump, heading_jump);
         }
         return true;
     }

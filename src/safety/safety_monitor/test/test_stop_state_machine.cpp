@@ -141,6 +141,34 @@ TEST(StopStateMachineTest, FullCycle) {
     EXPECT_EQ(fsm.state(), StopState::IDLE);
 }
 
+// ── C++20 std::format tests ───────────────────────────────────────────────
+
+TEST(StopStateMachineFormatTest, FormatsStopStateCorrectly) {
+    EXPECT_EQ(std::format("{}", StopState::IDLE), "IDLE");
+    EXPECT_EQ(std::format("{}", StopState::TIMEOUT_STOP), "TIMEOUT_STOP");
+    EXPECT_EQ(std::format("{}", StopState::REQUEST_STOP), "REQUEST_STOP");
+    EXPECT_EQ(std::format("{:>15}", StopState::IDLE), "           IDLE");
+}
+
+TEST(StopStateMachineFormatTest, FormatsStopReasonCorrectly) {
+    EXPECT_EQ(std::format("{}", StopReason::NONE), "none");
+    EXPECT_EQ(std::format("{}", StopReason::TIMEOUT), "timeout");
+    EXPECT_EQ(std::format("{}", StopReason::REQUEST), "request");
+}
+
+TEST(StopStateMachineFormatTest, FormatsStopActionCorrectly) {
+    EXPECT_EQ(std::format("{}", StopAction::NONE), "NONE");
+    EXPECT_EQ(std::format("{}", StopAction::PUBLISH_STOP), "PUBLISH_STOP");
+    EXPECT_EQ(std::format("{}", StopAction::CLEAR_STOP), "CLEAR_STOP");
+}
+
+TEST(StopStateMachineFormatTest, FormatsCompositeDiagnosticString) {
+    StopState state = StopState::TIMEOUT_STOP;
+    StopReason reason = StopReason::TIMEOUT;
+    std::string diag = std::format("State is {}, Reason is {}", state, reason);
+    EXPECT_EQ(diag, "State is TIMEOUT_STOP, Reason is timeout");
+}
+
 int main(int argc, char** argv) {
     testing::InitGoogleTest(&argc, argv);
     return RUN_ALL_TESTS();

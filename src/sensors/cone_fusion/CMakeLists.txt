@@ -54,6 +54,7 @@ if(BUILD_TESTING)
   )
   target_link_libraries(test_cone_fusion_utils
     ${PROJECT_NAME}_utils
+    common_msgs::common_msgs
   )
 endif()
 

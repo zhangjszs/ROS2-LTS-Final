@@ -1,3 +1,4 @@
+#include <format>
 #include <diagnostic_msgs/msg/diagnostic_status.hpp>
 #include <diagnostic_updater/diagnostic_updater.hpp>
 #include <rclcpp/rclcpp.hpp>
@@ -12,7 +13,7 @@ class SafetyMonitor {
     SafetyMonitor() {
         node_ = rclcpp::Node::make_shared("safety_monitor");
 
-        double planner_timeout;
+        double planner_timeout = 0.5;
         std::string pathlimits_topic, vehicle_state_topic, stop_topic, stop_request_topic, reset_stop_topic;
 
         node_->declare_parameter("planner_timeout", 0.5);
@@ -48,7 +49,8 @@ class SafetyMonitor {
             sub_reset_ = node_->create_subscription<common_msgs::msg::HuatStop>(
                 reset_stop_topic, 1,
                 std::bind(&SafetyMonitor::OnResetStop, this, std::placeholders::_1));
-            RCLCPP_INFO(node_->get_logger(), "[safety_monitor] Manual reset enabled on: %s", reset_stop_topic.c_str());
+            RCLCPP_INFO(node_->get_logger(), "%s",
+                        std::format("[safety_monitor] Manual reset enabled on: {}", reset_stop_topic).c_str());
         }
         pub_stop_ = node_->create_publisher<common_msgs::msg::HuatStop>(stop_topic, 1);  // 锁存发布
 
@@ -58,10 +60,11 @@ class SafetyMonitor {
         diag_updater_->add("Safety Monitor Health", this, &SafetyMonitor::DiagnoseHealth);
         diag_updater_->setHardwareID("safety_monitor");
 
-        RCLCPP_INFO(node_->get_logger(),
-                    "[safety_monitor] Started (timeout=%.1fs, pathlimits=%s, stop=%s, stop_request=%s)", planner_timeout,
-                    pathlimits_topic.c_str(), stop_topic.c_str(),
-                    stop_request_topic.empty() ? "<disabled>" : stop_request_topic.c_str());
+        const std::string init_msg = std::format(
+            "[safety_monitor] Started (timeout={:.1f}s, pathlimits={}, stop={}, stop_request={})",
+            planner_timeout, pathlimits_topic, stop_topic,
+            stop_request_topic.empty() ? "<disabled>" : stop_request_topic);
+        RCLCPP_INFO(node_->get_logger(), "%s", init_msg.c_str());
         RCLCPP_INFO(node_->get_logger(),
                     "[safety_monitor] Timeout starts after first vehicle_state; empty pathlimits are not heartbeats");
     }
@@ -84,32 +87,28 @@ class SafetyMonitor {
         } else {
             StopState state = state_machine_.state();
             if (state == StopState::TIMEOUT_STOP) {
-                stat.summary(diagnostic_msgs::msg::DiagnosticStatus::ERROR, "Planner timeout stop active");
+                stat.summary(diagnostic_msgs::msg::DiagnosticStatus::ERROR,
+                             std::format("Planner timeout stop active (reason: {})", stop_reason_));
             } else if (state == StopState::REQUEST_STOP) {
-                stat.summary(diagnostic_msgs::msg::DiagnosticStatus::WARN, "Stop request active (race finished)");
+                stat.summary(diagnostic_msgs::msg::DiagnosticStatus::WARN,
+                             std::format("Stop request active (reason: {}, race finished)", stop_reason_));
             } else {
-                stat.summary(diagnostic_msgs::msg::DiagnosticStatus::OK, "Running");
+                stat.summary(diagnostic_msgs::msg::DiagnosticStatus::OK,
+                             std::format("Running (state: {})", state));
             }
         }
         stat.add("Stop active", stop_active_);
-        stat.add("Stop reason", StopReasonToString(stop_reason_));
-        stat.add("Current speed", current_speed_);
+        stat.add("Stop reason", std::format("{}", stop_reason_));
+        stat.add("Current speed", std::format("{:.2f} m/s", current_speed_));
         if (has_vehicle_state_) {
-            stat.add("Planner timeout remaining (s)",
-                     std::max(0.0, planner_timeout_.seconds() - (node_->now() - last_pathlimits_time_).seconds()));
+            const double remaining = std::max(0.0, planner_timeout_.seconds() - (node_->now() - last_pathlimits_time_).seconds());
+            stat.add("Planner timeout remaining (s)", std::format("{:.2f}", remaining));
         }
         stat.add("Has vehicle state", has_vehicle_state_);
     }
 
-    static const char *StopReasonToString(StopReason reason) {
-        switch (reason) {
-            case StopReason::TIMEOUT:
-                return "timeout";
-            case StopReason::REQUEST:
-                return "request";
-            default:
-                return "none";
-        }
+    static constexpr const char *StopReasonToString(StopReason reason) noexcept {
+        return to_string_view(reason).data();
     }
 
     void OnPathLimits(const common_msgs::msg::HuatPathLimits::ConstSharedPtr &msg) {
@@ -121,7 +120,8 @@ class SafetyMonitor {
         has_nonempty_pathlimits_ = true;
         auto result = state_machine_.onPathReceived();
         if (result.action == StopAction::CLEAR_STOP) {
-            RCLCPP_INFO(node_->get_logger(), "[safety_monitor] Planner resumed, clearing timeout stop");
+            RCLCPP_INFO(node_->get_logger(), "%s",
+                        std::format("[safety_monitor] Planner resumed (action: {}), clearing timeout stop", result.action).c_str());
             publishStop(false);
         }
     }
@@ -138,7 +138,9 @@ class SafetyMonitor {
         if (msg->stop) {
             auto result = state_machine_.onStopRequested();
             if (result.action == StopAction::PUBLISH_STOP) {
-                RCLCPP_WARN(node_->get_logger(), "[safety_monitor] Stop request received (race finished), publishing stop");
+                RCLCPP_WARN(node_->get_logger(), "%s",
+                            std::format("[safety_monitor] Stop request received (action: {}, reason: {}, race finished), publishing stop",
+                                        result.action, result.reason).c_str());
                 publishStop(true, StopReason::REQUEST);
             }
         }
@@ -148,7 +150,9 @@ class SafetyMonitor {
         if (!msg->stop) {
             auto result = state_machine_.onManualReset();
             if (result.action == StopAction::CLEAR_STOP) {
-                RCLCPP_WARN(node_->get_logger(), "[safety_monitor] Manual reset received, clearing REQUEST_STOP, returning to IDLE");
+                RCLCPP_WARN(node_->get_logger(), "%s",
+                            std::format("[safety_monitor] Manual reset received (action: {}), clearing REQUEST_STOP, returning to IDLE",
+                                        result.action).c_str());
                 publishStop(false);
             }
         }
@@ -162,9 +166,10 @@ class SafetyMonitor {
         if (elapsed > planner_timeout_) {
             auto result = state_machine_.onTimeoutExpired();
             if (result.action == StopAction::PUBLISH_STOP) {
-                RCLCPP_WARN(node_->get_logger(),
-                            "[safety_monitor] Planner timeout (%.1fs since last non-empty pathlimits), publishing stop",
-                            elapsed.seconds());
+                const std::string warn_msg = std::format(
+                    "[safety_monitor] Planner timeout ({:.1f}s since last non-empty pathlimits, limit: {:.1f}s), publishing stop (reason: {})",
+                    elapsed.seconds(), planner_timeout_.seconds(), result.reason);
+                RCLCPP_WARN(node_->get_logger(), "%s", warn_msg.c_str());
                 publishStop(true, StopReason::TIMEOUT);
             }
         }
