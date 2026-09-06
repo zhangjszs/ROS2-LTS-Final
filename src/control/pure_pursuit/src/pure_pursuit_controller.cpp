@@ -173,8 +173,8 @@ int PurePursuitController::GetGoalIndex() {
     return nearest.idx;
 }
 
-int PurePursuitController::GetLookaheadIndices(int current_idx, double lookahead, const vector<double> &refx,
-                                               const vector<double> &refy) {
+int PurePursuitController::GetLookaheadIndices(int current_idx, double lookahead, std::span<const double> refx,
+                                               std::span<const double> refy) {
     if (current_idx < 0 || refx.empty()) {
         return 0;
     }
@@ -201,7 +201,7 @@ int PurePursuitController::GetLookaheadIndices(int current_idx, double lookahead
 void PurePursuitController::ComputeControlCommand(common_msgs::msg::HuatControlCommand &cmd,
                                                   common_msgs::msg::HuatVehicleCmd &finall_cmd) {
     rclcpp::Time now = node_->now();
-    GuardResult guard = input_guard_.check(now, last_state_time_, last_path_time_, refx_.empty(), stop_requested_,
+    GuardResult guard = input_guard_.check(now, last_state_time_, last_path_time_, refx_, stop_requested_,
                                            has_received_state_, has_received_path_);
     if (guard.decision != GuardDecision::PROCEED) {
         RCLCPP_WARN_THROTTLE(node_->get_logger(), *node_->get_clock(), 1000, "[pure_pursuit] %s, braking", guard.reason);

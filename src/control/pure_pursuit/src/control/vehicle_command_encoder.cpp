@@ -31,6 +31,18 @@ void VehicleCommandEncoder::setHeader(common_msgs::msg::HuatVehicleCmd& cmd) {
     cmd.length = 10;
 }
 
+uint16_t VehicleCommandEncoder::computeChecksum(std::span<const uint8_t> payload) {
+    uint32_t sum = 0;
+    for (uint8_t byte : payload) {
+        sum += byte;
+    }
+    return static_cast<uint16_t>(sum & 0xFFFF);
+}
+
+bool VehicleCommandEncoder::verifyChecksum(std::span<const uint8_t> payload, uint16_t expected_checksum) {
+    return computeChecksum(payload) == expected_checksum;
+}
+
 uint16_t VehicleCommandEncoder::computeChecksum(const common_msgs::msg::HuatVehicleCmd& cmd) {
     return static_cast<uint16_t>(cmd.steering + cmd.brake_force + cmd.pedal_ratio + cmd.gear_position +
                                  cmd.working_mode + cmd.racing_num + cmd.racing_status);

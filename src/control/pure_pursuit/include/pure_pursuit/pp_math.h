@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <span>
 #include <string>
 #include <vector>
 
@@ -13,8 +14,8 @@ inline int clampKappaIdx(int idx, int n) {
     return std::max(1, std::min(idx, n - 2));
 }
 
-// 三点法曲率估算：κ = 2*area / (|ab|*|bc|*|ca|)
-inline double estimateCurvature(const std::vector<double>& refx, const std::vector<double>& refy, int idx) {
+// 三点法曲率估算：κ = 2*area / (|ab|*|bc|*|ca|) (C++20 std::span 零拷贝视图)
+inline double estimateCurvature(std::span<const double> refx, std::span<const double> refy, int idx) {
     const int n = static_cast<int>(refx.size());
     if (n < 3 || idx < 1 || idx >= n - 1)
         return 0.0;
@@ -40,8 +41,8 @@ struct NearestIndexResult {
     double dist_sq = 0.0;
 };
 
-// 在 [search_start, search_end) 内找距 (cx, cy) 最近的路径点。
-inline NearestIndexResult findNearestIndex(const std::vector<double>& refx, const std::vector<double>& refy, double cx,
+// 在 [search_start, search_end) 内找距 (cx, cy) 最近的路径点 (C++20 std::span 零拷贝视图)
+inline NearestIndexResult findNearestIndex(std::span<const double> refx, std::span<const double> refy, double cx,
                                            double cy, int search_start, int search_end) {
     NearestIndexResult result;
     const int n = static_cast<int>(refx.size());

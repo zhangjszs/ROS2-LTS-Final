@@ -9,6 +9,7 @@
 
 #include <cmath>
 #include <memory>
+#include <span>
 #include <string>
 #include <vector>
 
@@ -43,8 +44,8 @@ class PurePursuitController {
 
    private:
     int GetGoalIndex();
-    int GetLookaheadIndices(int current_idx, double lookahead, const std::vector<double>& refx,
-                            const std::vector<double>& refy);
+    int GetLookaheadIndices(int current_idx, double lookahead, std::span<const double> refx,
+                            std::span<const double> refy);
     double EstimatePathCurvature(int idx) const;
 
     rclcpp::Node::SharedPtr node_;

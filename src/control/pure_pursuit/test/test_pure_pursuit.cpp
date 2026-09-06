@@ -318,6 +318,53 @@ TEST(PurePursuitGeometry, StraightAheadProducesZeroDelta) {
     EXPECT_NEAR(delta, 0.0, 1e-12);
 }
 
+// ── C++20 std::span tests ──────────────────────────────────────────────────
+
+TEST(SpanAdoption, EstimateCurvatureWithRawCArray) {
+    // 验证原生静态数组 double[] 能够无需构造 vector 直接传入 estimateCurvature
+    const double raw_x[] = {0.0, 1.0, 2.0, 3.0, 4.0};
+    const double raw_y[] = {0.0, 0.0, 0.0, 0.0, 0.0};
+    double kappa = pp_math::estimateCurvature(raw_x, raw_y, 2);
+    EXPECT_NEAR(kappa, 0.0, 1e-9);
+}
+
+TEST(SpanAdoption, FindNearestIndexWithStdArrayAndSubspan) {
+    // 验证 std::array 及其 subspan() 切片零拷贝查找
+    const std::array<double, 5> arr_x = {0.0, 10.0, 20.0, 30.0, 40.0};
+    const std::array<double, 5> arr_y = {0.0, 0.0, 0.0, 0.0, 0.0};
+    std::span<const double> full_span_x(arr_x);
+    std::span<const double> full_span_y(arr_y);
+    auto sub_x = full_span_x.subspan(1, 3);  // 10.0, 20.0, 30.0
+    auto sub_y = full_span_y.subspan(1, 3);
+    auto res = pp_math::findNearestIndex(sub_x, sub_y, 19.5, 0.0, 0, 3);
+    EXPECT_EQ(res.idx, 1);  // sub_x[1] = 20.0
+}
+
+TEST(SpanAdoption, InputGuardSpanOverload) {
+    InputGuard guard(0.5, 0.5);
+    rclcpp::Time now(10, 0);
+    rclcpp::Time last_state(10, 0);
+    rclcpp::Time last_path(10, 0);
+
+    const double points_x[] = {1.0, 2.0, 3.0};
+    std::span<const double> span_x(points_x);
+    auto res = guard.check(now, last_state, last_path, span_x, false, true, true);
+    EXPECT_EQ(res.decision, GuardDecision::PROCEED);
+
+    std::span<const double> empty_span;
+    auto res_empty = guard.check(now, last_state, last_path, empty_span, false, true, true);
+    EXPECT_EQ(res_empty.decision, GuardDecision::SOFT_BRAKE);
+    EXPECT_STREQ(res_empty.reason, "Path is empty");
+}
+
+TEST(SpanAdoption, VehicleCommandEncoderPayloadChecksum) {
+    const uint8_t payload[] = {0xAA, 0x55, 0x01, 0x02, 0x03};
+    uint16_t checksum = VehicleCommandEncoder::computeChecksum(payload);
+    EXPECT_EQ(checksum, static_cast<uint16_t>(0xAA + 0x55 + 0x01 + 0x02 + 0x03));
+    EXPECT_TRUE(VehicleCommandEncoder::verifyChecksum(payload, checksum));
+    EXPECT_FALSE(VehicleCommandEncoder::verifyChecksum(payload, static_cast<uint16_t>(checksum + 1)));
+}
+
 int main(int argc, char** argv) {
     testing::InitGoogleTest(&argc, argv);
     return RUN_ALL_TESTS();

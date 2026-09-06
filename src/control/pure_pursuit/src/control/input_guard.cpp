@@ -4,6 +4,13 @@ InputGuard::InputGuard(double state_timeout, double path_timeout)
     : state_timeout_(state_timeout), path_timeout_(path_timeout) {}
 
 GuardResult InputGuard::check(const rclcpp::Time& now, const rclcpp::Time& last_state_time, const rclcpp::Time& last_path_time,
+                              std::span<const double> path_x, bool stop_requested, bool has_received_state,
+                              bool has_received_path) const {
+    return check(now, last_state_time, last_path_time, path_x.empty(), stop_requested, has_received_state,
+                 has_received_path);
+}
+
+GuardResult InputGuard::check(const rclcpp::Time& now, const rclcpp::Time& last_state_time, const rclcpp::Time& last_path_time,
                               bool path_empty, bool stop_requested, bool has_received_state,
                               bool has_received_path) const {
     if (stop_requested) {
