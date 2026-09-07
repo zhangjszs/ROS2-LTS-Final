@@ -6,8 +6,10 @@
 
 #include <Eigen/Dense>
 #include <Eigen/SVD>
+#include <algorithm>
 #include <cmath>
 #include <limits>
+#include <ranges>
 
 namespace {
 
@@ -23,7 +25,7 @@ static std::pair<std::vector<skidpad::Point2D>, std::vector<skidpad::Point2D>> F
     }
 
     // 将 tgt 构建为 PCL 点云并建 KD-tree
-    pcl::PointCloud<pcl::PointXY>::Ptr tgt_cloud(new pcl::PointCloud<pcl::PointXY>);
+    auto tgt_cloud = std::make_shared<pcl::PointCloud<pcl::PointXY>>();
     tgt_cloud->points.reserve(tgt.size());
     for (const auto& q : tgt) {
         pcl::PointXY pt;
@@ -140,14 +142,12 @@ void IcpApfPlanner::ClusterCones(const std::vector<common_msgs::msg::HuatCone>& 
                                  std::vector<common_msgs::msg::HuatCone>& right) {
     left.clear();
     right.clear();
-    for (const auto& c : cones) {
-        double y = c.position_base_link.y;
-        if (y < -center_margin_) {
-            left.push_back(c);
-        } else if (y > center_margin_) {
-            right.push_back(c);
-        }
-    }
+    std::ranges::copy_if(cones, std::back_inserter(left),
+                         [this](float y) { return y < -center_margin_; },
+                         [](const common_msgs::msg::HuatCone& c) { return c.position_base_link.y; });
+    std::ranges::copy_if(cones, std::back_inserter(right),
+                         [this](float y) { return y > center_margin_; },
+                         [](const common_msgs::msg::HuatCone& c) { return c.position_base_link.y; });
 }
 
 std::vector<Point2D> IcpApfPlanner::ComputeCenterline(const std::vector<common_msgs::msg::HuatCone>& left,
@@ -167,19 +167,16 @@ std::vector<Point2D> IcpApfPlanner::ComputeCenterline(const std::vector<common_m
     ordered.reserve(centerline.size());
     std::vector<bool> used(centerline.size(), false);
     auto take_nearest = [&](double x0, double y0) -> int {
-        int best = -1;
-        double best_d = std::numeric_limits<double>::max();
-        for (size_t i = 0; i < centerline.size(); ++i) {
-            if (used[i])
-                continue;
-            double dx = centerline[i].x - x0, dy = centerline[i].y - y0;
-            double d = dx * dx + dy * dy;
-            if (d < best_d) {
-                best_d = d;
-                best = static_cast<int>(i);
-            }
-        }
-        return best;
+        auto unused_indices = std::views::iota(size_t{0}, centerline.size())
+                            | std::views::filter([&used](size_t i) { return !used[i]; });
+        auto it = std::ranges::min_element(unused_indices, {}, [&](size_t i) {
+            const double dx = centerline[i].x - x0;
+            const double dy = centerline[i].y - y0;
+            return dx * dx + dy * dy;
+        });
+        if (it == unused_indices.end())
+            return -1;
+        return static_cast<int>(*it);
     };
     int start = take_nearest(0.0, 0.0);
     while (start >= 0) {
@@ -205,10 +202,9 @@ std::vector<Point2D> IcpApfPlanner::ComputeCenterline(const std::vector<common_m
     std::vector<Point2D> result;
     result.reserve(deduped.size());
     const double lookahead_sq = path_lookahead_ * path_lookahead_;
-    for (const auto& p : deduped) {
-        if (p.x * p.x + p.y * p.y <= lookahead_sq)
-            result.push_back(p);
-    }
+    std::ranges::copy_if(deduped, std::back_inserter(result),
+        [lookahead_sq](double d2) { return d2 <= lookahead_sq; },
+        [](const Point2D& p) { return p.x * p.x + p.y * p.y; });
     return result;
 }
 
@@ -406,11 +402,11 @@ std::vector<Point2D> IcpApfPlanner::TransformPoints(const std::vector<Point2D>& 
                                                     double ty) {
     std::vector<Point2D> result;
     result.reserve(points.size());
-    double c = std::cos(rotation);
-    double s = std::sin(rotation);
-    for (const auto& p : points) {
-        result.emplace_back(c * p.x - s * p.y + tx, s * p.x + c * p.y + ty);
-    }
+    const double c = std::cos(rotation);
+    const double s = std::sin(rotation);
+    std::ranges::transform(points, std::back_inserter(result), [c, s, tx, ty](const Point2D& p) {
+        return Point2D(c * p.x - s * p.y + tx, s * p.x + c * p.y + ty);
+    });
     return result;
 }
 
@@ -419,23 +415,19 @@ Point2D IcpApfPlanner::ComputeApfForce(const Point2D& p, const std::vector<Point
                                        const std::vector<common_msgs::msg::HuatCone>& right) {
     Point2D force;
 
-    // 1. 朝向中心线的吸引力
+    // 1. 朝向中心线的吸引力：使用 std::ranges::min_element 配合距离投影
     if (!centerline.empty()) {
-        double min_dist = std::numeric_limits<double>::max();
-        Point2D nearest;
-        for (const auto& c : centerline) {
-            double dx = p.x - c.x;
-            double dy = p.y - c.y;
-            double dist = dx * dx + dy * dy;
-            if (dist < min_dist) {
-                min_dist = dist;
-                nearest = c;
-            }
-        }
-        min_dist = std::sqrt(min_dist);
+        auto nearest_it = std::ranges::min_element(centerline, {}, [&](const Point2D& c) {
+            const double dx = p.x - c.x;
+            const double dy = p.y - c.y;
+            return dx * dx + dy * dy;
+        });
+        const double dx = p.x - nearest_it->x;
+        const double dy = p.y - nearest_it->y;
+        const double min_dist = std::sqrt(dx * dx + dy * dy);
         if (min_dist > 1e-6) {
-            force.x += -k_a_ * (p.x - nearest.x);
-            force.y += -k_a_ * (p.y - nearest.y);
+            force.x += -k_a_ * dx;
+            force.y += -k_a_ * dy;
         }
     }
 

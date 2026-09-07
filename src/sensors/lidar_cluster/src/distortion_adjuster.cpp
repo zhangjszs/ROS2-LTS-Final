@@ -19,7 +19,7 @@ void DistortionAdjuster::SetMotionInfo(float scan_period, ImuData velocity_data)
 
 void DistortionAdjuster::AdjustCloud(pcl::PointCloud<PointType>::Ptr &input_cloud_ptr,
                                      pcl::PointCloud<PointType>::Ptr &output_cloud_ptr) {
-    output_cloud_ptr.reset(new pcl::PointCloud<PointType>);
+    output_cloud_ptr = std::make_shared<pcl::PointCloud<PointType>>();
     if (!input_cloud_ptr || input_cloud_ptr->points.empty()) {
         return;
     }
@@ -28,7 +28,7 @@ void DistortionAdjuster::AdjustCloud(pcl::PointCloud<PointType>::Ptr &input_clou
     constexpr float kTwoPi = 2.0f * kPi;
     float orientation_space = kTwoPi;
     float delete_space = 5.0f * kPi / 180.0f;
-    float start_orientation = atan2(origin_cloud_ptr->points[0].y, origin_cloud_ptr->points[0].x);
+    float start_orientation = std::atan2(origin_cloud_ptr->points[0].y, origin_cloud_ptr->points[0].x);
     Eigen::AngleAxisf t_V(start_orientation, Eigen::Vector3f::UnitZ());
     Eigen::Matrix3f rotate_matrix = t_V.matrix();
     Eigen::Matrix4f transform_matrix = Eigen::Matrix4f::Identity();
@@ -39,13 +39,13 @@ void DistortionAdjuster::AdjustCloud(pcl::PointCloud<PointType>::Ptr &input_clou
     angular_rate_ = rotate_matrix * angular_rate_;
 
     for (size_t point_index = 1; point_index < origin_cloud_ptr->points.size(); ++point_index) {
-        float orientation = atan2(origin_cloud_ptr->points[point_index].y, origin_cloud_ptr->points[point_index].x);
+        float orientation = std::atan2(origin_cloud_ptr->points[point_index].y, origin_cloud_ptr->points[point_index].x);
         if (orientation < 0.0f)
             orientation += kTwoPi;
 
         if (orientation < delete_space || kTwoPi - orientation < delete_space)
             continue;
-        float real_time = fabs(orientation) / orientation_space * scan_period_ - scan_period_ / 2.0;
+        float real_time = std::abs(orientation) / orientation_space * scan_period_ - scan_period_ / 2.0f;
         Eigen::Vector3f origin_point(origin_cloud_ptr->points[point_index].x, origin_cloud_ptr->points[point_index].y,
                                      origin_cloud_ptr->points[point_index].z);
 

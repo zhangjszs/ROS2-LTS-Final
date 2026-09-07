@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.8)
+cmake_minimum_required(VERSION 3.16)
 project(urinay)
 
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
@@ -53,8 +53,21 @@ install(DIRECTORY include/ DESTINATION include)
 install(DIRECTORY launch config DESTINATION share/${PROJECT_NAME})
 
 if(BUILD_TESTING)
-  find_package(ament_lint_auto REQUIRED)
-  ament_lint_auto_find_test_dependencies()
+  find_package(ament_cmake_gtest REQUIRED)
+  ament_add_gtest(test_point_concepts test/test_point_concepts.cpp)
+  target_link_libraries(test_point_concepts ${PROJECT_NAME})
+
+  ament_add_gtest(test_kdtree_concepts test/test_kdtree_concepts.cpp)
+  target_link_libraries(test_kdtree_concepts ${PROJECT_NAME})
+
+  ament_add_gtest(test_way test/test_way.cpp)
+  target_link_libraries(test_way ${PROJECT_NAME})
+
+  ament_add_gtest(test_race_director test/test_race_director.cpp)
+  target_link_libraries(test_race_director ${PROJECT_NAME})
+
+  ament_add_gtest(test_three_way_comparison test/test_three_way_comparison.cpp)
+  target_link_libraries(test_three_way_comparison ${PROJECT_NAME})
 endif()
 
 ament_package()

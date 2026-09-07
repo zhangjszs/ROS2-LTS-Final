@@ -35,7 +35,7 @@ void UrinayVisualizer::init(rclcpp::Node::SharedPtr node, const UrinayParams::Vi
 void UrinayVisualizer::visualize(const TriangleSet &triSet) const {
     if (not this->params_.publish_markers)
         return;
-    if (trianglesPub->get_subscription_count() == 0)
+    if (!trianglesPub || trianglesPub->get_subscription_count() == 0)
         return;
 
     visualization_msgs::msg::MarkerArray ma;
@@ -99,7 +99,7 @@ void UrinayVisualizer::visualize(const TriangleSet &triSet) const {
 void UrinayVisualizer::visualize(const EdgeSet &edgeSet) const {
     if (not this->params_.publish_markers)
         return;
-    if (midpointsPub->get_subscription_count() == 0)
+    if (!midpointsPub || midpointsPub->get_subscription_count() == 0)
         return;
 
     visualization_msgs::msg::MarkerArray ma;
@@ -131,7 +131,7 @@ void UrinayVisualizer::visualize(const EdgeSet &edgeSet) const {
 void UrinayVisualizer::visualize(const Way &way) const {
     if (not this->params_.publish_markers)
         return;
-    if (wayPub->get_subscription_count() == 0)
+    if (!wayPub || wayPub->get_subscription_count() == 0)
         return;
 
     visualization_msgs::msg::MarkerArray ma;

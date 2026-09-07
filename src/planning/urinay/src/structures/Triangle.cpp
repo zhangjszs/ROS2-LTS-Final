@@ -14,8 +14,9 @@
 
 uint64_t Triangle::computeHash(const Node &n0, const Node &n1, const Node &n2) {
     // 此处需要排序；具有相同节点但顺序不同的两个三角形必须具有相同的哈希值。
-    std::vector<uint64_t> ids = {n0.id, n1.id, n2.id};
-    std::sort(ids.begin(), ids.end(), std::greater<uint64_t>());
+    // 使用 std::array 替代 std::vector，彻底消除三角形高频构建时的堆内存分配开销
+    std::array<uint64_t, 3> ids = {n0.id, n1.id, n2.id};
+    std::ranges::sort(ids, std::greater<uint64_t>{});
     return (ids[0] << (2 * HASH_SHIFT_NUM)) + (ids[1] << HASH_SHIFT_NUM) + ids[2];
 }
 
@@ -23,23 +24,15 @@ uint64_t Triangle::computeHash(const Node &n0, const Node &n1, const Node &n2) {
 
 Triangle::Triangle(const Node &n0, const Node &n1, const Node &n2)
     : nodes{n0, n1, n2},
-      circumCircle_(n0, n1, n2),
       edges{Edge(n0, n1), Edge(n1, n2), Edge(n0, n2)},
+      circumCircle_(n0, n1, n2),
       hash_(computeHash(n0, n1, n2)) {}
 
 Triangle::Triangle(const Edge &e, const Node &n)
     : nodes{e.n0, e.n1, n},
-      circumCircle_(e.n0, e.n1, n),
       edges{Edge(e.n0, e.n1), Edge(e.n1, n), Edge(e.n0, n)},
+      circumCircle_(e.n0, e.n1, n),
       hash_(computeHash(e.n0, e.n1, n)) {}
-
-bool Triangle::operator==(const Triangle &t) const {
-    return this->hash_ == t.hash_;
-}
-
-bool Triangle::operator!=(const Triangle &t) const {
-    return not(*this == t);
-}
 
 bool Triangle::containsNode(const Node &n) const {
     return this->nodes[0] == n or this->nodes[1] == n or this->nodes[2] == n;

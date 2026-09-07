@@ -114,6 +114,57 @@ TEST(FindNearestIndex, CrosstrackDistanceIsReported) {
     EXPECT_NEAR(r.dist_sq, 100.0, 1e-9);
 }
 
+// ── pp_math::findLookaheadIndex (折线累加流式管道测试) ──────────────────────
+
+TEST(FindLookaheadIndex, AccumulatesAlongPolyline) {
+    // 路径点间距为 1.0m：(0,0), (1,0), (2,0), (3,0), (4,0)
+    std::vector<double> rx = {0.0, 1.0, 2.0, 3.0, 4.0};
+    std::vector<double> ry = {0.0, 0.0, 0.0, 0.0, 0.0};
+    // 从 idx=0 开始，lookahead=2.5m，应累积走过 1.0 + 1.0 = 2.0m (到达 idx=2)，再走 1.0m 超过 2.5m，最终停在 idx=2
+    int idx = pp_math::findLookaheadIndex(rx, ry, 0, 2.5);
+    EXPECT_EQ(idx, 2);
+
+    // lookahead=3.0m，刚好到达 idx=3
+    EXPECT_EQ(pp_math::findLookaheadIndex(rx, ry, 0, 3.0), 3);
+}
+
+TEST(FindLookaheadIndex, ZeroLookaheadReturnsCurrent) {
+    std::vector<double> rx = {0.0, 1.0, 2.0};
+    std::vector<double> ry = {0.0, 0.0, 0.0};
+    EXPECT_EQ(pp_math::findLookaheadIndex(rx, ry, 1, 0.0), 1);
+}
+
+TEST(FindLookaheadIndex, ExceedsPathLengthClampsToEnd) {
+    std::vector<double> rx = {0.0, 1.0, 2.0};
+    std::vector<double> ry = {0.0, 0.0, 0.0};
+    // 超过路径总长，应停在最后一个索引 2
+    EXPECT_EQ(pp_math::findLookaheadIndex(rx, ry, 0, 100.0), 2);
+}
+
+// ── pp_math::findLookaheadIndexEuclidean (欧氏距离 filter & transform 管道测试) ──
+
+TEST(FindLookaheadIndexEuclidean, FiltersPointsBeyondLookahead) {
+    // 点距离 (0,0) 的距离分别为 0, 1, 2, 3, 4
+    std::vector<double> rx = {0.0, 1.0, 2.0, 3.0, 4.0};
+    std::vector<double> ry = {0.0, 0.0, 0.0, 0.0, 0.0};
+    // lookahead=2.5m，首个距离 >= 2.5m 的点是 idx=3 (dist=3.0m)
+    int idx = pp_math::findLookaheadIndexEuclidean(rx, ry, 0, 2.5);
+    EXPECT_EQ(idx, 3);
+}
+
+TEST(FindLookaheadIndexEuclidean, DiagonalPath) {
+    // 对角线路径：(0,0), (3,4) 距离 5m
+    std::vector<double> rx = {0.0, 3.0, 6.0};
+    std::vector<double> ry = {0.0, 4.0, 8.0};
+    EXPECT_EQ(pp_math::findLookaheadIndexEuclidean(rx, ry, 0, 4.0), 1);
+}
+
+TEST(FindLookaheadIndexEuclidean, BeyondEndReturnsLast) {
+    std::vector<double> rx = {0.0, 1.0};
+    std::vector<double> ry = {0.0, 0.0};
+    EXPECT_EQ(pp_math::findLookaheadIndexEuclidean(rx, ry, 0, 50.0), 1);
+}
+
 TEST(IsBaseLinkFrame, RecognizesBaseLink) {
     EXPECT_TRUE(pp_math::isBaseLinkFrame("base_link"));
     EXPECT_FALSE(pp_math::isBaseLinkFrame("map"));

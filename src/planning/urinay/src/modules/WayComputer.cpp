@@ -59,8 +59,8 @@ double WayComputer::getHeuristic(const Point &actPos, const Point &nextPos, cons
 
     double angle = Vector(actPos, nextPos).angleWith(dir);
     constexpr double kHalfPi = std::numbers::pi_v<double> / 2.0;
-    double angleHeur = -log(
-        std::max(1e-9, ((kHalfPi - abs(angle)) / kHalfPi) - 0.2));  //这个计算过程的目的是将夹角越接近0，启发式函数值越大
+    double angleHeur = -std::log(
+        std::max(1e-9, ((kHalfPi - std::abs(angle)) / kHalfPi) - 0.2));  //这个计算过程的目的是将夹角越接近0，启发式函数值越大
 
     return params.heur_dist_ponderation * distHeur + (1 - params.heur_dist_ponderation) * angleHeur;
 }
@@ -84,7 +84,7 @@ bool WayComputer::shouldExcludeEdge(const Edge &candidate, const Edge *actEdge, 
     if (candidate == *actEdge)
         return true;
     // 2. 夹角过大
-    if (abs(dir.angleWith(Vector(actPos, candidate.midPoint()))) > params.max_angle_diff)
+    if (std::abs(dir.angleWith(Vector(actPos, candidate.midPoint()))) > params.max_angle_diff)
         return true;
     // 3. 路径中已存在但不是闭环边
     if (not this->way_.closesLoopWith(candidate) and (not actTrace or not actTrace->isLoopClosed()) and
@@ -220,7 +220,7 @@ size_t WayComputer::treeSearch(std::vector<HeurInd> &nextEdges, const KDTree &mi
         cua.pop();
 
         bool trace_at_max_height = false;
-        if (t.size() >= params.max_search_tree_height)
+        if (params.max_search_tree_height > 0 && t.size() >= static_cast<size_t>(params.max_search_tree_height))
             trace_at_max_height = true;
         else
             this->findNextEdges(nextEdges, &t, midpointsKDT, edges, params);
@@ -251,7 +251,7 @@ void WayComputer::computeWay(const std::vector<Edge> &edges, const UrinayParams:
     this->findNextEdges(nextEdges, nullptr, midpointsKDT, edges, params);
 
     while (rclcpp::ok() and not nextEdges.empty() and
-           (!params.max_way_horizon_size or this->way_.sizeAheadOfCar() <= params.max_way_horizon_size)) {
+           (params.max_way_horizon_size <= 0 or this->way_.sizeAheadOfCar() <= static_cast<uint32_t>(params.max_way_horizon_size))) {
         size_t nextEdgeInd = this->treeSearch(nextEdges, midpointsKDT, edges, params);
         this->way_.addEdge(edges[nextEdgeInd]);
 

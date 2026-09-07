@@ -9,6 +9,7 @@
 #include <atomic>
 #include <limits>
 #include <mutex>
+#include <span>
 #include <string>
 #include <vector>
 
@@ -92,22 +93,22 @@ class ConeDedup {
 
     void ApplyPositionUpdate(TrackedCone &tc, double obs_x, double obs_y, double obs_z,
                              const common_msgs::msg::HuatCone &src, const rclcpp::Time &stamp, double alpha);
-    std::vector<size_t> FilterInputByDistance(const std::vector<common_msgs::msg::HuatCone> &cones,
+    std::vector<size_t> FilterInputByDistance(std::span<const common_msgs::msg::HuatCone> cones,
                                               int &culled_count) const;
-    std::vector<std::vector<double>> BuildCostMatrix(const std::vector<size_t> &valid_idx,
-                                                     const std::vector<common_msgs::msg::HuatCone> &cones, int n_tracks,
+    std::vector<std::vector<double>> BuildCostMatrix(std::span<const size_t> valid_idx,
+                                                     std::span<const common_msgs::msg::HuatCone> cones, int n_tracks,
                                                      double inf_cost) const;
     void UpdateUnmatchedExistingTracks(const std::vector<bool> &matched_existing, size_t original_size,
                                        const rclcpp::Time &stamp);
     int RemoveStaleTracks();
     void CollectConfirmedCones(common_msgs::msg::HuatMap &out) const;
-    void ProcessUnmatchedInputs(const std::vector<size_t> &valid_input_idx,
-                                const std::vector<common_msgs::msg::HuatCone> &cones, std::vector<bool> &matched_input,
+    void ProcessUnmatchedInputs(std::span<const size_t> valid_input_idx,
+                                std::span<const common_msgs::msg::HuatCone> cones, std::vector<bool> &matched_input,
                                 std::vector<bool> &matched_existing, const rclcpp::Time &stamp, double alpha,
                                 double radius_sq, MatchDiagStats &stats);
-    void ProcessMatchedPairs(const std::vector<size_t> &valid_input_idx,
-                             const std::vector<common_msgs::msg::HuatCone> &cones, const std::vector<int> &assignment,
-                             const std::vector<std::vector<double>> &cost_mat, std::vector<bool> &matched_existing,
+    void ProcessMatchedPairs(std::span<const size_t> valid_input_idx,
+                             std::span<const common_msgs::msg::HuatCone> cones, std::span<const int> assignment,
+                             std::span<const std::vector<double>> cost_mat, std::vector<bool> &matched_existing,
                              std::vector<bool> &matched_input, const rclcpp::Time &stamp, double alpha,
                              MatchDiagStats &stats);
     void PublishStatus(size_t input_size, const MatchDiagStats &stats, size_t published_count);

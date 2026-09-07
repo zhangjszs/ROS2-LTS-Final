@@ -15,6 +15,7 @@
 
 #include <Eigen/Geometry>
 #include <cmath>
+#include <compare>
 #include <iostream>
 
 #include <common_msgs/msg/huat_cone.hpp>
@@ -28,6 +29,12 @@
  *（位置和 ID）。
  */
 class Node {
+   public:
+    /**
+     * @brief 节点的 ID，原则上由锥桶追踪器给出。
+     */
+    const uint32_t id;
+
    private:
     /**
      * @brief 超级三角形的节点必须有一个 ID，这个 ID 不能干扰
@@ -43,11 +50,6 @@ class Node {
     static uint32_t superTriangleNodeNum;
 
     /**
-     * @brief 该节点是否属于超级三角形。
-     */
-    const bool belongsToSuperTriangle_;
-
-    /**
      * @brief 局部坐标系下的锥桶点。
      * **注意** 它是 mutable（可变的）。
      * 表示该变量是可变的（mutable）。即使在一个常量成员函数中，这个可变变量也可以被修改。
@@ -60,6 +62,11 @@ class Node {
     const Point pointGlobal_;
 
     /**
+     * @brief 该节点是否属于超级三角形。
+     */
+    const bool belongsToSuperTriangle_;
+
+    /**
      * @brief 构造一个新的 Node 对象，该对象将作为超级三角形。
      *
      * @param[in] x
@@ -68,10 +75,6 @@ class Node {
     Node(const double &x, const double &y);
 
    public:
-    /**
-     * @brief 节点的 ID，原则上由锥桶追踪器给出。
-     */
-    const uint32_t id;
 
     /**
      * @brief 构造一个新的 Node 对象。
@@ -102,18 +105,21 @@ class Node {
     const double &y() const;
 
     /**
-     * @brief 比较运算符。当且仅当两个节点的 ID 相同时，它们相等。
-     *
-     * @param[in] n
+     * @brief C++20 宇宙飞船操作符 <=>。
+     * 当且仅当两个节点的 ID 相同时判定相同/顺序，返回 std::strong_ordering 全序。
+     * 自动合成 <, <=, >, >=。
      */
-    bool operator==(const Node &n) const;
+    [[nodiscard]] constexpr std::strong_ordering operator<=>(const Node &n) const noexcept {
+        return this->id <=> n.id;
+    }
 
     /**
-     * @brief 比较运算符的否定。
-     *
-     * @param[in] n
+     * @brief 比较运算符。当且仅当两个节点的 ID 相同时，它们相等。
+     * C++20 自动合成 != 运算符。
      */
-    bool operator!=(const Node &n) const;
+    [[nodiscard]] constexpr bool operator==(const Node &n) const noexcept {
+        return this->id == n.id;
+    }
 
     /**
      * @brief 返回一个局部坐标为 (x, y) 的超级三角形节点。

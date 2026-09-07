@@ -16,7 +16,7 @@ uint32_t Node::superTriangleNodeNum = 0;
 /* ----------------------------- 私有方法 ---------------------------- */
 
 Node::Node(const double &x, const double &y)
-    : point_(x, y), id(SUPERTRIANGLE_BASEID + superTriangleNodeNum), belongsToSuperTriangle_(true) {
+    : id(SUPERTRIANGLE_BASEID + superTriangleNodeNum), point_(x, y), belongsToSuperTriangle_(true) {
     superTriangleNodeNum++;
     superTriangleNodeNum %= 3;
 }
@@ -24,7 +24,7 @@ Node::Node(const double &x, const double &y)
 /* ----------------------------- 公有方法 ----------------------------- */
 
 Node::Node(const double &x, const double &y, const double &xGlobal, const double &yGlobal, const uint32_t &id)
-    : point_(x, y), pointGlobal_(xGlobal, yGlobal), id(id), belongsToSuperTriangle_(false) {
+    : id(id), point_(x, y), pointGlobal_(xGlobal, yGlobal), belongsToSuperTriangle_(false) {
     if (this->id >= (1 << HASH_SHIFT_NUM) - 3)
         RCLCPP_ERROR(rclcpp::get_logger("urinay"), "[urinay] Cone ID exceeds allowed threshold, check utils/constants.hpp/HASH_SHIFT_NUM");
 }
@@ -38,14 +38,6 @@ const double &Node::x() const {
 
 const double &Node::y() const {
     return this->point_.y;
-}
-
-bool Node::operator==(const Node &n) const {
-    return n.id == this->id;
-}
-
-bool Node::operator!=(const Node &n) const {
-    return not(*this == n);
 }
 
 Node Node::superTriangleNode(const double &x, const double &y) {
@@ -73,7 +65,7 @@ double Node::distSq(const Point &p) const {
 }
 
 double Node::angleWith(const Node &n0, const Node &n1) const {
-    return abs(Vector(this->point(), n0.point()).angleWith(Vector(this->point(), n1.point())));
+    return std::abs(Vector(this->point(), n0.point()).angleWith(Vector(this->point(), n1.point())));
 }
 
 common_msgs::msg::HuatCone Node::cone() const {

@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.8)
+cmake_minimum_required(VERSION 3.16)
 project(vehicle_state)
 
 set(CMAKE_CXX_STANDARD 20)

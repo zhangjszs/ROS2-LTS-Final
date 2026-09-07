@@ -1,6 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <array>
 #include <cmath>
+#include <span>
 #include <vector>
 
 #include "cone_dedup_algo.h"
@@ -8,6 +10,7 @@
 using cone_dedup_algo::ComputeDynamicAlpha;
 using cone_dedup_algo::FilterIndicesByRadiusSq;
 using cone_dedup_algo::HungarianAssign;
+using cone_dedup_algo::Point2D;
 
 static constexpr double kInfCost = 1e9;
 
@@ -86,6 +89,28 @@ TEST(HungarianAssignTest, ClassicAssignment) {
     EXPECT_EQ(result[2], 0);
 }
 
+TEST(HungarianAssignTest, FlatMatrixEquivalentTo2D) {
+    // 验证展平的一维连续内存版本与二维 vector 版本结果严格一致
+    std::vector<std::vector<double>> cost_2d = {{4, 1}, {2, 3}};
+    std::vector<double> cost_flat = {4, 1, 2, 3};
+    auto res_2d = HungarianAssign(cost_2d, kInfCost);
+    auto res_flat = HungarianAssign(cost_flat, 2, 2, kInfCost);
+    ASSERT_EQ(res_flat.size(), res_2d.size());
+    for (size_t i = 0; i < res_2d.size(); ++i) {
+        EXPECT_EQ(res_flat[i], res_2d[i]);
+    }
+
+    // 矩形矩阵测试
+    std::vector<std::vector<double>> cost_rect_2d = {{1, 10}, {10, 1}, {5, 5}};
+    std::vector<double> cost_rect_flat = {1, 10, 10, 1, 5, 5};
+    auto res_rect_2d = HungarianAssign(cost_rect_2d, kInfCost);
+    auto res_rect_flat = HungarianAssign(cost_rect_flat, 3, 2, kInfCost);
+    ASSERT_EQ(res_rect_flat.size(), res_rect_2d.size());
+    for (size_t i = 0; i < res_rect_2d.size(); ++i) {
+        EXPECT_EQ(res_rect_flat[i], res_rect_2d[i]);
+    }
+}
+
 // ── ComputeDynamicAlpha ────────────────────────────────────────────────────
 
 TEST(ComputeDynamicAlphaTest, DisabledReturnsFallback) {
@@ -145,6 +170,47 @@ TEST(FilterIndicesByRadiusSq, CulledIndicesAreSkippedByUnmatchedLoop) {
     EXPECT_TRUE(visited[0]);
     EXPECT_FALSE(visited[1]);
     EXPECT_TRUE(visited[2]);
+}
+
+TEST(FilterIndicesByRadiusSq, StdArraySupport) {
+    // C++20 std::span 零开销兼容固定大小栈容器 std::array
+    std::array<double, 3> xs = {0.0, 10.0, 1.0};
+    std::array<double, 3> ys = {0.0, 0.0, 0.0};
+    auto idx = FilterIndicesByRadiusSq(xs, ys, 0.0, 0.0, 4.0);
+    ASSERT_EQ(idx.size(), 2u);
+    EXPECT_EQ(idx[0], 0u);
+    EXPECT_EQ(idx[1], 2u);
+}
+
+TEST(FilterIndicesByRadiusSq, RawArraySupport) {
+    // C++20 std::span 自动退化推导 C 语言原始数组，安全传递大小
+    double xs[] = {0.0, 10.0, 1.0};
+    double ys[] = {0.0, 0.0, 0.0};
+    auto idx = FilterIndicesByRadiusSq(xs, ys, 0.0, 0.0, 4.0);
+    ASSERT_EQ(idx.size(), 2u);
+    EXPECT_EQ(idx[0], 0u);
+    EXPECT_EQ(idx[1], 2u);
+}
+
+TEST(FilterIndicesByRadiusSq, SubspanSupport) {
+    // 验证利用 std::span::subspan 进行零拷贝切片过滤
+    std::vector<double> xs = {999.0, 0.0, 10.0, 1.0, 999.0};
+    std::vector<double> ys = {999.0, 0.0, 0.0, 0.0, 999.0};
+    std::span<const double> xs_sub(xs.data() + 1, 3);
+    std::span<const double> ys_sub(ys.data() + 1, 3);
+    auto idx = FilterIndicesByRadiusSq(xs_sub, ys_sub, 0.0, 0.0, 4.0);
+    ASSERT_EQ(idx.size(), 2u);
+    EXPECT_EQ(idx[0], 0u);
+    EXPECT_EQ(idx[1], 2u);
+}
+
+TEST(FilterIndicesByRadiusSq, Point2DSupport) {
+    // 验证 Point2D 结构体视图接口
+    std::vector<Point2D> points = {{0.0, 0.0}, {10.0, 0.0}, {1.0, 0.0}};
+    auto idx = FilterIndicesByRadiusSq(points, 0.0, 0.0, 4.0);
+    ASSERT_EQ(idx.size(), 2u);
+    EXPECT_EQ(idx[0], 0u);
+    EXPECT_EQ(idx[1], 2u);
 }
 
 int main(int argc, char** argv) {

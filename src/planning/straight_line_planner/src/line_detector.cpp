@@ -4,6 +4,7 @@
 #include <cmath>
 #include <numbers>
 #include <random>
+#include <ranges>
 
 LineDetector::LineDetector(const LineDetectorConfig& cfg) : cfg_(cfg) {}
 
@@ -11,14 +12,12 @@ void LineDetector::ClusterCones(const std::vector<common_msgs::msg::HuatCone>& c
                                 std::vector<common_msgs::msg::HuatCone>& left, std::vector<common_msgs::msg::HuatCone>& right) {
     left.clear();
     right.clear();
-    for (const auto& c : cones) {
-        double y = c.position_base_link.y;
-        if (y < -cfg_.center_margin) {
-            left.push_back(c);
-        } else if (y > cfg_.center_margin) {
-            right.push_back(c);
-        }
-    }
+    std::ranges::copy_if(cones, std::back_inserter(left),
+                         [this](float y) { return y < -cfg_.center_margin; },
+                         [](const common_msgs::msg::HuatCone& c) { return c.position_base_link.y; });
+    std::ranges::copy_if(cones, std::back_inserter(right),
+                         [this](float y) { return y > cfg_.center_margin; },
+                         [](const common_msgs::msg::HuatCone& c) { return c.position_base_link.y; });
 }
 
 LineParams LineDetector::HoughFit(const std::vector<common_msgs::msg::HuatCone>& cones) {
@@ -51,19 +50,29 @@ LineParams LineDetector::HoughFit(const std::vector<common_msgs::msg::HuatCone>&
         }
     }
 
-    // 3x1 沿 rho 邻域投票累加 -> 容忍锥桶噪声
-    int best_t = -1, best_r = -1;
-    int best_votes = 0;
+    // 3x1 沿 rho 邻域投票累加 -> 容忍锥桶噪声，使用 std::ranges::max_element 配合成员投影寻找投票峰值
+    struct HoughVoteCandidate {
+        int t;
+        int r;
+        int votes;
+    };
+    std::vector<HoughVoteCandidate> candidates;
+    candidates.reserve(static_cast<size_t>(theta_bins) * static_cast<size_t>(std::max(0, rho_bins - 2)));
     for (int t = 0; t < theta_bins; ++t) {
         for (int r = 1; r < rho_bins - 1; ++r) {
             int s = accumulator[t][r - 1] + accumulator[t][r] + accumulator[t][r + 1];
-            if (s > best_votes) {
-                best_votes = s;
-                best_t = t;
-                best_r = r;
-            }
+            candidates.push_back({t, r, s});
         }
     }
+
+    if (candidates.empty()) {
+        return LineParams();
+    }
+
+    auto best_cand = std::ranges::max_element(candidates, {}, &HoughVoteCandidate::votes);
+    int best_t = best_cand->t;
+    int best_r = best_cand->r;
+    int best_votes = best_cand->votes;
 
     int dynamic_min = static_cast<int>(std::ceil(cfg_.hough_min_inlier_ratio * static_cast<double>(cones.size())));
     int adaptive_thresh = std::max(3, dynamic_min);
@@ -92,12 +101,12 @@ LineParams LineDetector::HoughFit(const std::vector<common_msgs::msg::HuatCone>&
 bool LineDetector::IsLineGood(const LineParams& line, const std::vector<common_msgs::msg::HuatCone>& cones, double thresh) {
     if (!line.valid || cones.empty())
         return false;
-    int inliers = 0;
-    for (const auto& c : cones) {
-        if (PointToLineDistance(c.position_base_link, line.slope, line.intercept) < thresh) {
-            ++inliers;
-        }
-    }
+    auto inliers = std::ranges::count_if(
+        cones,
+        [thresh](double d) { return d < thresh; },
+        [&](const common_msgs::msg::HuatCone& c) {
+            return PointToLineDistance(c.position_base_link, line.slope, line.intercept);
+        });
     if (inliers < cfg_.ransac_min_inliers)
         return false;
     double ratio = static_cast<double>(inliers) / static_cast<double>(cones.size());
@@ -131,11 +140,12 @@ LineParams LineDetector::RansacFit(const std::vector<common_msgs::msg::HuatCone>
             continue;
         double b = p1.y - m * p1.x;
 
-        size_t inliers = 0;
-        for (const auto& c : cones) {
-            if (PointToLineDistance(c.position_base_link, m, b) < cfg_.ransac_inlier_threshold)
-                ++inliers;
-        }
+        size_t inliers = static_cast<size_t>(std::ranges::count_if(
+            cones,
+            [this](double d) { return d < cfg_.ransac_inlier_threshold; },
+            [&](const common_msgs::msg::HuatCone& c) {
+                return PointToLineDistance(c.position_base_link, m, b);
+            }));
         if (inliers > best_inliers) {
             best_inliers = inliers;
             best = LineParams(m, b);
@@ -150,11 +160,15 @@ LineParams LineDetector::RansacFit(const std::vector<common_msgs::msg::HuatCone>
     // 用最佳内点集做最小二乘精化，比直接返回两点采样直线更准
     std::vector<common_msgs::msg::HuatCone> inlier_cones;
     inlier_cones.reserve(best_inliers);
-    for (const auto& c : cones) {
-        if (PointToLineDistance(c.position_base_link, best.slope, best.intercept) < cfg_.ransac_inlier_threshold) {
-            inlier_cones.push_back(c);
-        }
-    }
+    std::ranges::copy_if(
+        cones, std::back_inserter(inlier_cones),
+        [this](double d) { return d < cfg_.ransac_inlier_threshold; },
+        [&best](const common_msgs::msg::HuatCone& c) {
+            return PointToLineDistance(c.position_base_link, best.slope, best.intercept);
+        });
+    // 使用 std::ranges::sort 按 x 坐标投影排序，保证最小二乘计算具有确定性的数值稳定性
+    std::ranges::sort(inlier_cones, {}, [](const common_msgs::msg::HuatCone& c) { return c.position_base_link.x; });
+
     if (static_cast<int>(inlier_cones.size()) >= cfg_.ransac_min_inliers) {
         LineParams refined = LeastSquaresFit(inlier_cones);
         if (refined.valid)

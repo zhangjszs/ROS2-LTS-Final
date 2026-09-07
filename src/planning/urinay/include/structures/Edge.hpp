@@ -10,6 +10,7 @@
 
 #pragma once
 
+#include <compare>
 #include "structures/Node.hpp"
 #include "utils/constants.hpp"
 
@@ -17,6 +18,17 @@
  * @brief 表示三角形的一条边，并包含所有相关信息。
  */
 class Edge {
+   public:
+    /**
+     * @brief 一条边由两个节点定义（其点构成一条边）。
+     */
+    const Node n0, n1;
+
+    /**
+     * @brief 边的长度。
+     */
+    const double len;
+
    private:
     /**
      * @brief 边的唯一哈希值。哈希值使用节点的 ID 计算得出。
@@ -41,15 +53,6 @@ class Edge {
     friend class std::hash<Edge>;
 
    public:
-    /**
-     * @brief 一条边由两个节点定义（其点构成一条边）。
-     */
-    const Node n0, n1;
-
-    /**
-     * @brief 边的长度。
-     */
-    const double len;
 
     /**
      * @brief 构造一个新的 Edge 对象。
@@ -60,18 +63,21 @@ class Edge {
     Edge(const Node &n0, const Node &n1);
 
     /**
-     * @brief 比较运算符。如果两条边的哈希值相同，则它们相等。
-     *
-     * @param[in] e
+     * @brief C++20 宇宙飞船操作符 <=>。
+     * 根据边的唯一哈希值 hash_ 进行全序三路比较，返回 std::strong_ordering。
+     * 自动合成 <, <=, >, >=，使 Edge 可直接用于 std::ranges::sort、std::set 等有序容器。
      */
-    bool operator==(const Edge &e) const;
+    [[nodiscard]] constexpr std::strong_ordering operator<=>(const Edge &e) const noexcept {
+        return this->hash_ <=> e.hash_;
+    }
 
     /**
-     * @brief 比较运算符的否定。
-     *
-     * @param[in] e
+     * @brief 比较运算符。如果两条边的哈希值相同，则它们相等。
+     * C++20 自动合成 != 运算符。
      */
-    bool operator!=(const Edge &e) const;
+    [[nodiscard]] constexpr bool operator==(const Edge &e) const noexcept {
+        return this->hash_ == e.hash_;
+    }
 
     /**
      * @brief 更新两个节点的局部坐标。

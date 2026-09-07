@@ -24,7 +24,7 @@ class SkidpadPlannerNode {
     void PublishEmptyPathLimits();
     void PublishPrevPath(const std::vector<Point2D>& prev_path_bl);
     bool IsPrevPathFrozen(const std::vector<Point2D>& prev_path_bl) const;
-    geometry_msgs::msg::Point MakePoint(double x, double y, double z);
+    static geometry_msgs::msg::Point MakePoint(double x, double y, double z);
 
     // 将锥桶的 position_global 转换到当前帧的 position_base_link
     void UpdateBaseLinkCoords(std::vector<common_msgs::msg::HuatCone>& cones) const;

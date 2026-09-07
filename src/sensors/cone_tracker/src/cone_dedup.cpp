@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <limits>
+#include <span>
 
 #include "cone_dedup_algo.h"
 
@@ -226,7 +227,7 @@ void ConeDedup::ApplyPositionUpdate(TrackedCone &tc, double obs_x, double obs_y,
     tc.last_update = stamp;
 }
 
-std::vector<size_t> ConeDedup::FilterInputByDistance(const std::vector<common_msgs::msg::HuatCone> &cones,
+std::vector<size_t> ConeDedup::FilterInputByDistance(std::span<const common_msgs::msg::HuatCone> cones,
                                                      int &culled_count) const {
     if (!has_car_state_) {
         std::vector<size_t> valid(cones.size());
@@ -247,8 +248,8 @@ std::vector<size_t> ConeDedup::FilterInputByDistance(const std::vector<common_ms
     return valid;
 }
 
-std::vector<std::vector<double>> ConeDedup::BuildCostMatrix(const std::vector<size_t> &valid_idx,
-                                                            const std::vector<common_msgs::msg::HuatCone> &cones,
+std::vector<std::vector<double>> ConeDedup::BuildCostMatrix(std::span<const size_t> valid_idx,
+                                                            std::span<const common_msgs::msg::HuatCone> cones,
                                                             int n_tracks, double inf_cost) const {
     int n_in = static_cast<int>(valid_idx.size());
     // PCL FLANN nearestKSearch 返回的 point_dist 是平方距离，门限也需用平方半径比较（F2-P2-03）
@@ -276,8 +277,8 @@ std::vector<std::vector<double>> ConeDedup::BuildCostMatrix(const std::vector<si
     return cost_mat;
 }
 
-void ConeDedup::ProcessUnmatchedInputs(const std::vector<size_t> &valid_input_idx,
-                                       const std::vector<common_msgs::msg::HuatCone> &cones,
+void ConeDedup::ProcessUnmatchedInputs(std::span<const size_t> valid_input_idx,
+                                       std::span<const common_msgs::msg::HuatCone> cones,
                                        std::vector<bool> &matched_input, std::vector<bool> &matched_existing,
                                        const rclcpp::Time &stamp, double alpha, double radius_sq, MatchDiagStats &stats) {
     int anomaly_log_count = 0;
@@ -400,10 +401,10 @@ void ConeDedup::CollectConfirmedCones(common_msgs::msg::HuatMap &out) const {
     }
 }
 
-void ConeDedup::ProcessMatchedPairs(const std::vector<size_t> &valid_input_idx,
-                                    const std::vector<common_msgs::msg::HuatCone> &cones,
-                                    const std::vector<int> &assignment,
-                                    const std::vector<std::vector<double>> &cost_mat,
+void ConeDedup::ProcessMatchedPairs(std::span<const size_t> valid_input_idx,
+                                    std::span<const common_msgs::msg::HuatCone> cones,
+                                    std::span<const int> assignment,
+                                    std::span<const std::vector<double>> cost_mat,
                                     std::vector<bool> &matched_existing, std::vector<bool> &matched_input,
                                     const rclcpp::Time &stamp, double alpha, MatchDiagStats &stats) {
     int n_in = static_cast<int>(valid_input_idx.size());

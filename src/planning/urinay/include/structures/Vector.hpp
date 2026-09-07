@@ -23,6 +23,9 @@ class Vector : public Point {
      */
     Vector() = default;
 
+    [[nodiscard]] constexpr auto operator<=>(const Vector &) const noexcept = default;
+    [[nodiscard]] constexpr bool operator==(const Vector &) const noexcept = default;
+
     /**
      * @brief 从两个点构造一个新的 Vector 对象。
      *

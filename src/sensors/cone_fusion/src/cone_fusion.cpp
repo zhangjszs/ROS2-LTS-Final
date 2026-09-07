@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <chrono>
 #include <functional>
+#include <ranges>
 
 ConeFusion::ConeFusion(rclcpp::Node::SharedPtr node)
     : node_(node), diag_updater_(node) {
@@ -14,6 +15,14 @@ ConeFusion::ConeFusion(rclcpp::Node::SharedPtr node)
     node_->declare_parameter("vehicle_state_heading_threshold", 0.5);
     node_->declare_parameter("lidar_to_imu_dist", 1.87);
 
+    // C++20 锥桶流式清洗过滤参数
+    node_->declare_parameter("enable_cone_filtering", true);
+    node_->declare_parameter("min_cone_distance", 0.5);
+    node_->declare_parameter("max_cone_distance", 30.0);
+    node_->declare_parameter("min_fov_rad", -2.0);
+    node_->declare_parameter("max_fov_rad", 2.0);
+    node_->declare_parameter("min_confidence", 10);
+
     node_->get_parameter("enable_vehicle_state_jump_check", enable_vehicle_state_jump_check_);
     node_->get_parameter("vehicle_state_base_jump_threshold", vehicle_state_base_jump_threshold_);
     node_->get_parameter("vehicle_state_speed_margin", vehicle_state_speed_margin_);
@@ -21,6 +30,13 @@ ConeFusion::ConeFusion(rclcpp::Node::SharedPtr node)
     node_->get_parameter("vehicle_state_max_dt", vehicle_state_max_dt_);
     node_->get_parameter("vehicle_state_heading_threshold", vehicle_state_heading_threshold_);
     node_->get_parameter("lidar_to_imu_dist", lidar_to_imu_dist_);
+
+    node_->get_parameter("enable_cone_filtering", enable_cone_filtering_);
+    node_->get_parameter("min_cone_distance", min_cone_distance_);
+    node_->get_parameter("max_cone_distance", max_cone_distance_);
+    node_->get_parameter("min_fov_rad", min_fov_rad_);
+    node_->get_parameter("max_fov_rad", max_fov_rad_);
+    node_->get_parameter("min_confidence", min_confidence_);
 
     std::string input_cones_topic;
     std::string vehicle_state_topic;
@@ -206,11 +222,40 @@ void ConeFusion::OnSyncedMessages(const common_msgs::msg::HuatConeCluster::Const
     common_msgs::msg::HuatMap transformed_map;
     transformed_map.header = cones->header;
     transformed_map.header.frame_id = "map";
-    pcl::PointCloud<pcl::PointXYZ>::Ptr global_cloud(new pcl::PointCloud<pcl::PointXYZ>);
+    auto global_cloud = std::make_shared<pcl::PointCloud<pcl::PointXYZ>>();
     std::vector<uint8_t> lidar_sizes;
     lidar_sizes.reserve(cones->points.size());
 
-    for (size_t i = 0; i < cones->points.size(); i++) {
+    const double min_dist_sq = min_cone_distance_ * min_cone_distance_;
+    const double max_dist_sq = max_cone_distance_ * max_cone_distance_;
+    const size_t total_points = cones->points.size();
+
+    // C++20 惰性流式清洗流水线：按需组合距离、视场角和置信度过滤，无中间 vector 堆分配
+    auto indices = std::views::iota(size_t{0}, total_points);
+
+    auto valid_cone_indices = indices
+        | std::views::filter([&](size_t i) {
+            const auto &p = cones->points[i];
+            return std::isfinite(p.x) && std::isfinite(p.y) && std::isfinite(p.z);
+        })
+        | std::views::filter([&](size_t i) {
+            if (!enable_cone_filtering_) return true;
+            const auto &p = cones->points[i];
+            const double d2 = p.x * p.x + p.y * p.y;
+            return d2 >= min_dist_sq && d2 <= max_dist_sq;
+        })
+        | std::views::filter([&](size_t i) {
+            if (!enable_cone_filtering_) return true;
+            const auto &p = cones->points[i];
+            const double angle = std::atan2(p.y, p.x);
+            return angle >= min_fov_rad_ && angle <= max_fov_rad_;
+        })
+        | std::views::filter([&](size_t i) {
+            if (!enable_cone_filtering_) return true;
+            return ConfidenceToPercent(*cones, i) >= static_cast<uint32_t>(min_confidence_);
+        });
+
+    for (size_t i : valid_cone_indices) {
         Eigen::Vector2d local_xy(cones->points[i].x, cones->points[i].y);
         Eigen::Vector2d global_xy = R * local_xy + T;
 

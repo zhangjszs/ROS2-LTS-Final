@@ -6,7 +6,7 @@
 #include <rclcpp/rclcpp.hpp>
 #include <tf2/LinearMath/Quaternion.hpp>
 #include <tf2/LinearMath/Transform.hpp>
-#include <tf2_ros/transform_broadcaster.h>
+#include <tf2_ros/transform_broadcaster.hpp>
 
 #include <iostream>
 #include <string>
@@ -31,15 +31,15 @@ class VehicleStateEstimator {
     rclcpp::Subscription<common_msgs::msg::HuatASENSING>::SharedPtr ins_sub_;
 
     /**
+     * @brief ros节点
+     */
+    rclcpp::Node::SharedPtr node_;
+
+    /**
      * @brief 发布转换过的话题：/Carstate
      */
     rclcpp::Publisher<common_msgs::msg::HuatCarstate>::SharedPtr state_pub_;
     tf2_ros::TransformBroadcaster tf_broadcaster_;
-
-    /**
-     * @brief ros节点
-     */
-    rclcpp::Node::SharedPtr node_;
 
     /**
      * @brief 用于存储经纬度转换为东北天坐标系的x,y,z

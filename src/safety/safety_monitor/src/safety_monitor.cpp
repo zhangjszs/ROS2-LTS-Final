@@ -1,4 +1,6 @@
 #include <format>
+#include <stop_token>
+#include <thread>
 #include <diagnostic_msgs/msg/diagnostic_status.hpp>
 #include <diagnostic_updater/diagnostic_updater.hpp>
 #include <rclcpp/rclcpp.hpp>
@@ -69,16 +71,59 @@ class SafetyMonitor {
                     "[safety_monitor] Timeout starts after first vehicle_state; empty pathlimits are not heartbeats");
     }
 
+    ~SafetyMonitor() {
+        stopWatchdog();
+    }
+
+    /**
+     * @brief 启动后台安全看门狗监控线程。
+     * 使用 C++20 std::jthread 实现 RAII 生命周期管理与协作式中断（std::stop_token）。
+     */
+    void startWatchdog() {
+        if (watchdog_thread_.joinable()) {
+            return;
+        }
+        watchdog_thread_ = std::jthread([this](std::stop_token st) {
+            watchdogLoop(st);
+        });
+        RCLCPP_INFO(node_->get_logger(),
+                    "[safety_monitor] Background safety watchdog started via std::jthread");
+    }
+
+    /**
+     * @brief 协作式优雅停止看门狗监控线程。
+     */
+    void stopWatchdog() {
+        if (watchdog_thread_.joinable()) {
+            watchdog_thread_.request_stop();
+            watchdog_thread_.join();
+            RCLCPP_INFO(node_->get_logger(),
+                        "[safety_monitor] Background safety watchdog joined safely");
+        }
+    }
+
+    bool isWatchdogRunning() const noexcept {
+        return watchdog_thread_.joinable();
+    }
+
     void spin() {
+        startWatchdog();
+        rclcpp::spin(node_);
+        stopWatchdog();
+    }
+
+   private:
+    /**
+     * @brief 50Hz 安全检测主循环，通过 std::stop_token 检测外部中断请求。
+     */
+    void watchdogLoop(std::stop_token st) {
         rclcpp::Rate rate(50);  // 50Hz 检查
-        while (rclcpp::ok()) {
+        while (!st.stop_requested() && rclcpp::ok()) {
             checkPlannerLiveness();
             diag_updater_->force_update();
             rate.sleep();
         }
     }
-
-   private:
     void DiagnoseHealth(diagnostic_updater::DiagnosticStatusWrapper &stat) {
         if (!has_vehicle_state_) {
             stat.summary(diagnostic_msgs::msg::DiagnosticStatus::STALE, "No vehicle state received yet");
@@ -201,6 +246,7 @@ class SafetyMonitor {
     bool stop_active_ = false;
     StopReason stop_reason_ = StopReason::NONE;
 
+    std::jthread watchdog_thread_;
     std::shared_ptr<diagnostic_updater::Updater> diag_updater_;
 };
 

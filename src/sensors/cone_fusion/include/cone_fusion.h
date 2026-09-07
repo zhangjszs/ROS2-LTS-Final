@@ -61,6 +61,15 @@ class ConeFusion {
     double vehicle_state_heading_threshold_ = 0.5;
     bool enable_vehicle_state_jump_check_ = true;
     double lidar_to_imu_dist_ = 1.87;
+
+    // 锥桶多重流式清洗参数（C++20 std::views::filter）
+    bool enable_cone_filtering_ = true;
+    double min_cone_distance_ = 0.5;
+    double max_cone_distance_ = 30.0;
+    double min_fov_rad_ = -2.0;
+    double max_fov_rad_ = 2.0;
+    int min_confidence_ = 10;
+
     int frame_count_ = 0;
     int last_cone_count_ = 0;
     diagnostic_updater::Updater diag_updater_;

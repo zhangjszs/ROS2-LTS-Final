@@ -3,15 +3,18 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <span>
 #include <vector>
 
 namespace cone_dedup_algo {
 
-std::vector<int> HungarianAssign(const std::vector<std::vector<double>>& cost, double inf_cost) {
-    int rows = static_cast<int>(cost.size());
+namespace {
+
+// 内部通用的 Kuhn-Munkres 匈牙利算法实现，通过 Lambda 访问代价矩阵，消除多重重载的代码重复
+template <typename CostAccessor>
+std::vector<int> HungarianAssignInternal(int rows, int cols, double inf_cost, CostAccessor&& get_cost) {
     if (rows == 0)
         return {};
-    int cols = static_cast<int>(cost[0].size());
     if (cols == 0)
         return std::vector<int>(rows, -1);
     int sz = std::max(rows, cols);
@@ -20,7 +23,7 @@ std::vector<int> HungarianAssign(const std::vector<std::vector<double>>& cost, d
     std::vector<std::vector<double>> c(sz, std::vector<double>(sz, inf_cost));
     for (int i = 0; i < rows; ++i)
         for (int j = 0; j < cols; ++j)
-            c[i][j] = cost[i][j];
+            c[i][j] = get_cost(i, j);
 
     std::vector<double> u(sz + 1, 0.0), v(sz + 1, 0.0);
     std::vector<int> p(sz + 1, 0), way(sz + 1, 0);
@@ -68,10 +71,26 @@ std::vector<int> HungarianAssign(const std::vector<std::vector<double>>& cost, d
     std::vector<int> result(rows, -1);
     for (int j = 1; j <= cols; ++j) {
         int row = p[j] - 1;
-        if (row >= 0 && row < rows && cost[row][j - 1] < inf_cost)
+        if (row >= 0 && row < rows && get_cost(row, j - 1) < inf_cost)
             result[row] = j - 1;
     }
     return result;
+}
+
+}  // namespace
+
+std::vector<int> HungarianAssign(std::span<const std::vector<double>> cost, double inf_cost) {
+    int rows = static_cast<int>(cost.size());
+    if (rows == 0)
+        return {};
+    int cols = static_cast<int>(cost[0].size());
+    return HungarianAssignInternal(rows, cols, inf_cost, [&](int r, int c) { return cost[r][c]; });
+}
+
+std::vector<int> HungarianAssign(std::span<const double> cost_flat, int rows, int cols, double inf_cost) {
+    if (rows < 0 || cols < 0 || cost_flat.size() < static_cast<size_t>(rows * cols))
+        return {};
+    return HungarianAssignInternal(rows, cols, inf_cost, [&](int r, int c) { return cost_flat[r * cols + c]; });
 }
 
 double ComputeDynamicAlpha(double current_speed, double speed_ref, double alpha_min, double alpha_max,
@@ -88,7 +107,7 @@ double ComputeDynamicAlpha(double current_speed, double speed_ref, double alpha_
     return alpha;
 }
 
-std::vector<size_t> FilterIndicesByRadiusSq(const std::vector<double>& xs, const std::vector<double>& ys,
+std::vector<size_t> FilterIndicesByRadiusSq(std::span<const double> xs, std::span<const double> ys,
                                             double origin_x, double origin_y, double radius_sq) {
     std::vector<size_t> valid;
     const size_t n = std::min(xs.size(), ys.size());
@@ -96,6 +115,19 @@ std::vector<size_t> FilterIndicesByRadiusSq(const std::vector<double>& xs, const
     for (size_t i = 0; i < n; ++i) {
         const double dx = xs[i] - origin_x;
         const double dy = ys[i] - origin_y;
+        if (dx * dx + dy * dy <= radius_sq)
+            valid.push_back(i);
+    }
+    return valid;
+}
+
+std::vector<size_t> FilterIndicesByRadiusSq(std::span<const Point2D> points,
+                                            double origin_x, double origin_y, double radius_sq) {
+    std::vector<size_t> valid;
+    valid.reserve(points.size());
+    for (size_t i = 0; i < points.size(); ++i) {
+        const double dx = points[i].x - origin_x;
+        const double dy = points[i].y - origin_y;
         if (dx * dx + dy * dy <= radius_sq)
             valid.push_back(i);
     }

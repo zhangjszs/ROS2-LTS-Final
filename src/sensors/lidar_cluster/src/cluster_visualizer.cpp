@@ -27,8 +27,9 @@ bool LidarCluster::InitializeVisualization() {
     return true;
 }
 
-void LidarCluster::PublishClusterMarker(const PointType max, const PointType min, float euc, float intensity_max,
-                                        float intensity_min, float intensity_mean, bool type, float conf) {
+void LidarCluster::PublishClusterMarker(const PointType max, const PointType min, [[maybe_unused]] float euc,
+                                        [[maybe_unused]] float intensity_max, [[maybe_unused]] float intensity_min,
+                                        [[maybe_unused]] float intensity_mean, bool type, float conf) {
     bbox_marker.points.clear();
     bbox_marker.id = marker_id_;
     euc_marker.id = marker_id_;

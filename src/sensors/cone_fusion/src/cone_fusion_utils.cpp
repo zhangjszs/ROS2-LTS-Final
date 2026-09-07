@@ -7,6 +7,8 @@
 #include <iterator>
 #include <limits>
 #include <numbers>
+#include <ranges>
+#include <span>
 #include <string>
 
 namespace cone_fusion_utils {
@@ -74,6 +76,61 @@ uint32_t ConfidenceToPercent(const float* confidence_data, size_t data_size, siz
     }
 
     return static_cast<uint32_t>(std::lround(confidence));
+}
+
+bool IsPointFinite(const RawPoint& pt) {
+    return std::isfinite(pt.x) && std::isfinite(pt.y) && std::isfinite(pt.z);
+}
+
+bool IsDistanceValid(const RawPoint& pt, double min_dist, double max_dist) {
+    const double d2 = pt.x * pt.x + pt.y * pt.y;
+    return d2 >= min_dist * min_dist && d2 <= max_dist * max_dist;
+}
+
+bool IsFieldOfViewValid(const RawPoint& pt, double min_fov, double max_fov) {
+    const double angle = std::atan2(pt.y, pt.x);
+    return angle >= min_fov && angle <= max_fov;
+}
+
+bool IsConfidenceValid(uint32_t confidence, uint32_t min_conf) {
+    return confidence >= min_conf;
+}
+
+std::vector<size_t> FilterConesPipeline(std::span<const RawPoint> points,
+                                        std::span<const uint32_t> confidences,
+                                        const ConeCleaningParams& params) {
+    if (points.empty()) {
+        return {};
+    }
+
+    const double min_dist_sq = params.min_distance * params.min_distance;
+    const double max_dist_sq = params.max_distance * params.max_distance;
+    const size_t n = points.size();
+
+    // C++20 惰性流式管道：多重清洗过滤组合为单一视图管道，无任何中间 vector 分配
+    auto indices = std::views::iota(size_t{0}, n)
+        | std::views::filter([&](size_t i) {
+            return IsPointFinite(points[i]);
+        })
+        | std::views::filter([&](size_t i) {
+            const double d2 = points[i].x * points[i].x + points[i].y * points[i].y;
+            return d2 >= min_dist_sq && d2 <= max_dist_sq;
+        })
+        | std::views::filter([&](size_t i) {
+            const double angle = std::atan2(points[i].y, points[i].x);
+            return angle >= params.min_fov_rad && angle <= params.max_fov_rad;
+        })
+        | std::views::filter([&](size_t i) {
+            const uint32_t conf = (i < confidences.size()) ? confidences[i] : 100u;
+            return conf >= params.min_confidence;
+        });
+
+    std::vector<size_t> valid_indices;
+    valid_indices.reserve(n);
+    for (size_t i : indices) {
+        valid_indices.push_back(i);
+    }
+    return valid_indices;
 }
 
 }  // namespace cone_fusion_utils

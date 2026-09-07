@@ -4,6 +4,8 @@
 #include <cmath>
 #include <functional>
 #include <numbers>
+#include <ranges>
+#include <utility>
 #include <vector>
 
 #include "pure_pursuit/pp_math.h"
@@ -175,25 +177,31 @@ int PurePursuitController::GetGoalIndex() {
 
 int PurePursuitController::GetLookaheadIndices(int current_idx, double lookahead, std::span<const double> refx,
                                                std::span<const double> refy) {
-    if (current_idx < 0 || refx.empty()) {
+    if (current_idx < 0 || refx.empty() || refx.size() != refy.size()) {
         return 0;
     }
+    const int n = static_cast<int>(refx.size());
     double distance_sum = 0.0;
     int idx = current_idx;
 
-    while (distance_sum < lookahead && idx < static_cast<int>(refx.size()) - 1) {
-        double dx = refx[idx + 1] - refx[idx];
-        double dy = refy[idx + 1] - refy[idx];
-        double distance = sqrt(dx * dx + dy * dy);
+    // C++20 std::ranges 管道流水线：iota 惰性生成线段下标，transform 惰性计算步进欧氏距离
+    auto segment_dists = std::views::iota(current_idx, std::max(current_idx, n - 1))
+        | std::views::transform([&](int i) {
+            double dx = refx[i + 1] - refx[i];
+            double dy = refy[i + 1] - refy[i];
+            return std::make_pair(i + 1, std::hypot(dx, dy));
+        });
 
-        if (distance_sum + distance <= lookahead) {
-            distance_sum += distance;
-            idx++;
+    for (const auto &[next_idx, seg_dist] : segment_dists) {
+        if (distance_sum + seg_dist <= lookahead) {
+            distance_sum += seg_dist;
+            idx = next_idx;
         } else {
             break;
         }
     }
-    if (idx >= 0 && idx < static_cast<int>(refx.size()))
+
+    if (idx >= 0 && idx < n)
         RCLCPP_DEBUG(node_->get_logger(), "[pure_pursuit] Lookahead point: x=%f y=%f", refx[idx], refy[idx]);
     return idx;
 }
@@ -249,18 +257,18 @@ void PurePursuitController::ComputeControlCommand(common_msgs::msg::HuatControlC
                                       : localTf_ * Eigen::Vector3d(refx_[lookahead_idx], refy_[lookahead_idx], 0.0);
         double goalX = product.x();
         double goalY = product.y();
-        float alpha = atan2(goalY, goalX);
+        float alpha = std::atan2(static_cast<float>(goalY), static_cast<float>(goalX));
         alpha = (alpha > kPi) ? (alpha - 2 * kPi) : (alpha < -kPi) ? (alpha + 2 * kPi) : alpha;
 
-        float delta = atan2(steer.pure_pursuit_gain * sin(alpha) / adaptive_lookahead, 1.0);
+        float delta = std::atan2(static_cast<float>(steer.pure_pursuit_gain * std::sin(alpha) / adaptive_lookahead), 1.0f);
         delta = std::max(std::min(delta_max, delta), -delta_max);
-        if (abs(delta - filtered_angle_) > steer.filter_threshold) {
-            delta = delta * steer.filter_blend_ratio + filtered_angle_ * (1.0 - steer.filter_blend_ratio);
+        if (std::abs(delta - filtered_angle_) > steer.filter_threshold) {
+            delta = static_cast<float>(delta * steer.filter_blend_ratio + filtered_angle_ * (1.0 - steer.filter_blend_ratio));
         }
         filtered_angle_ = delta;
         cmd.steering_angle.data = delta;
         RCLCPP_DEBUG(node_->get_logger(), "[pure_pursuit] Steering angle: %f, steering: %d, speed: %f", delta, steering_, current_speed_);
-        steering_ = int(cmd.steering_angle.data * 180 / kPi * steer.mapping.deg_per_rad) + steer.mapping.center_offset;
+        steering_ = static_cast<int>(cmd.steering_angle.data * 180 / kPi * steer.mapping.deg_per_rad) + steer.mapping.center_offset;
         long_error_ = throt.target_speed - current_speed_;
         {
             const double zone = throt.speed_blend_zone > 0.0 ? throt.speed_blend_zone : 0.0;
@@ -301,9 +309,9 @@ void PurePursuitController::ComputeControlCommand(common_msgs::msg::HuatControlC
                 long_current_ = throt.current_clamp_max;
             }
         }
-        cmd.throttle.data = int(long_current_);
+        cmd.throttle.data = static_cast<float>(static_cast<int>(long_current_));
         RCLCPP_DEBUG(node_->get_logger(), "[pure_pursuit] Throttle: %f, pedal ratio: %d", cmd.throttle.data, pedal_ratio_);
-        pedal_ratio_ = int(cmd.throttle.data);
+        pedal_ratio_ = static_cast<int>(cmd.throttle.data);
 
         if (steering_ < steer.mapping.clamp_min) {
             steering_ = steer.mapping.clamp_min;
@@ -347,12 +355,14 @@ int main(int argc, char **argv) {
     PurePursuitController car(node);
     common_msgs::msg::HuatControlCommand cc;
     common_msgs::msg::HuatVehicleCmd a;
+    rclcpp::executors::SingleThreadedExecutor executor;
+    executor.add_node(node);
     rclcpp::Rate rate(car.controlRate());
     if (car.startupDelay() > 0.0) {
         rclcpp::Rate(1.0 / car.startupDelay()).sleep();
     }
     while (rclcpp::ok()) {
-        rclcpp::spin_some(node);
+        executor.spin_some();
         car.ComputeControlCommand(cc, a);
         car.diag_updater_->force_update();
         rate.sleep();

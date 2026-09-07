@@ -13,6 +13,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <compare>
 #include <iostream>
 #include <unordered_set>
 #include <vector>
@@ -26,6 +27,21 @@
  * 三角剖分计算的元素。
  */
 class Triangle {
+   public:
+    /**
+     * @brief 定义一个三角形的 3 个节点。
+     */
+    const std::array<Node, 3> nodes;
+
+    /**
+     * @brief 由 3 个节点定义的边。这个对象基本上包含
+     * 与 nodes 相同的信息，但它便于访问三角形的边
+     * 并且通过少量额外的内存使程序运行更快。
+     * 这是对变量用途和优化的说明。它指出，这个对象基本上包含了与 `nodes` 相同的信息，
+     * 但它方便了对三角形（`Triangle`）的边进行访问，并且通过少量额外的内存消耗使程序运行更快
+     */
+    const std::array<Edge, 3> edges;
+
    private:
     /**
      * @brief 三角形的外接圆。
@@ -48,19 +64,6 @@ class Triangle {
     friend class std::hash<Triangle>;
 
    public:
-    /**
-     * @brief 定义一个三角形的 3 个节点。
-     */
-    const std::array<Node, 3> nodes;
-
-    /**
-     * @brief 由 3 个节点定义的边。这个对象基本上包含
-     * 与 nodes 相同的信息，但它便于访问三角形的边
-     * 并且通过少量额外的内存使程序运行更快。
-     * 这是对变量用途和优化的说明。它指出，这个对象基本上包含了与 `nodes` 相同的信息，
-     * 但它方便了对三角形（`Triangle`）的边进行访问，并且通过少量额外的内存消耗使程序运行更快
-     */
-    const std::array<Edge, 3> edges;
 
     /**
      * @brief 从 3 个节点构造一个新的 Triangle 对象。
@@ -80,18 +83,21 @@ class Triangle {
     Triangle(const Edge &e, const Node &n);
 
     /**
-     * @brief 比较运算符，如果两个三角形的哈希值相同，则它们相等。
-     *
-     * @param[in] t
+     * @brief C++20 宇宙飞船操作符 <=>。
+     * 根据三角形唯一哈希值 hash_ 进行全序三路比较，返回 std::strong_ordering。
+     * 自动合成 <, <=, >, >=，使 Triangle 可直接用于排序与有序容器。
      */
-    bool operator==(const Triangle &t) const;
+    [[nodiscard]] constexpr std::strong_ordering operator<=>(const Triangle &t) const noexcept {
+        return this->hash_ <=> t.hash_;
+    }
 
     /**
-     * @brief 比较运算符的否定。
-     *
-     * @param[in] t
+     * @brief 比较运算符，如果两个三角形的哈希值相同，则它们相等。
+     * C++20 自动合成 != 运算符。
      */
-    bool operator!=(const Triangle &t) const;
+    [[nodiscard]] constexpr bool operator==(const Triangle &t) const noexcept {
+        return this->hash_ == t.hash_;
+    }
 
     /**
      * @brief 检查三角形是否包含节点 n。

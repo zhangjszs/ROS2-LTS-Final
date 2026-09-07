@@ -39,8 +39,8 @@ double ScoreSizePenalty(double height, double area, const ScoringParams& p) {
 double ScoreTiltPenalty(const pcl::PointCloud<PointType>::Ptr& cloud, const ScoringParams& p) {
     if (!cloud || cloud->size() < 3)
         return 0.0;
-    Eigen::Matrix3f cov;
-    Eigen::Vector4f pca_centroid;
+    Eigen::Matrix3f cov = Eigen::Matrix3f::Zero();
+    Eigen::Vector4f pca_centroid = Eigen::Vector4f::Zero();
     pcl::computeMeanAndCovarianceMatrix(*cloud, cov, pca_centroid);
     Eigen::SelfAdjointEigenSolver<Eigen::Matrix3f> solver(cov);
     if (solver.info() != Eigen::Success)
@@ -51,7 +51,7 @@ double ScoreTiltPenalty(const pcl::PointCloud<PointType>::Ptr& cloud, const Scor
     return tilt_deg > p.max_tilt_angle ? p.conf_penalty_tilt * (tilt_deg - p.max_tilt_angle) / p.max_tilt_angle : 0.0;
 }
 
-double ComputeConfidence(PointType max_pt, PointType min_pt, Eigen::Vector4f centroid,
+double ComputeConfidence(PointType max_pt, PointType min_pt, [[maybe_unused]] Eigen::Vector4f centroid,
                          const pcl::PointCloud<PointType>::Ptr& cloud, const ScoringParams& p) {
     double length = std::fabs(max_pt.x - min_pt.x);
     double width = std::fabs(max_pt.y - min_pt.y);

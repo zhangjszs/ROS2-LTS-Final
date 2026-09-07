@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <ranges>
 
 #include "straight_line_geom.h"
 
@@ -174,17 +175,16 @@ void StraightLinePlannerNode::BuildPathLimits(const DetectedBoundaries& boundari
         out.path.push_back(MakePoint(x, y_center, 0.0));
     }
 
-    std::vector<common_msgs::msg::HuatCone> left_cones, right_cones;
-    for (const auto& c : cones) {
-        double y = c.position_base_link.y;
-        if (y < -center_margin_) {
-            left_cones.push_back(c);
-        } else if (y > center_margin_) {
-            right_cones.push_back(c);
-        }
-    }
-    out.tracklimits.left = left_cones;
-    out.tracklimits.right = right_cones;
+    out.tracklimits.left.clear();
+    out.tracklimits.right.clear();
+    std::ranges::copy_if(cones, std::back_inserter(out.tracklimits.left),
+                         [this](float y) { return y < -center_margin_; },
+                         [](const common_msgs::msg::HuatCone& c) { return c.position_base_link.y; });
+    std::ranges::copy_if(cones, std::back_inserter(out.tracklimits.right),
+                         [this](float y) { return y > center_margin_; },
+                         [](const common_msgs::msg::HuatCone& c) { return c.position_base_link.y; });
+    std::ranges::sort(out.tracklimits.left, {}, [](const auto& c) { return c.position_base_link.x; });
+    std::ranges::sort(out.tracklimits.right, {}, [](const auto& c) { return c.position_base_link.x; });
     out.replan = true;
 }
 

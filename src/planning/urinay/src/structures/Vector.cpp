@@ -24,7 +24,7 @@ double Vector::dot(const Vector &v) const {
 
 double Vector::angleWith(const Vector &v) const {
     double det = this->x * v.y - this->y * v.x;
-    return atan2(det, this->dot(v));
+    return std::atan2(det, this->dot(v));
 }
 
 bool Vector::pointBehind(const Point &futPos, const Point &actPos, const Vector &dir) {

@@ -3,6 +3,7 @@
 #include <rclcpp_components/register_node_macro.hpp>
 
 #include <imu_subscriber.hpp>
+#include <stop_token>
 #include <string>
 #include <thread>
 
@@ -12,33 +13,28 @@ class LidarClusterComponent : public rclcpp::Node {
     LidarClusterComponent() : LidarClusterComponent(rclcpp::NodeOptions()) {}
 
     explicit LidarClusterComponent(const rclcpp::NodeOptions & options)
-        : rclcpp::Node("lidar_cluster_node", options), running_(false) {
+        : rclcpp::Node("lidar_cluster_node", options) {
         lc_ = std::make_shared<LidarCluster>(shared_from_this());
-        running_ = true;
-        poll_thread_ = std::thread([this]() { algoPoll(); });
+        poll_thread_ = std::jthread([this](std::stop_token st) { algoPoll(st); });
     }
 
-    ~LidarClusterComponent() {
-        running_ = false;
+    ~LidarClusterComponent() override {
         if (lc_)
             lc_->RequestStop();
-        if (poll_thread_.joinable())
-            poll_thread_.join();
+        // C++20 std::jthread 析构时通过 RAII 自动触发 request_stop() 并自动 join()，杜绝未 join 导致的崩溃
     }
 
    private:
-    void algoPoll() {
-        while (running_ && rclcpp::ok()) {
+    void algoPoll(std::stop_token st) {
+        while (!st.stop_requested() && rclcpp::ok()) {
             lc_->WaitForPendingCloud();
-            if (!running_ || !rclcpp::ok())
+            if (st.stop_requested() || !rclcpp::ok())
                 break;
             lc_->RunAlgorithm();
         }
-        running_ = false;
     }
 
-    volatile bool running_;
-    std::thread poll_thread_;
+    std::jthread poll_thread_;
     std::shared_ptr<LidarCluster> lc_;
 };
 

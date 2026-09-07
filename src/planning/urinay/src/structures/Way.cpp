@@ -56,6 +56,20 @@ Way::Way() : avgEdgeLen_(0.0) {
     sizeToCar_ = 0;
 }
 
+Way::Way(const Way &way)
+    : path_(way.path_),
+      avgEdgeLen_(way.avgEdgeLen_),
+      sizeToCar_(way.sizeToCar_) {
+    updateClosestToCarElem();
+}
+
+Way::Way(Way &&way) noexcept
+    : path_(std::move(way.path_)),
+      avgEdgeLen_(way.avgEdgeLen_),
+      sizeToCar_(way.sizeToCar_) {
+    updateClosestToCarElem();
+}
+
 bool Way::empty() const {
     return this->path_.empty();
 }
@@ -155,7 +169,7 @@ bool Way::closesLoopWith(const Edge &e, const Point *lastPosInTrace) const {
         Point::distSq(this->front().midPoint(), e.midPoint()) <=
             params_.max_dist_loop_closure * params_.max_dist_loop_closure and
         // 检查与第一个点的闭合角度
-        abs(Vector(this->front().midPoint(), (++this->path_.begin())->midPoint())
+        std::abs(Vector(this->front().midPoint(), (++this->path_.begin())->midPoint())
                 .angleWith(Vector(actPos, e.midPoint()))) <= params_.max_angle_diff_loop_closure;
 }
 
@@ -286,31 +300,23 @@ Tracklimits Way::getTracklimits() const {
 }
 
 Way &Way::operator=(const Way &way) {
-    this->path_ = std::list<Edge>(way.path_);
-    this->avgEdgeLen_ = way.avgEdgeLen_;
-    this->sizeToCar_ = way.sizeToCar_;
-    this->updateClosestToCarElem();  // 直接复制该属性是不安全的
+    if (this != &way) {
+        this->path_ = std::list<Edge>(way.path_);
+        this->avgEdgeLen_ = way.avgEdgeLen_;
+        this->sizeToCar_ = way.sizeToCar_;
+        this->updateClosestToCarElem();  // 直接复制该属性是不安全的
+    }
     return *this;
 }
 
-bool Way::operator==(const Way &way) const {
-    if (this->size() != way.size())
-        return false;
-    auto thisIt = this->path_.cbegin();
-    auto paramIt = way.path_.cbegin();
-
-    while (thisIt != this->path_.cend()) {
-        if (*thisIt != *paramIt)
-            return false;
-        thisIt++;
-        paramIt++;
+Way &Way::operator=(Way &&way) noexcept {
+    if (this != &way) {
+        this->path_ = std::move(way.path_);
+        this->avgEdgeLen_ = way.avgEdgeLen_;
+        this->sizeToCar_ = way.sizeToCar_;
+        this->updateClosestToCarElem();
     }
-
-    return true;
-}
-
-bool Way::operator!=(const Way &way) const {
-    return not(*this == way);
+    return *this;
 }
 
 bool Way::quinEhLobjetiuDeLaSevaDiresio(const Way &way) const {
@@ -418,7 +424,7 @@ std::vector<geometry_msgs::msg::Point> Way::getPathInterpolation(double x, doubl
     auto lastIt = it;
     it++;
 
-    for (int j = 0; j < path_.size() - 1; j++) {
+    for (size_t j = 0; j + 1 < path_.size(); ++j) {
         diffX = (it->midPointGlobal().x - lastIt->midPointGlobal().x) / 10.0;
         diffY = (it->midPointGlobal().y - lastIt->midPointGlobal().y) / 10.0;
 
@@ -442,7 +448,7 @@ std::vector<geometry_msgs::msg::Point> Way::getPathFullInterpolation() {
     double diffX, diffY;
     geometry_msgs::msg::Point p;
     it++;  //跳到下一个
-    for (int j = 0; j < path_.size() - 1; j++) {
+    for (size_t j = 0; j + 1 < path_.size(); ++j) {
         diffX = (it->midPointGlobal().x - lastIt->midPointGlobal().x) / 10.0;
         diffY = (it->midPointGlobal().y - lastIt->midPointGlobal().y) / 10.0;
 
@@ -457,7 +463,7 @@ std::vector<geometry_msgs::msg::Point> Way::getPathFullInterpolation() {
     return res;
 }
 
-std::vector<geometry_msgs::msg::Point> Way::getPathInterpolationLocal(double x, double y) {
+std::vector<geometry_msgs::msg::Point> Way::getPathInterpolationLocal([[maybe_unused]] double x, [[maybe_unused]] double y) {
     deleteWayPassed();
     std::vector<geometry_msgs::msg::Point> res;
     if (path_.empty())
@@ -477,7 +483,7 @@ std::vector<geometry_msgs::msg::Point> Way::getPathInterpolationLocal(double x, 
     auto lastIt = it;
     it++;
 
-    for (int j = 0; j < path_.size() - 1; j++) {
+    for (size_t j = 0; j + 1 < path_.size(); ++j) {
         diffX = (it->midPoint().x - lastIt->midPoint().x) / 10.0;
         diffY = (it->midPoint().y - lastIt->midPoint().y) / 10.0;
 
@@ -501,7 +507,7 @@ std::vector<geometry_msgs::msg::Point> Way::getPathFullInterpolationLocal() {
     double diffX, diffY;
     geometry_msgs::msg::Point p;
     it++;  //跳到下一个
-    for (int j = 0; j < path_.size() - 1; j++) {
+    for (size_t j = 0; j + 1 < path_.size(); ++j) {
         diffX = (it->midPoint().x - lastIt->midPoint().x) / 10.0;
         diffY = (it->midPoint().y - lastIt->midPoint().y) / 10.0;
 

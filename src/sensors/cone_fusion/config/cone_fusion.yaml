@@ -10,6 +10,14 @@ vehicle_state_min_dt: 0.02
 vehicle_state_max_dt: 1.0
 vehicle_state_heading_threshold: 0.5
 
+# 锥桶多重流式清洗流水线（C++20 std::views::filter）
+enable_cone_filtering: true
+min_cone_distance: 0.5     # 最小有效距离（m），过滤车身自反射杂波
+max_cone_distance: 30.0    # 最大有效距离（m），过滤远端稀疏噪点
+min_fov_rad: -2.0          # 视场角下限（rad）
+max_fov_rad: 2.0           # 视场角上限（rad）
+min_confidence: 10         # 最低置信度百分比 [0, 100]
+
 # vehicle_state 环形缓存大小（用于最近邻时间匹配）
 max_buffer_size: 50
 

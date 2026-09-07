@@ -2,9 +2,12 @@
 
 #include <algorithm>
 #include <cmath>
+#include <compare>
 #include <limits>
+#include <ranges>
 #include <span>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace pp_math {
@@ -33,15 +36,22 @@ inline double estimateCurvature(std::span<const double> refx, std::span<const do
     if (area2 < 1e-9)
         return 0.0;
 
-    return 2.0 * area2 / (ab * bc * ca);
+    double denom = ab * bc * ca;
+    if (denom < 1e-9)
+        return 0.0;
+
+    return 2.0 * area2 / denom;
 }
 
 struct NearestIndexResult {
     int idx = -1;
     double dist_sq = 0.0;
+
+    auto operator<=>(const NearestIndexResult&) const = default;
 };
 
-// 在 [search_start, search_end) 内找距 (cx, cy) 最近的路径点 (C++20 std::span 零拷贝视图)
+// 在 [search_start, search_end) 内找距 (cx, cy) 最近的路径点
+// C++20 现代 Ranges 算法与投影重构：基于 std::views::iota 与 std::ranges::min_element，无堆内存分配
 inline NearestIndexResult findNearestIndex(std::span<const double> refx, std::span<const double> refy, double cx,
                                            double cy, int search_start, int search_end) {
     NearestIndexResult result;
@@ -49,18 +59,78 @@ inline NearestIndexResult findNearestIndex(std::span<const double> refx, std::sp
     if (n == 0 || static_cast<int>(refy.size()) != n || search_start >= search_end || search_start < 0)
         return result;
     search_end = std::min(search_end, n);
-    result.dist_sq = std::numeric_limits<double>::max();
-    result.idx = search_start;
-    for (int i = search_start; i < search_end; i++) {
+
+    auto indices = std::views::iota(search_start, search_end);
+    auto compute_dist_sq = [&](int i) -> double {
         double dx = cx - refx[i];
         double dy = cy - refy[i];
-        double d2 = dx * dx + dy * dy;
-        if (d2 < result.dist_sq) {
-            result.dist_sq = d2;
-            result.idx = i;
-        }
+        return dx * dx + dy * dy;
+    };
+
+    auto best_it = std::ranges::min_element(indices, {}, compute_dist_sq);
+    if (best_it != indices.end()) {
+        result.idx = *best_it;
+        result.dist_sq = compute_dist_sq(result.idx);
     }
     return result;
+}
+
+// 基于折线累积距离的流式前瞻点搜索 (C++20 Ranges pipeline)
+// 利用 std::views::iota 生成段索引区间，并通过 std::views::transform 惰性计算每段折线距离
+inline int findLookaheadIndex(std::span<const double> refx, std::span<const double> refy,
+                              int current_idx, double lookahead) {
+    const int n = static_cast<int>(refx.size());
+    if (current_idx < 0 || n == 0 || static_cast<int>(refy.size()) != n)
+        return 0;
+
+    double distance_sum = 0.0;
+    int target_idx = current_idx;
+
+    auto segments = std::views::iota(current_idx, std::max(current_idx, n - 1))
+        | std::views::transform([&](int i) {
+            double dx = refx[i + 1] - refx[i];
+            double dy = refy[i + 1] - refy[i];
+            return std::make_pair(i + 1, std::hypot(dx, dy));
+        });
+
+    for (const auto& [next_idx, seg_dist] : segments) {
+        if (distance_sum + seg_dist <= lookahead) {
+            distance_sum += seg_dist;
+            target_idx = next_idx;
+        } else {
+            break;
+        }
+    }
+    return target_idx;
+}
+
+// 基于欧氏距离的流式前瞻点搜索 (C++20 管道式流水线: iota -> transform -> filter)
+// 惰性求值：仅在迭代时计算距离，首个满足 lookahead 门限的点即刻终止管道，零多余运算
+inline int findLookaheadIndexEuclidean(std::span<const double> refx, std::span<const double> refy,
+                                       int current_idx, double lookahead) {
+    const int n = static_cast<int>(refx.size());
+    if (current_idx < 0 || n == 0 || static_cast<int>(refy.size()) != n)
+        return 0;
+
+    const double lookahead_sq = lookahead * lookahead;
+    const double ox = refx[current_idx];
+    const double oy = refy[current_idx];
+
+    auto ahead_points = std::views::iota(current_idx, n)
+        | std::views::transform([&](int i) {
+            double dx = refx[i] - ox;
+            double dy = refy[i] - oy;
+            return std::make_pair(i, dx * dx + dy * dy);
+        })
+        | std::views::filter([lookahead_sq](const auto& pt) {
+            return pt.second >= lookahead_sq;
+        });
+
+    auto it = ahead_points.begin();
+    if (it != ahead_points.end()) {
+        return (*it).first;
+    }
+    return n - 1;
 }
 
 inline bool isBaseLinkFrame(const std::string& frame_id) {

@@ -90,15 +90,10 @@ TriangleSet DelaunayTriangulator::compute(const std::vector<Node> &nodes) {
         }
     }
 
-    // 移除所有属于超级三角形的三角形
-    auto it = triangulation.begin();
-    while (it != triangulation.end()) {
-        if (it->anyNodeInSuperTriangle()) {
-            it = triangulation.erase(it);
-        } else {
-            it++;
-        }
-    }
+    // C++20 统一容器擦除：移除所有属于超级三角形的三角形
+    std::erase_if(triangulation, [](const Triangle &t) {
+        return t.anyNodeInSuperTriangle();
+    });
 
     return triangulation;
 }

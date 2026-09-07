@@ -33,7 +33,7 @@ UrinayParams::UrinayParams(rclcpp::Node *const nh) {
         .markers_full_topic = {},
         .markers_partial_topic = {},
         .profiling_topic = declare_and_get("profiling_topic", std::string("/debug/urinay/profiling")),
-        .package_path = ament_index_cpp::get_package_share_directory("urinay"),
+        .package_path = ament_index_cpp::get_package_share_path("urinay").string(),
         .shutdown_on_loop_closure = declare_and_get("shutdown_on_loop_closure", true),
         .enable_profiling = declare_and_get("enable_profiling", true),
         .min_cone_confidence = static_cast<float>(declare_and_get("min_cone_confidence", 0.0)),

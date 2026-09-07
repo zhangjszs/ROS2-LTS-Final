@@ -1,5 +1,11 @@
 #include <gtest/gtest.h>
 
+#include <chrono>
+#include <condition_variable>
+#include <mutex>
+#include <stop_token>
+#include <thread>
+
 #include "safety_monitor/stop_state_machine.h"
 
 // ── Initial state ─────────────────────────────────────────────────────────
@@ -167,6 +173,61 @@ TEST(StopStateMachineFormatTest, FormatsCompositeDiagnosticString) {
     StopReason reason = StopReason::TIMEOUT;
     std::string diag = std::format("State is {}, Reason is {}", state, reason);
     EXPECT_EQ(diag, "State is TIMEOUT_STOP, Reason is timeout");
+}
+
+// ── C++20 std::jthread & std::stop_token 协作式中断测试 ───────────────────────
+
+TEST(JThreadCooperativeCancellationTest, RequestStopGracefulExit) {
+    std::atomic<int> loop_count{0};
+    std::atomic<bool> callback_triggered{false};
+
+    {
+        std::jthread worker([&loop_count, &callback_triggered](std::stop_token st) {
+            // 注册中断回调：当外部触发 request_stop() 时立即异步触发
+            std::stop_callback cb(st, [&callback_triggered]() {
+                callback_triggered = true;
+            });
+
+            while (!st.stop_requested()) {
+                loop_count.fetch_add(1, std::memory_order_relaxed);
+                std::this_thread::sleep_for(std::chrono::milliseconds(5));
+            }
+        });
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(20));
+        EXPECT_GT(loop_count.load(), 0);
+        EXPECT_FALSE(callback_triggered.load());
+
+        // 外部主动发起协作式停止请求
+        worker.request_stop();
+        EXPECT_TRUE(callback_triggered.load());
+        // worker 离开作用域，std::jthread 析构函数自动调用 join()，无任何未定义行为或崩溃
+    }
+
+    EXPECT_TRUE(callback_triggered.load());
+}
+
+TEST(JThreadCooperativeCancellationTest, ConditionVariableAnyInterruptibleWait) {
+    std::condition_variable_any cv;
+    std::mutex mtx;
+    std::atomic<bool> thread_exited{false};
+
+    {
+        std::jthread waiter([&cv, &mtx, &thread_exited](std::stop_token st) {
+            std::unique_lock<std::mutex> lock(mtx);
+            // 配合 std::stop_token，等待条件变量被中断，无需设置死等超时
+            cv.wait(lock, st, [] { return false; });
+            thread_exited = true;
+        });
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        EXPECT_FALSE(thread_exited.load());
+
+        // 外部触发中断请求，cv.wait 立即感知并苏醒，消除长阻塞延时
+        waiter.request_stop();
+    }
+
+    EXPECT_TRUE(thread_exited.load());
 }
 
 int main(int argc, char** argv) {

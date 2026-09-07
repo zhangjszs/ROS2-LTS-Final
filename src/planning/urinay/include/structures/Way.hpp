@@ -14,6 +14,7 @@
 #include <rclcpp/rclcpp.hpp>
 
 #include <Eigen/Geometry>
+#include <compare>
 #include <list>
 
 #include "structures/Edge.hpp"
@@ -108,6 +109,21 @@ class Way {
     Way();
 
     /**
+     * @brief 拷贝构造函数（深拷贝边列表并安全重建最近迭代器索引）。
+     */
+    Way(const Way &way);
+
+    /**
+     * @brief 移动构造函数。
+     */
+    Way(Way &&way) noexcept;
+
+    /**
+     * @brief 析构函数。
+     */
+    ~Way() = default;
+
+    /**
      * @brief 查询 Way 是否为空。
      */
     bool empty() const;
@@ -200,19 +216,27 @@ class Way {
     Way &operator=(const Way &way);
 
     /**
-     * @brief 比较运算符。如果两个 Way 包含相同的边，则它们相等。
-     * **注意** 中点（和赛道边界）的位置可能不相等。
+     * @brief 移动赋值运算符。
      *
      * @param[in] way
      */
-    bool operator==(const Way &way) const;
+    Way &operator=(Way &&way) noexcept;
 
     /**
-     * @brief 比较运算符的否定。
-     *
-     * @param[in] way
+     * @brief C++20 宇宙飞船操作符 <=>。
+     * 按底层边序列进行字典序全序比较，返回 std::strong_ordering。
      */
-    bool operator!=(const Way &way) const;
+    [[nodiscard]] auto operator<=>(const Way &way) const {
+        return this->path_ <=> way.path_;
+    }
+
+    /**
+     * @brief 比较运算符。如果两个 Way 包含相同的边序列，则它们相等。
+     * C++20 自动合成 != 运算符。
+     */
+    [[nodiscard]] bool operator==(const Way &way) const {
+        return this->path_ == way.path_;
+    }
 
     /**
      * @brief 检查 vital_num_midpoints（车辆位置后的 n 个中点）

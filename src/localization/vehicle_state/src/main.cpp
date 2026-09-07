@@ -11,9 +11,11 @@ int main(int argc, char* argv[]) {
     auto node = rclcpp::Node::make_shared("vehicle_state");
     RCLCPP_INFO(node->get_logger(), "[vehicle_state] Node started");
     VehicleStateEstimator estimator(node);
+    rclcpp::executors::SingleThreadedExecutor executor;
+    executor.add_node(node);
     rclcpp::Rate rate(50);
     while (rclcpp::ok()) {
-        rclcpp::spin_some(node);
+        executor.spin_some();
         estimator.UpdateDiagnostics();
         rate.sleep();
     }

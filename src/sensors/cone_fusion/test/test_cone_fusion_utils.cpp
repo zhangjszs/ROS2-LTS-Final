@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <cmath>
 #include <numbers>
 #include <string>
@@ -12,6 +13,13 @@ using cone_fusion_utils::ConfidenceToPercent;
 using cone_fusion_utils::IsVehicleStateJumpAbnormal;
 using cone_fusion_utils::NormalizeAngle;
 using cone_fusion_utils::VehicleState;
+using cone_fusion_utils::RawPoint;
+using cone_fusion_utils::ConeCleaningParams;
+using cone_fusion_utils::FilterConesPipeline;
+using cone_fusion_utils::IsPointFinite;
+using cone_fusion_utils::IsDistanceValid;
+using cone_fusion_utils::IsFieldOfViewValid;
+using cone_fusion_utils::IsConfidenceValid;
 
 constexpr double kPi = std::numbers::pi_v<double>;
 
@@ -222,6 +230,90 @@ TEST(MergeVisionColorWithLidarSize, LidarSizeIsNotAColor) {
     // Copying SIZE_LARGE (1) into HuatCone.type would look like YELLOW, not BLUE.
     EXPECT_NE(static_cast<uint32_t>(huat_cone::SIZE_LARGE), huat_cone::BLUE);
     EXPECT_EQ(static_cast<uint32_t>(huat_cone::SIZE_LARGE), huat_cone::YELLOW_SMALL);
+}
+
+// ── C++20 流式清洗流水线测试 (FilterConesPipeline) ──────────────────────────
+
+TEST(ConeCleaningPredicates, FiniteChecks) {
+    EXPECT_TRUE(IsPointFinite(RawPoint{.x = 1.0, .y = 2.0, .z = 0.0}));
+    EXPECT_FALSE(IsPointFinite(RawPoint{.x = std::nan(""), .y = 2.0, .z = 0.0}));
+    EXPECT_FALSE(IsPointFinite(RawPoint{.x = 1.0, .y = std::numeric_limits<double>::infinity(), .z = 0.0}));
+}
+
+TEST(ConeCleaningPredicates, DistanceChecks) {
+    RawPoint pt{.x = 3.0, .y = 4.0, .z = 0.0};  // d = 5.0m
+    EXPECT_TRUE(IsDistanceValid(pt, 0.5, 30.0));
+    EXPECT_FALSE(IsDistanceValid(pt, 6.0, 30.0));  // 太近
+    EXPECT_FALSE(IsDistanceValid(pt, 0.5, 4.0));   // 太远
+}
+
+TEST(ConeCleaningPredicates, FovChecks) {
+    RawPoint front{.x = 5.0, .y = 0.0, .z = 0.0};    // 0 rad
+    RawPoint left{.x = 0.0, .y = 5.0, .z = 0.0};     // +pi/2 rad
+    RawPoint behind{.x = -5.0, .y = 0.0, .z = 0.0};   // pi rad
+
+    EXPECT_TRUE(IsFieldOfViewValid(front, -kPi / 2, kPi / 2));
+    EXPECT_TRUE(IsFieldOfViewValid(left, -kPi / 2, kPi / 2));
+    EXPECT_FALSE(IsFieldOfViewValid(behind, -kPi / 2, kPi / 2));
+}
+
+TEST(ConeCleaningPipeline, FiltersMultiStageInSinglePass) {
+    ConeCleaningParams params{
+        .min_distance = 1.0,
+        .max_distance = 20.0,
+        .min_fov_rad = -kPi / 3.0,  // -60 deg
+        .max_fov_rad = kPi / 3.0,   // +60 deg
+        .min_confidence = 30
+    };
+
+    std::vector<RawPoint> pts = {
+        RawPoint{.x = 5.0, .y = 0.0, .z = 0.0},    // 0: 有效点 (d=5m, angle=0, conf=80)
+        RawPoint{.x = 0.5, .y = 0.0, .z = 0.0},    // 1: 距离过近 (d=0.5m < 1.0m)
+        RawPoint{.x = 30.0, .y = 0.0, .z = 0.0},   // 2: 距离过远 (d=30m > 20.0m)
+        RawPoint{.x = 0.0, .y = 5.0, .z = 0.0},    // 3: 视场角过大 (angle=90 deg > 60 deg)
+        RawPoint{.x = 8.0, .y = 1.0, .z = 0.0},    // 4: 置信度过低 (conf=15 < 30)
+        RawPoint{.x = std::nan(""), .y = 0.0, .z = 0.0}, // 5: NaN 无效值
+        RawPoint{.x = 10.0, .y = -2.0, .z = 0.0}   // 6: 有效点 (d=10.2m, angle=-11 deg, conf=90)
+    };
+
+    std::vector<uint32_t> confidences = {80, 80, 80, 80, 15, 80, 90};
+
+    auto valid_idx = FilterConesPipeline(pts, confidences, params);
+    ASSERT_EQ(valid_idx.size(), 2u);
+    EXPECT_EQ(valid_idx[0], 0u);
+    EXPECT_EQ(valid_idx[1], 6u);
+}
+
+TEST(ConeCleaningPipeline, EmptyInputReturnsEmpty) {
+    ConeCleaningParams params;
+    std::vector<RawPoint> pts;
+    std::vector<uint32_t> confs;
+    auto valid_idx = FilterConesPipeline(pts, confs, params);
+    EXPECT_TRUE(valid_idx.empty());
+}
+
+TEST(ConeCandidateThreeWayTest, SpaceshipAndEquality) {
+    using cone_fusion_utils::ConeCandidate;
+
+    ConeCandidate c1{1.0, 2.0, 0.0, 0.9, huat_cone::BLUE};
+    ConeCandidate c2{1.0, 2.0, 0.0, 0.9, huat_cone::BLUE};
+    ConeCandidate c3{1.0, 2.0, 0.0, 0.95, huat_cone::BLUE};
+    ConeCandidate c4{2.0, 1.0, 0.0, 0.5, huat_cone::YELLOW};
+
+    EXPECT_TRUE(c1 == c2);
+    EXPECT_FALSE(c1 != c2);
+    EXPECT_TRUE(c1 < c3);
+    EXPECT_TRUE(c1 < c4);
+    EXPECT_TRUE(c4 > c1);
+
+    auto cmp = (c1 <=> c2);
+    EXPECT_TRUE(cmp == std::partial_ordering::equivalent);
+
+    std::vector<ConeCandidate> candidates{c4, c3, c1};
+    std::ranges::sort(candidates);
+    EXPECT_TRUE(candidates[0] == c1);
+    EXPECT_TRUE(candidates[1] == c3);
+    EXPECT_TRUE(candidates[2] == c4);
 }
 
 int main(int argc, char** argv) {

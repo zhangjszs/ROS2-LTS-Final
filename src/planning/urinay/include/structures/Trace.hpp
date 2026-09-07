@@ -40,14 +40,14 @@ class Trace {
         const std::shared_ptr<Connection> before;
 
         /**
-         * @brief 从此连接开始的 Trace 的大小
-         */
-        const size_t size;
-
-        /**
          * @brief 此次追加的启发式值。
          */
         const double heur;
+
+        /**
+         * @brief 从此连接开始的 Trace 的大小
+         */
+        const size_t size;
 
         /**
          * @brief 整条 Trace 的平均边长。

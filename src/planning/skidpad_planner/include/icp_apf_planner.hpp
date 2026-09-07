@@ -54,10 +54,12 @@ class IcpApfPlanner {
     std::vector<Point2D> GeneratePath(const std::vector<common_msgs::msg::HuatCone>& cones,
                                       const std::vector<Point2D>& prev_path, double icp_rmse_limit = 0.5);
 
-   private:
     void ClusterCones(const std::vector<common_msgs::msg::HuatCone>& cones, std::vector<common_msgs::msg::HuatCone>& left,
                       std::vector<common_msgs::msg::HuatCone>& right);
 
+    std::vector<Point2D> TransformPoints(const std::vector<Point2D>& points, double rotation, double tx, double ty);
+
+   private:
     std::vector<Point2D> ComputeCenterline(const std::vector<common_msgs::msg::HuatCone>& left,
                                            const std::vector<common_msgs::msg::HuatCone>& right);
 
@@ -70,9 +72,6 @@ class IcpApfPlanner {
 
     // ICP：将源点云 src 对齐到目标点云 tgt
     IcpResult IcpAlign(const std::vector<Point2D>& src, const std::vector<Point2D>& tgt);
-
-    // 对点云应用刚性变换
-    std::vector<Point2D> TransformPoints(const std::vector<Point2D>& points, double rotation, double tx, double ty);
 
     // APF：计算位置 p 处的受力
     Point2D ComputeApfForce(const Point2D& p, const std::vector<Point2D>& centerline,

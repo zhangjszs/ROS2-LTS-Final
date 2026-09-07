@@ -1,5 +1,8 @@
 #include "skidpad_planner_node.hpp"
 
+#include <algorithm>
+#include <ranges>
+
 #include <common_msgs/msg/huat_tracklimits.hpp>
 
 namespace skidpad {
@@ -157,9 +160,9 @@ void SkidpadPlannerNode::PublishPrevPath(const std::vector<Point2D>& prev_path_b
     common_msgs::msg::HuatPathLimits path_limits;
     path_limits.header.stamp = node_->now();
     path_limits.header.frame_id = "base_link";
-    for (const auto& pt : prev_path_bl) {
-        path_limits.path.push_back(MakePoint(pt.x, pt.y, 0.0));
-    }
+    path_limits.path.reserve(prev_path_bl.size());
+    std::ranges::transform(prev_path_bl, std::back_inserter(path_limits.path),
+                           [](const Point2D& pt) { return MakePoint(pt.x, pt.y, 0.0); });
     path_limits.replan = false;
     path_limits_pub_->publish(path_limits);
 }
@@ -168,12 +171,16 @@ bool SkidpadPlannerNode::IsPrevPathFrozen(const std::vector<Point2D>& prev_path_
     if (prev_path_bl.empty())
         return false;
     const double freeze_threshold = path_lookahead_ * 0.8;
-    for (const auto& p : prev_path_bl) {
-        if (std::sqrt(p.x * p.x + p.y * p.y) <= freeze_threshold)
-            return false;
+    const double freeze_threshold_sq = freeze_threshold * freeze_threshold;
+    // 若没有任意一个点落在 freeze 阈值内（即全部点都在车辆前瞻外），判定路径已失效冻结
+    const bool frozen = std::ranges::none_of(
+        prev_path_bl,
+        [freeze_threshold_sq](double d2) { return d2 <= freeze_threshold_sq; },
+        [](const Point2D& p) { return p.x * p.x + p.y * p.y; });
+    if (frozen) {
+        RCLCPP_WARN(node_->get_logger(), "[skidpad_planner] Prev path frozen (all pts > %.1fm), resetting", freeze_threshold);
     }
-    RCLCPP_WARN(node_->get_logger(), "[skidpad_planner] Prev path frozen (all pts > %.1fm), resetting", freeze_threshold);
-    return true;
+    return frozen;
 }
 
 void SkidpadPlannerNode::PublishEmptyPathLimits() {
@@ -240,18 +247,18 @@ void SkidpadPlannerNode::OnConeMapMessage(const common_msgs::msg::HuatMap::Const
     common_msgs::msg::HuatPathLimits path_limits;
     path_limits.header.stamp = node_->now();
     path_limits.header.frame_id = "base_link";
-    for (const auto& pt : path) {
-        path_limits.path.push_back(MakePoint(pt.x, pt.y, 0.0));
-    }
+    path_limits.path.reserve(path.size());
+    std::ranges::transform(path, std::back_inserter(path_limits.path),
+                           [](const Point2D& pt) { return MakePoint(pt.x, pt.y, 0.0); });
 
-    for (const auto& c : cones) {
-        double y = c.position_base_link.y;
-        if (y < -center_margin_) {
-            path_limits.tracklimits.left.push_back(c);
-        } else if (y > center_margin_) {
-            path_limits.tracklimits.right.push_back(c);
-        }
-    }
+    std::ranges::copy_if(cones, std::back_inserter(path_limits.tracklimits.left),
+                         [this](float y) { return y < -center_margin_; },
+                         [](const common_msgs::msg::HuatCone& c) { return c.position_base_link.y; });
+    std::ranges::copy_if(cones, std::back_inserter(path_limits.tracklimits.right),
+                         [this](float y) { return y > center_margin_; },
+                         [](const common_msgs::msg::HuatCone& c) { return c.position_base_link.y; });
+    std::ranges::sort(path_limits.tracklimits.left, {}, [](const auto& c) { return c.position_base_link.x; });
+    std::ranges::sort(path_limits.tracklimits.right, {}, [](const auto& c) { return c.position_base_link.x; });
     path_limits.replan = true;
 
     path_limits_pub_->publish(path_limits);

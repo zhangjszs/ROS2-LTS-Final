@@ -26,7 +26,7 @@ void Time::tick(const std::string &clockName) {
 
 std::chrono::duration<double> Time::tock(const std::string &clockName) {
     std::map<std::string, std::chrono::steady_clock::time_point>::iterator it = clocks_.find(clockName);
-    std::chrono::duration<double> res;
+    std::chrono::duration<double> res{0.0};
     if (it == clocks_.end()) {
         RCLCPP_ERROR(rclcpp::get_logger("urinay"), "[urinay] tock() called before tick()");
     } else {
