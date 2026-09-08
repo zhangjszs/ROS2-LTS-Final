@@ -238,17 +238,37 @@ void LidarCluster::InitState() {
     SplitString(str_seg_distance_, seg_distances);
 
     has_point_clouds_ = false;
-    g_not_ground_pc.reset(new pcl::PointCloud<PointType>());
-    current_pc_ptr.reset(new pcl::PointCloud<PointType>());
-    cloud_filtered.reset(new pcl::PointCloud<PointType>());
-    skidpad_detection_pc.reset(new pcl::PointCloud<PointType>());
+    pending_cloud_ = false;
+    g_not_ground_pc = std::make_shared<pcl::PointCloud<PointType>>();
+    cloud_filtered = std::make_shared<pcl::PointCloud<PointType>>();
+    skidpad_detection_pc = std::make_shared<pcl::PointCloud<PointType>>();
+
+    // 预分配复用点云缓冲区并预留容量，杜绝 20Hz 主循环高频 malloc/free
+    incoming_cloud_buf_ = std::make_shared<pcl::PointCloud<PointType>>();
+    ready_cloud_buf_ = std::make_shared<pcl::PointCloud<PointType>>();
+    processing_pc_ = std::make_shared<pcl::PointCloud<PointType>>();
+    ground_pc_ = std::make_shared<pcl::PointCloud<PointType>>();
+    cloud_cluster_ = std::make_shared<pcl::PointCloud<PointType>>();
+    final_cluster_ = std::make_shared<pcl::PointCloud<PointType>>();
+    distortion_adjusted_pc_ = std::make_shared<pcl::PointCloud<PointType>>();
+    accum_downsampled_pc_ = std::make_shared<pcl::PointCloud<PointType>>();
+
+    constexpr size_t kPreallocPoints = 40000;
+    incoming_cloud_buf_->reserve(kPreallocPoints);
+    ready_cloud_buf_->reserve(kPreallocPoints);
+    processing_pc_->reserve(kPreallocPoints);
+    g_not_ground_pc->reserve(kPreallocPoints);
+    ground_pc_->reserve(kPreallocPoints);
+    cloud_cluster_->reserve(1000);
+    final_cluster_->reserve(5000);
+    current_pc_ptr = ready_cloud_buf_;
 
     // 初始化可复用的分段数组（大小将在运行时根据 seg_distances 自适应）
     cloud_segments_array_.clear();
 
     if (use_distortion_adjust_) {
-        imu_sub_ptr_.reset(new ImuSubscriber(node_, imu_topic_, 100));
-        disAdjust.reset(new DistortionAdjuster());
+        imu_sub_ptr_ = std::make_shared<ImuSubscriber>(node_, imu_topic_, 100);
+        disAdjust = std::make_shared<DistortionAdjuster>();
         RCLCPP_INFO(node_->get_logger(), "[lidar_cluster] Distortion adjustment enabled (imu_topic=%s, scan_period=%.3f)", imu_topic_.c_str(),
                  scan_period_);
     } else {
@@ -435,18 +455,18 @@ void LidarCluster::ClusterMethod() {
     std::vector<std::vector<pcl::PointIndices>> cluster_indices;
     EuclideanAdaptiveClusterMethod(g_not_ground_pc, cluster_indices);
 
-    pcl::PointCloud<PointType>::Ptr final_cluster(new pcl::PointCloud<PointType>);
-    pcl::PointCloud<PointType>::Ptr cloud_cluster(new pcl::PointCloud<PointType>);
-    for (int i = 0; i < (int)cluster_indices.size(); ++i) {
+    final_cluster_->clear();
+    cloud_cluster_->clear();
+    for (size_t i = 0; i < cluster_indices.size(); ++i) {
         for (const auto &seg : cluster_indices[i]) {
-            cloud_cluster->clear();
-            cloud_cluster->points.reserve(seg.indices.size());
+            cloud_cluster_->clear();
+            cloud_cluster_->points.reserve(seg.indices.size());
             for (int idx : seg.indices)
-                cloud_cluster->points.push_back(cloud_segments_array_[i]->points[idx]);
-            cloud_cluster->width = cloud_cluster->points.size();
-            cloud_cluster->height = 1;
-            cloud_cluster->is_dense = true;
-            ProcessCluster(cloud_cluster, position, final_cluster);
+                cloud_cluster_->points.push_back(cloud_segments_array_[i]->points[idx]);
+            cloud_cluster_->width = cloud_cluster_->points.size();
+            cloud_cluster_->height = 1;
+            cloud_cluster_->is_dense = true;
+            ProcessCluster(cloud_cluster_, position, final_cluster_);
         }
     }
 
@@ -454,7 +474,7 @@ void LidarCluster::ClusterMethod() {
         SingleFrameDedup(position);
 
     if (enable_debug_) {
-        pcl::PCLPointCloud2 pcl_pc2_final; pcl::toPCLPointCloud2(*final_cluster, pcl_pc2_final); pcl_conversions::fromPCL(pcl_pc2_final, pub_pc);
+        pcl::PCLPointCloud2 pcl_pc2_final; pcl::toPCLPointCloud2(*final_cluster_, pcl_pc2_final); pcl_conversions::fromPCL(pcl_pc2_final, pub_pc);
         pub_pc.header = scan_header_;
         PublishDebugTopics();
     }

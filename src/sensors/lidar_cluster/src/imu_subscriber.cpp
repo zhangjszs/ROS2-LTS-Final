@@ -1,10 +1,10 @@
 #include <imu_subscriber.hpp>
 
 #include <numbers>
-ImuSubscriber::ImuSubscriber(rclcpp::Node::SharedPtr node, std::string topic_name, size_t buff_size) : node_(node) {
+ImuSubscriber::ImuSubscriber(rclcpp::Node* node, std::string topic_name, size_t buff_size) : node_(node) {
     subscriber_ = node_->create_subscription<common_msgs::msg::HuatInsP2>(
         topic_name, buff_size,
-        std::bind(&ImuSubscriber::MsgCallback, this, std::placeholders::_1));
+        [this](const common_msgs::msg::HuatInsP2::ConstSharedPtr msg) { MsgCallback(msg); });
 }
 
 void ImuSubscriber::MsgCallback(const common_msgs::msg::HuatInsP2::ConstSharedPtr imu_msg_ptr) {
@@ -18,12 +18,12 @@ void ImuSubscriber::MsgCallback(const common_msgs::msg::HuatInsP2::ConstSharedPt
     imu_data.angular_velocity.z = imu_msg_ptr->gyro_z;
     imu_data.rpy.heading = imu_msg_ptr->heading;
     imu_data.rpy.pitch = imu_msg_ptr->pitch;
-    std::lock_guard<std::mutex> lock(mtx);
+    std::scoped_lock lock(mtx);
     new_imu_data_.push_back(imu_data);
 }
 
 void ImuSubscriber::ParseData(std::deque<ImuData> &imu_data_buff) {
-    std::lock_guard<std::mutex> lock(mtx);
+    std::scoped_lock lock(mtx);
     if (!new_imu_data_.empty()) {
         imu_data_buff.insert(imu_data_buff.end(), new_imu_data_.begin(), new_imu_data_.end());
         new_imu_data_.clear();

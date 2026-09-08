@@ -82,33 +82,40 @@ size_t PointCloudPreprocessor::countValidPointsInRoi(PointSpan points, const Roi
     }));
 }
 
-void PointCloudPreprocessor::LoadZParams(rclcpp::Node::SharedPtr node) {
-    node->declare_parameter("road_type", 2);
-    node->declare_parameter("z_up", 0.7);
-    node->declare_parameter("z_down", -1.0);
+template <typename T>
+static void SafeDeclareParam(rclcpp::Node* node, const std::string& name, const T& default_val) {
+    if (!node->has_parameter(name)) {
+        node->declare_parameter(name, default_val);
+    }
+}
+
+void PointCloudPreprocessor::LoadZParams(rclcpp::Node* node) {
+    SafeDeclareParam(node, "road_type", 2);
+    SafeDeclareParam(node, "z_up", 0.7);
+    SafeDeclareParam(node, "z_down", -1.0);
 
     node->get_parameter("road_type", road_type_);
     node->get_parameter("z_up", z_up_);
     node->get_parameter("z_down", z_down_);
 }
 
-void PointCloudPreprocessor::LoadROIParams(rclcpp::Node::SharedPtr node) {
-    node->declare_parameter("accel_x_max", 0.0);
-    node->declare_parameter("accel_x_min", 0.0);
-    node->declare_parameter("accel_y_max", 0.0);
-    node->declare_parameter("accel_y_min", 0.0);
-    node->declare_parameter("track_x_max", 0.0);
-    node->declare_parameter("track_x_min", 0.0);
-    node->declare_parameter("track_y_max", 0.0);
-    node->declare_parameter("track_y_min", 0.0);
-    node->declare_parameter("enable_dynamic_roi", false);
-    node->declare_parameter("pitch_compensation", true);
-    node->declare_parameter("speed_compensation", true);
-    node->declare_parameter("z_pitch_scale", 0.1);
-    node->declare_parameter("speed_x_scale", 0.5);
-    node->declare_parameter("speed_y_shrink", 0.1);
-    node->declare_parameter("min_roi_x_max", 20.0);
-    node->declare_parameter("max_roi_x_max", 60.0);
+void PointCloudPreprocessor::LoadROIParams(rclcpp::Node* node) {
+    SafeDeclareParam(node, "accel_x_max", 0.0);
+    SafeDeclareParam(node, "accel_x_min", 0.0);
+    SafeDeclareParam(node, "accel_y_max", 0.0);
+    SafeDeclareParam(node, "accel_y_min", 0.0);
+    SafeDeclareParam(node, "track_x_max", 0.0);
+    SafeDeclareParam(node, "track_x_min", 0.0);
+    SafeDeclareParam(node, "track_y_max", 0.0);
+    SafeDeclareParam(node, "track_y_min", 0.0);
+    SafeDeclareParam(node, "enable_dynamic_roi", false);
+    SafeDeclareParam(node, "pitch_compensation", true);
+    SafeDeclareParam(node, "speed_compensation", true);
+    SafeDeclareParam(node, "z_pitch_scale", 0.1);
+    SafeDeclareParam(node, "speed_x_scale", 0.5);
+    SafeDeclareParam(node, "speed_y_shrink", 0.1);
+    SafeDeclareParam(node, "min_roi_x_max", 20.0);
+    SafeDeclareParam(node, "max_roi_x_max", 60.0);
 
     node->get_parameter("accel_x_max", accel_x_max_);
     node->get_parameter("accel_x_min", accel_x_min_);
@@ -128,14 +135,14 @@ void PointCloudPreprocessor::LoadROIParams(rclcpp::Node::SharedPtr node) {
     node->get_parameter("max_roi_x_max", max_roi_x_max_);
 }
 
-void PointCloudPreprocessor::LoadVoxelParams(rclcpp::Node::SharedPtr node) {
-    node->declare_parameter("enable_adaptive_voxel", false);
-    node->declare_parameter("voxel_ranges", std::string("5,15"));
-    node->declare_parameter("voxel_leaf_sizes", std::string("0.03,0.05,0.10"));
-    node->declare_parameter("enable_sor", false);
-    node->declare_parameter("sor_mean_k", 10);
-    node->declare_parameter("sor_stddev", 1.0);
-    node->declare_parameter("frp_coarse_leaf_size", 0.08);
+void PointCloudPreprocessor::LoadVoxelParams(rclcpp::Node* node) {
+    SafeDeclareParam(node, "enable_adaptive_voxel", false);
+    SafeDeclareParam(node, "voxel_ranges", std::string("5,15"));
+    SafeDeclareParam(node, "voxel_leaf_sizes", std::string("0.03,0.05,0.10"));
+    SafeDeclareParam(node, "enable_sor", false);
+    SafeDeclareParam(node, "sor_mean_k", 10);
+    SafeDeclareParam(node, "sor_stddev", 1.0);
+    SafeDeclareParam(node, "frp_coarse_leaf_size", 0.08);
 
     node->get_parameter("enable_adaptive_voxel", enable_adaptive_voxel_);
     node->get_parameter("voxel_ranges", voxel_ranges_str_);
@@ -146,7 +153,7 @@ void PointCloudPreprocessor::LoadVoxelParams(rclcpp::Node::SharedPtr node) {
     node->get_parameter("frp_coarse_leaf_size", frp_coarse_leaf_size_);
 }
 
-PointCloudPreprocessor::PointCloudPreprocessor(rclcpp::Node::SharedPtr node) {
+PointCloudPreprocessor::PointCloudPreprocessor(rclcpp::Node* node) {
     LoadZParams(node);
     LoadROIParams(node);
     LoadVoxelParams(node);

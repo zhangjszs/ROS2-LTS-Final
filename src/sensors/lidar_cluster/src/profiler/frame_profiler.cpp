@@ -2,7 +2,7 @@
 
 #include <format>
 
-FrameProfiler::FrameProfiler(rclcpp::Node::SharedPtr node, const std::string &topic, double warn_ms, double error_ms,
+FrameProfiler::FrameProfiler(rclcpp::Node* node, const std::string &topic, double warn_ms, double error_ms,
                              int consecutive_threshold)
     : warn_ms_(warn_ms), error_ms_(error_ms), consecutive_threshold_(consecutive_threshold) {
     pub_ = node->create_publisher<std_msgs::msg::Float64MultiArray>(topic, 10);

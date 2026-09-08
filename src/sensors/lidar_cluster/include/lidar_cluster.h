@@ -39,7 +39,9 @@ constexpr int kHighSpeedTracking = 3;
 
 class LidarCluster {
    public:
-    LidarCluster(rclcpp::Node::SharedPtr node);
+    explicit LidarCluster(rclcpp::Node* node);
+    explicit LidarCluster(rclcpp::Node& node) : LidarCluster(&node) {}
+    explicit LidarCluster(const rclcpp::Node::SharedPtr& node) : LidarCluster(node.get()) {}
     ~LidarCluster();
 
     /**
@@ -52,7 +54,7 @@ class LidarCluster {
 
    private:
     // ========== 节点 / 通信 ==========
-    rclcpp::Node::SharedPtr node_;
+    rclcpp::Node* node_{nullptr};
     rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr sub_point_cloud_;
     rclcpp::Subscription<common_msgs::msg::HuatInsP2>::SharedPtr sub_ins_;
     rclcpp::Subscription<common_msgs::msg::HuatASENSING>::SharedPtr sub_asensing_;
@@ -73,10 +75,19 @@ class LidarCluster {
     // ========== 点云缓冲区 ==========
     pcl::PointCloud<PointType>::Ptr g_not_ground_pc;
     pcl::PointCloud<PointType>::Ptr current_pc_ptr;
-    pcl::PointCloud<PointType>::Ptr distortion_out;
     pcl::PointCloud<PointType>::Ptr cloud_filtered;
     pcl::PointCloud<PointType>::Ptr skidpad_detection_pc;
     std::vector<pcl::PointCloud<PointType>::Ptr> cloud_segments_array_;
+
+    // ========== 预分配复用点云缓冲区（消除 20Hz 热路径中的 new / free 堆分配） ==========
+    pcl::PointCloud<PointType>::Ptr incoming_cloud_buf_;      // 接收线程专用的暂存缓冲区
+    pcl::PointCloud<PointType>::Ptr ready_cloud_buf_;         // 互斥交换区，存放最新完整帧
+    pcl::PointCloud<PointType>::Ptr processing_pc_;           // 算法处理线程专用的工作缓冲区
+    pcl::PointCloud<PointType>::Ptr ground_pc_;               // 地面分割预分配缓冲区
+    pcl::PointCloud<PointType>::Ptr cloud_cluster_;           // 单个聚类预分配缓冲区
+    pcl::PointCloud<PointType>::Ptr final_cluster_;           // 最终聚类融合预分配缓冲区
+    pcl::PointCloud<PointType>::Ptr distortion_adjusted_pc_;  // 畸变校正预分配缓冲区
+    pcl::PointCloud<PointType>::Ptr accum_downsampled_pc_;    // 时序累积降采样预分配缓冲区
 
     // ========== 消息头 / 可视化 ==========
     sensor_msgs::msg::PointCloud2 out_pc;

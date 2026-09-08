@@ -40,19 +40,6 @@ target_link_libraries(${PROJECT_NAME}_viewer
   ${PCL_LIBRARIES}
 )
 
-if(BUILD_TESTING)
-  find_package(ament_cmake_gtest REQUIRED)
-  ament_add_gtest(test_lidar_cluster_scoring
-    test/test_lidar_cluster_scoring.cpp
-  )
-  target_link_libraries(test_lidar_cluster_scoring
-    ${PROJECT_NAME}
-    pcl_conversions::pcl_conversions
-    rclcpp::rclcpp
-    common_msgs::common_msgs
-    ${PCL_LIBRARIES}
-  )
-endif()
 
 link_directories(${PCL_LIBRARY_DIRS})
 add_library(${PROJECT_NAME} SHARED
@@ -118,5 +105,14 @@ ament_export_dependencies(
   visualization_msgs
   pluginlib
 )
+
+if(BUILD_TESTING)
+  find_package(ament_cmake_gtest REQUIRED)
+  ament_add_gtest(test_lidar_cluster_scoring test/test_lidar_cluster_scoring.cpp)
+  target_link_libraries(test_lidar_cluster_scoring ${PROJECT_NAME})
+
+  ament_add_gtest(test_lidar_cluster_component test/test_lidar_cluster_component.cpp)
+  target_link_libraries(test_lidar_cluster_component ${PROJECT_NAME})
+endif()
 
 ament_package()

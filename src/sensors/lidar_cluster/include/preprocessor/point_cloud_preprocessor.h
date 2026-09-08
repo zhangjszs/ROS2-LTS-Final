@@ -12,7 +12,9 @@ class PointCloudPreprocessor {
     using PointSpan = std::span<const PointType>;
     using MutablePointSpan = std::span<PointType>;
 
-    explicit PointCloudPreprocessor(rclcpp::Node::SharedPtr node);
+    explicit PointCloudPreprocessor(rclcpp::Node* node);
+    explicit PointCloudPreprocessor(rclcpp::Node& node) : PointCloudPreprocessor(&node) {}
+    explicit PointCloudPreprocessor(const rclcpp::Node::SharedPtr& node) : PointCloudPreprocessor(node.get()) {}
 
     void process(pcl::PointCloud<PointType>::Ptr& cloud, bool frp_active, double current_pitch, double current_speed);
 
@@ -33,9 +35,9 @@ class PointCloudPreprocessor {
     void adaptiveVoxelGrid(pcl::PointCloud<PointType>::Ptr& cloud, bool frp_active);
     void applySOR(pcl::PointCloud<PointType>::Ptr& cloud);
 
-    void LoadZParams(rclcpp::Node::SharedPtr node);
-    void LoadROIParams(rclcpp::Node::SharedPtr node);
-    void LoadVoxelParams(rclcpp::Node::SharedPtr node);
+    void LoadZParams(rclcpp::Node* node);
+    void LoadROIParams(rclcpp::Node* node);
+    void LoadVoxelParams(rclcpp::Node* node);
 
     int road_type_ = 2;
     bool enable_dynamic_roi_ = false;

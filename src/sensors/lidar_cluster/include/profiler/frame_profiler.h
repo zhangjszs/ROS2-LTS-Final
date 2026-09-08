@@ -19,8 +19,14 @@
  */
 class FrameProfiler {
    public:
-    FrameProfiler(rclcpp::Node::SharedPtr node, const std::string &topic, double warn_ms, double error_ms,
-                  int consecutive_threshold);
+    explicit FrameProfiler(rclcpp::Node* node, const std::string &topic, double warn_ms, double error_ms,
+                           int consecutive_threshold);
+    explicit FrameProfiler(rclcpp::Node& node, const std::string &topic, double warn_ms, double error_ms,
+                           int consecutive_threshold)
+        : FrameProfiler(&node, topic, warn_ms, error_ms, consecutive_threshold) {}
+    explicit FrameProfiler(const rclcpp::Node::SharedPtr& node, const std::string &topic, double warn_ms, double error_ms,
+                           int consecutive_threshold)
+        : FrameProfiler(node.get(), topic, warn_ms, error_ms, consecutive_threshold) {}
 
     /**
      * @brief 发布性能分析数据并评估自动告警阈值。

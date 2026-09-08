@@ -11,28 +11,28 @@
 #include <string>
 using namespace lidar_distortion;
 
-LidarCluster::LidarCluster(rclcpp::Node::SharedPtr node) : node_(node) {
+LidarCluster::LidarCluster(rclcpp::Node* node) : node_(node) {
     Init();
 
-    // 初始化订阅者
+    // 初始化订阅者 (使用 C++20 强类型 Lambda 替代 std::bind)
     sub_point_cloud_ = node_->create_subscription<sensor_msgs::msg::PointCloud2>(
         input_topic_, point_cloud_queue_size_,
-        std::bind(&LidarCluster::OnPointCloud, this, std::placeholders::_1));
+        [this](const sensor_msgs::msg::PointCloud2::ConstSharedPtr msg) { OnPointCloud(msg); });
     // vehicle_state 订阅：dynamic_roi 或时序累积自运动补偿均需要位姿
     if (enable_dynamic_roi_ || enable_temporal_accumulation_) {
         sub_vehicle_state_ = node_->create_subscription<common_msgs::msg::HuatCarstate>(
             vehicle_state_topic_, 10,
-            std::bind(&LidarCluster::OnVehicleState, this, std::placeholders::_1));
+            [this](const common_msgs::msg::HuatCarstate::ConstSharedPtr msg) { OnVehicleState(msg); });
         RCLCPP_INFO(node_->get_logger(), "[lidar_cluster] Vehicle state subscriber active (dynamic_roi=%s, temporal_accum=%s)",
                  enable_dynamic_roi_ ? "true" : "false", enable_temporal_accumulation_ ? "true" : "false");
     }
     if (enable_dynamic_roi_ || enable_ground_slope_compensation_) {
         sub_asensing_ = node_->create_subscription<common_msgs::msg::HuatASENSING>(
             ins_asensing_topic_, 10,
-            std::bind(&LidarCluster::OnAsensing, this, std::placeholders::_1));
+            [this](const common_msgs::msg::HuatASENSING::ConstSharedPtr msg) { OnAsensing(msg); });
         sub_ins_ = node_->create_subscription<common_msgs::msg::HuatInsP2>(
             ins_p2_topic_, 10,
-            std::bind(&LidarCluster::OnInsP2, this, std::placeholders::_1));
+            [this](const common_msgs::msg::HuatInsP2::ConstSharedPtr msg) { OnInsP2(msg); });
         RCLCPP_INFO(node_->get_logger(), "[lidar_cluster] Pitch/ROI INS: ASENSING=%s ins_p2=%s", ins_asensing_topic_.c_str(),
                  ins_p2_topic_.c_str());
     }
@@ -98,13 +98,13 @@ void LidarCluster::ComputeGroundSegParams(GroundSegParams &params) {
 void LidarCluster::AccumulateTemporalFrames() {
     double cur_x, cur_y, cur_theta;
     {
-        std::lock_guard<std::mutex> lock(acc_pose_mutex_);
+        std::scoped_lock lock(acc_pose_mutex_);
         cur_x = acc_car_x_;
         cur_y = acc_car_y_;
         cur_theta = acc_car_theta_;
     }
 
-    pcl::PointCloud<PointType>::Ptr current_far(new pcl::PointCloud<PointType>);
+    pcl::PointCloud<PointType>::Ptr current_far = std::make_shared<pcl::PointCloud<PointType>>();
     float d2_thresh = static_cast<float>(accumulation_min_distance_ * accumulation_min_distance_);
     for (const auto &p : g_not_ground_pc->points) {
         if (p.x * p.x + p.y * p.y >= d2_thresh)
@@ -146,9 +146,9 @@ void LidarCluster::AccumulateTemporalFrames() {
         pcl::VoxelGrid<PointType> voxel;
         voxel.setLeafSize(accumulation_voxel_size_, accumulation_voxel_size_, accumulation_voxel_size_);
         voxel.setInputCloud(g_not_ground_pc);
-        pcl::PointCloud<PointType>::Ptr downsampled(new pcl::PointCloud<PointType>);
-        voxel.filter(*downsampled);
-        *g_not_ground_pc = std::move(*downsampled);
+        accum_downsampled_pc_->clear();
+        voxel.filter(*accum_downsampled_pc_);
+        *g_not_ground_pc = std::move(*accum_downsampled_pc_);
     }
 
     RCLCPP_DEBUG(node_->get_logger(), "[lidar_cluster] Temporal accum: %zu frames, far=%zu, total non-ground=%zu",
@@ -163,18 +163,17 @@ void LidarCluster::ApplyDistortionAdjustment(pcl::PointCloud<PointType>::Ptr &cl
     if (!imu_sub_ptr_->SyncData(unsynced_imu_, synced_imu, cloud_time))
         return;
     disAdjust->SetMotionInfo(scan_period_, synced_imu);
-    pcl::PointCloud<PointType>::Ptr adjusted(new pcl::PointCloud<PointType>);
-    disAdjust->AdjustCloud(cloud, adjusted);
-    cloud = adjusted;
+    distortion_adjusted_pc_->clear();
+    disAdjust->AdjustCloud(cloud, distortion_adjusted_pc_);
+    cloud = distortion_adjusted_pc_;
 }
 
 void LidarCluster::RunAlgorithm() {
     bool no_cloud_yet = false;
     bool empty_cloud = false;
     bool waiting_for_scan = false;
-    pcl::PointCloud<PointType>::Ptr processing_pc(new pcl::PointCloud<PointType>);
     {
-        std::lock_guard<std::mutex> lock(lidar_mutex);
+        std::scoped_lock lock(lidar_mutex);
         if (!pending_cloud_) {
             waiting_for_scan = true;
             no_cloud_yet = !has_point_clouds_;
@@ -182,16 +181,16 @@ void LidarCluster::RunAlgorithm() {
             pending_cloud_ = false;
             no_cloud_yet = !has_point_clouds_;
             scan_header_ = in_pc.header;
-            if (!current_pc_ptr || current_pc_ptr->empty()) {
+            if (!ready_cloud_buf_ || ready_cloud_buf_->empty()) {
                 empty_cloud = true;
             } else {
-                processing_pc.swap(current_pc_ptr);
-                current_pc_ptr.reset(new pcl::PointCloud<PointType>());
+                processing_pc_.swap(ready_cloud_buf_);
+                current_pc_ptr = ready_cloud_buf_;
             }
         }
     }
     {
-        std::lock_guard<std::mutex> lock(acc_pose_mutex_);
+        std::scoped_lock lock(acc_pose_mutex_);
         scan_speed_ = current_speed_;
         scan_pitch_ = current_pitch_;
         scan_has_ins_ = has_ins_p2_;
@@ -220,11 +219,11 @@ void LidarCluster::RunAlgorithm() {
                           ins_asensing_topic_.c_str(), ins_p2_topic_.c_str());
     }
 
-    ApplyDistortionAdjustment(processing_pc);
+    ApplyDistortionAdjustment(processing_pc_);
 
     auto startTimePassThrough = std::chrono::steady_clock::now();
-    preprocessor_->process(processing_pc, frp_active_, scan_pitch_, scan_speed_);
-    cloud_filtered = processing_pc;
+    preprocessor_->process(processing_pc_, frp_active_, scan_pitch_, scan_speed_);
+    cloud_filtered = processing_pc_;
     auto endTimePassThrough = std::chrono::steady_clock::now();
     double elapsedTimePassThrough =
         std::chrono::duration_cast<std::chrono::microseconds>(endTimePassThrough - startTimePassThrough).count() /
@@ -246,8 +245,8 @@ void LidarCluster::RunAlgorithm() {
     auto startTimeSeg = std::chrono::steady_clock::now();
     GroundSegParams gs_params;
     ComputeGroundSegParams(gs_params);
-    pcl::PointCloud<PointType>::Ptr ground_pc(new pcl::PointCloud<PointType>());
-    ground_strategy_->segment(cloud_filtered, ground_pc, g_not_ground_pc, gs_params);
+    ground_pc_->clear();
+    ground_strategy_->segment(cloud_filtered, ground_pc_, g_not_ground_pc, gs_params);
 
     if (enable_temporal_accumulation_)
         AccumulateTemporalFrames();
@@ -290,29 +289,34 @@ void LidarCluster::WaitForPendingCloud() {
 }
 
 void LidarCluster::OnPointCloud(const sensor_msgs::msg::PointCloud2::ConstSharedPtr original_cloud_ptr) {
-    // 在锁外转换，以缩小临界区
-    pcl::PointCloud<PointType>::Ptr tmp_cloud(new pcl::PointCloud<PointType>);
-    pcl::PCLPointCloud2 pcl_pc2_original; pcl_conversions::toPCL(*original_cloud_ptr, pcl_pc2_original); pcl::fromPCLPointCloud2(pcl_pc2_original, *tmp_cloud);
+    // 在锁外转换，复用预分配点云缓冲，消除高频堆内存申请
+    incoming_cloud_buf_->clear();
+    pcl::PCLPointCloud2 pcl_pc2_original;
+    pcl_conversions::toPCL(*original_cloud_ptr, pcl_pc2_original);
+    pcl::fromPCLPointCloud2(pcl_pc2_original, *incoming_cloud_buf_);
 
-    std::lock_guard<std::mutex> lock(lidar_mutex);
-    out_pc.data.clear();
-    out_pc.width = 0;
-    out_pc.height = 1;
-    out_pc.row_step = 0;
-    has_point_clouds_ = true;
-    pending_cloud_ = true;
+    {
+        std::scoped_lock lock(lidar_mutex);
+        out_pc.data.clear();
+        out_pc.width = 0;
+        out_pc.height = 1;
+        out_pc.row_step = 0;
+        has_point_clouds_ = true;
+        pending_cloud_ = true;
 
-    in_pc = *original_cloud_ptr;  // 保存头信息
-    current_pc_ptr.swap(tmp_cloud);
+        in_pc = *original_cloud_ptr;  // 保存头信息
+        ready_cloud_buf_.swap(incoming_cloud_buf_);
+        current_pc_ptr = ready_cloud_buf_;
 
-    out_pc.header.frame_id = "velodyne";
-    out_pc.header.stamp = original_cloud_ptr->header.stamp;
-    cloud_time = original_cloud_ptr->header.stamp.sec + original_cloud_ptr->header.stamp.nanosec * 1e-9;
+        out_pc.header.frame_id = "velodyne";
+        out_pc.header.stamp = original_cloud_ptr->header.stamp;
+        cloud_time = original_cloud_ptr->header.stamp.sec + original_cloud_ptr->header.stamp.nanosec * 1e-9;
+    }
     cloud_cv_.notify_one();
 }
 
 void LidarCluster::OnVehicleState(const common_msgs::msg::HuatCarstate::ConstSharedPtr msg) {
-    std::lock_guard<std::mutex> lock(acc_pose_mutex_);
+    std::scoped_lock lock(acc_pose_mutex_);
     current_speed_ = static_cast<double>(msg->v);
     acc_car_x_ = msg->car_state.x;
     acc_car_y_ = msg->car_state.y;
@@ -320,7 +324,7 @@ void LidarCluster::OnVehicleState(const common_msgs::msg::HuatCarstate::ConstSha
 }
 
 void LidarCluster::OnInsP2(const common_msgs::msg::HuatInsP2::ConstSharedPtr msg) {
-    std::lock_guard<std::mutex> lock(acc_pose_mutex_);
+    std::scoped_lock lock(acc_pose_mutex_);
     if (!has_ins_p2_) {
         has_ins_p2_ = true;
         RCLCPP_INFO(node_->get_logger(), "[lidar_cluster] %s received — pitch compensation active", ins_p2_topic_.c_str());
@@ -329,7 +333,7 @@ void LidarCluster::OnInsP2(const common_msgs::msg::HuatInsP2::ConstSharedPtr msg
 }
 
 void LidarCluster::OnAsensing(const common_msgs::msg::HuatASENSING::ConstSharedPtr msg) {
-    std::lock_guard<std::mutex> lock(acc_pose_mutex_);
+    std::scoped_lock lock(acc_pose_mutex_);
     if (!has_ins_p2_) {
         has_ins_p2_ = true;
         RCLCPP_INFO(node_->get_logger(), "[lidar_cluster] %s received — pitch compensation active (pitch=%.2f deg)",

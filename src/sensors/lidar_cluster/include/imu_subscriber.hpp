@@ -6,7 +6,11 @@
 #include <imu_data.hpp>
 class ImuSubscriber {
    public:
-    ImuSubscriber(rclcpp::Node::SharedPtr node, std::string topic_name, size_t buff_size);
+    explicit ImuSubscriber(rclcpp::Node* node, std::string topic_name, size_t buff_size);
+    explicit ImuSubscriber(rclcpp::Node& node, std::string topic_name, size_t buff_size)
+        : ImuSubscriber(&node, std::move(topic_name), buff_size) {}
+    explicit ImuSubscriber(const rclcpp::Node::SharedPtr& node, std::string topic_name, size_t buff_size)
+        : ImuSubscriber(node.get(), std::move(topic_name), buff_size) {}
     ImuSubscriber() = default;
     bool buff_mutex_;
 
@@ -16,7 +20,7 @@ class ImuSubscriber {
     bool readAndSync(std::deque<ImuData>& unsynced_imu_, ImuData& synced_data, double sync_time);
 
    private:
-    rclcpp::Node::SharedPtr node_;
+    rclcpp::Node* node_{nullptr};
     rclcpp::Subscription<common_msgs::msg::HuatInsP2>::SharedPtr subscriber_;
     std::deque<ImuData> imu_data_buff_;
     std::deque<ImuData> new_imu_data_;
