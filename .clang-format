@@ -1,0 +1,47 @@
+---
+# Clang-Format configuration for FSAC ROS 2 C++20 Codebase
+Language: Cpp
+BasedOnStyle: Google
+Standard: c++20
+
+# 缩进与排版 (4格缩进，匹配工程规范)
+IndentWidth: 4
+TabWidth: 4
+UseTab: Never
+ColumnLimit: 120
+
+# 访问修饰符 (public/private 缩进)
+AccessModifierOffset: -1
+
+# 换行与括号规则
+BreakBeforeBraces: Attach
+AllowShortFunctionsOnASingleLine: Inline
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+AllowShortCaseLabelsOnASingleLine: false
+AllowShortBlocksOnASingleLine: Never
+AlwaysBreakTemplateDeclarations: Yes
+
+# 现代 C++20 特性格式化
+BreakBeforeConceptDeclarations: Always
+RequiresClausePosition: OwnLine
+IndentRequiresClause: true
+
+# 参数与操作符对齐
+AlignAfterOpenBracket: Align
+AlignConsecutiveAssignments: false
+AlignConsecutiveDeclarations: false
+AlignOperands: Align
+BinPackArguments: true
+BinPackParameters: true
+BreakBeforeBinaryOperators: None
+BreakBeforeTernaryOperators: true
+
+# 命名空间与注释
+FixNamespaceComments: true
+NamespaceIndentation: None
+
+# 头文件自动排序与分组
+SortIncludes: CaseSensitive
+IncludeBlocks: Regroup
+...
