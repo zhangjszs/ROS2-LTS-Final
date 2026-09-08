@@ -25,32 +25,25 @@ bool WayComputer::ShouldRemoveTriangle(const Triangle &t) const {
 }
 
 void WayComputer::filterTriangulation(TriangleSet &triangulation) const {
-    auto it = triangulation.begin();
-    while (it != triangulation.end()) {
-        if (ShouldRemoveTriangle(*it))
-            it = triangulation.erase(it);
-        else
-            it++;
-    }
+    std::erase_if(triangulation, [this](const Triangle &t) {
+        return ShouldRemoveTriangle(t);
+    });
 }
 
 void WayComputer::filterMidpoints(EdgeSet &edges, const TriangleSet &triangulation) const {
-    std::vector<Point> circums(triangulation.size());
-    std::transform(triangulation.begin(), triangulation.end(), circums.begin(),
-                   [](const Triangle &t) -> const Point & { return t.circumCenter(); });
+    std::vector<Point> circums;
+    circums.reserve(triangulation.size());
+    for (const Triangle &t : triangulation) {
+        circums.push_back(t.circumCenter());
+    }
     KDTree circumKDTree(circums);
 
-    auto it = edges.begin();
-    while (it != edges.end()) {
-        Point midPoint = it->midPoint();
-        KDTData<size_t> nearestCC = circumKDTree.nearest_index(midPoint);
-        if (bool(nearestCC) and
-            Point::distSq(circums[*nearestCC], midPoint) > pow(this->params_.max_dist_circum_midPoint, 2)) {
-            it = edges.erase(it);
-        } else {
-            it++;
-        }
-    }
+    const double max_dist_sq = this->params_.max_dist_circum_midPoint * this->params_.max_dist_circum_midPoint;
+    std::erase_if(edges, [&](const Edge &e) {
+        Point midPoint = e.midPoint();
+        std::optional<size_t> nearestCC = circumKDTree.nearest_index(midPoint);
+        return nearestCC.has_value() && Point::distSq(circums[*nearestCC], midPoint) > max_dist_sq;
+    });
 }
 
 double WayComputer::getHeuristic(const Point &actPos, const Point &nextPos, const Vector &dir,
@@ -141,19 +134,23 @@ void WayComputer::ResolveSearchContext(const Trace *actTrace, const std::vector<
 }
 
 void WayComputer::AppendPointsToPath(const std::vector<Point> &pts, common_msgs::msg::HuatPathLimits &res) {
-    res.path.reserve(pts.size());
-    for (const Point &p : pts)
-        res.path.push_back(p.gmPoint());
+    res.path.reserve(res.path.size() + pts.size());
+    std::ranges::transform(pts, std::back_inserter(res.path), [](const Point &p) {
+        return p.gmPoint();
+    });
 }
 
 void WayComputer::FillTracklimits(common_msgs::msg::HuatPathLimits &res) const {
     const Tracklimits tracklimits = this->wayToPublish_.getTracklimits();
     res.tracklimits.header.stamp = this->lastStamp_;
     res.tracklimits.left.reserve(tracklimits.left.size());
-    for (const Node &n : tracklimits.left)
-        res.tracklimits.left.push_back(n.cone());
-    for (const Node &n : tracklimits.right)
-        res.tracklimits.right.push_back(n.cone());
+    std::ranges::transform(tracklimits.left, std::back_inserter(res.tracklimits.left), [](const Node &n) {
+        return n.cone();
+    });
+    res.tracklimits.right.reserve(tracklimits.right.size());
+    std::ranges::transform(tracklimits.right, std::back_inserter(res.tracklimits.right), [](const Node &n) {
+        return n.cone();
+    });
     res.tracklimits.replan = this->way_.quinEhLobjetiuDeLaSevaDiresio(this->lastWay_);
 }
 
@@ -168,13 +165,10 @@ void WayComputer::findNextEdges(std::vector<HeurInd> &nextEdges, const Trace *ac
 
     std::unordered_set<size_t> nextPossibleEdges = midpointsKDT.neighborhood_indices_set(actPos, params.search_radius);
 
-    auto it = nextPossibleEdges.begin();
-    while (it != nextPossibleEdges.end()) {
-        if (shouldExcludeEdge(edges[*it], actEdge, actPos, lastPos, dir, actTrace, params))
-            it = nextPossibleEdges.erase(it);
-        else
-            it++;
-    }
+    // C++20 统一容器擦除
+    std::erase_if(nextPossibleEdges, [&](size_t edge_idx) {
+        return shouldExcludeEdge(edges[edge_idx], actEdge, actPos, lastPos, dir, actTrace, params);
+    });
 
     std::vector<HeurInd> privilege_runner;
     privilege_runner.reserve(nextPossibleEdges.size());
@@ -257,14 +251,14 @@ void WayComputer::computeWay(const std::vector<Edge> &edges, const UrinayParams:
 
         if (this->way_.closesLoop()) {
             Way closed = this->way_.restructureClosure();
-            std::lock_guard<std::mutex> lock(way_mutex_);
+            std::scoped_lock lock(way_mutex_);
             this->wayToPublish_ = closed;
             this->isLoopClosed_ = true;
             return;
         }
         this->findNextEdges(nextEdges, nullptr, midpointsKDT, edges, params);
     }
-    std::lock_guard<std::mutex> lock(way_mutex_);
+    std::scoped_lock lock(way_mutex_);
     this->isLoopClosed_ = false;
     this->wayToPublish_ = this->way_;
 }
@@ -294,7 +288,7 @@ void WayComputer::stateCallback(common_msgs::msg::HuatCarstate::ConstSharedPtr i
     tf2::fromMsg(next_pose, next_local_tf);  // localTf_ 我在获取了全局姿态下的位资后。
     next_local_tf = next_local_tf.inverse();
 
-    std::lock_guard<std::mutex> lock(state_mutex_);
+    std::scoped_lock lock(state_mutex_);
     CarState = next_state;
     pose = next_pose;
     this->localTf_ = next_local_tf;
@@ -304,7 +298,7 @@ void WayComputer::stateCallback(common_msgs::msg::HuatCarstate::ConstSharedPtr i
 void WayComputer::update(TriangleSet &triangulation, const rclcpp::Time &stamp) {
     Eigen::Affine3d local_tf_snapshot;
     {
-        std::lock_guard<std::mutex> lock(state_mutex_);
+        std::scoped_lock lock(state_mutex_);
         if (not this->localTfValid_) {
             RCLCPP_WARN(rclcpp::get_logger("urinay"), "[urinay] Vehicle state not received");
             return;
@@ -359,7 +353,7 @@ void WayComputer::update(TriangleSet &triangulation, const rclcpp::Time &stamp) 
     // #7: 可视化（快照保护，避免与 computeWay 竞态）
     Way waySnapshot;
     {
-        std::lock_guard<std::mutex> lock(way_mutex_);
+        std::scoped_lock lock(way_mutex_);
         waySnapshot = this->wayToPublish_;
     }
     UrinayVisualizer::getInstance().setTimestamp(stamp);
@@ -369,12 +363,12 @@ void WayComputer::update(TriangleSet &triangulation, const rclcpp::Time &stamp) 
 }
 
 const bool &WayComputer::isLoopClosed() const {
-    std::lock_guard<std::mutex> lock(way_mutex_);
+    std::scoped_lock lock(way_mutex_);
     return this->isLoopClosed_;
 }
 
 void WayComputer::writeWayToFile(const std::string &file_path) const {
-    std::lock_guard<std::mutex> lock(way_mutex_);
+    std::scoped_lock lock(way_mutex_);
     std::ofstream oStreamToWrite(file_path);
     if (!oStreamToWrite.is_open()) {
         RCLCPP_ERROR(rclcpp::get_logger("urinay"), "[urinay] Failed to open file for writing: %s", file_path.c_str());
@@ -384,27 +378,27 @@ void WayComputer::writeWayToFile(const std::string &file_path) const {
 }
 
 bool WayComputer::isLocalTfValid() const {
-    std::lock_guard<std::mutex> lock(state_mutex_);
+    std::scoped_lock lock(state_mutex_);
     return this->localTfValid_;
 }
 
 Eigen::Affine3d WayComputer::getLocalTf() const {
-    std::lock_guard<std::mutex> lock(state_mutex_);
+    std::scoped_lock lock(state_mutex_);
     return this->localTf_;
 }
 
 std::vector<Point> WayComputer::getPath() const {
-    std::lock_guard<std::mutex> lock(way_mutex_);
+    std::scoped_lock lock(way_mutex_);
     return this->wayToPublish_.getPath();
 }
 
 Tracklimits WayComputer::getTracklimits() const {
-    std::lock_guard<std::mutex> lock(way_mutex_);
+    std::scoped_lock lock(way_mutex_);
     return this->wayToPublish_.getTracklimits();
 }
 
 common_msgs::msg::HuatPathLimits WayComputer::getPathLimits() const {
-    std::lock_guard<std::mutex> lock(way_mutex_);
+    std::scoped_lock lock(way_mutex_);
     common_msgs::msg::HuatPathLimits res;
     res.header.stamp = this->lastStamp_;
     res.header.frame_id = "map";
@@ -423,7 +417,7 @@ common_msgs::msg::HuatPathLimits WayComputer::getPathLimits() const {
  * mode 4/5（局部坐标插值）和 mode 6（局部坐标）路径在 base_link 帧，其余在 map 帧。
  */
 common_msgs::msg::HuatPathLimits WayComputer::getPathLimitsGlobal(PathMode mode) {
-    std::lock_guard<std::mutex> lock(way_mutex_);
+    std::scoped_lock lock(way_mutex_);
     common_msgs::msg::HuatPathLimits res;
     res.header.stamp = this->lastStamp_;
     res.header.frame_id =
@@ -432,7 +426,7 @@ common_msgs::msg::HuatPathLimits WayComputer::getPathLimitsGlobal(PathMode mode)
             : "map";
     geometry_msgs::msg::Pose pose_snapshot;
     {
-        std::lock_guard<std::mutex> lock(state_mutex_);
+        std::scoped_lock lock(state_mutex_);
         pose_snapshot = pose;
     }
     // res.replan 表示路径是否与上次迭代不同
@@ -479,6 +473,6 @@ common_msgs::msg::HuatPathLimits WayComputer::getPathLimitsGlobal(PathMode mode)
 }
 
 common_msgs::msg::HuatCarstate WayComputer::getCarState() {
-    std::lock_guard<std::mutex> lock(state_mutex_);
+    std::scoped_lock lock(state_mutex_);
     return CarState;
 }

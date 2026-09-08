@@ -158,7 +158,9 @@ int main(int argc, char **argv) {
     // 车辆位姿订阅
     auto subPose = node->create_subscription<common_msgs::msg::HuatCarstate>(
         g_params->main.input_pose_topic, 1,
-        std::bind(&WayComputer::stateCallback, g_wayComputer.get(), std::placeholders::_1));
+        [](const common_msgs::msg::HuatCarstate::ConstSharedPtr &data) {
+            g_wayComputer->stateCallback(data);
+        });
 
     rclcpp::executors::MultiThreadedExecutor executor;
     executor.add_node(node);

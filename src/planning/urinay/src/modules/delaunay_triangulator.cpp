@@ -10,22 +10,23 @@
 
 #include "modules/delaunay_triangulator.hpp"
 
+#include <algorithm>
+#include <cassert>
+#include <ranges>
 #include <unordered_map>
 
 /* ----------------------------- 私有方法 ---------------------------- */
-//超级三角形是用来包围一组节点的初始三角形，在进行Delaunay三角剖分时，这个超级三角形会被去除。
-Triangle DelaunayTriangulator::superTriangle(const std::vector<Node> &nodes) {
-    // 查找坐标的最大值和最小值
-    double xmax = nodes.front().x();  // front 获取链表的第一个节点
-    double xmin = nodes.front().x();
-    double ymax = nodes.front().y();
-    double ymin = nodes.front().y();
-    for (const Node &n : nodes) {
-        xmax = std::max(xmax, n.x());
-        xmin = std::min(xmin, n.x());
-        ymax = std::max(ymax, n.y());
-        ymin = std::min(ymin, n.y());
-    }
+// 超级三角形是用来包围一组节点的初始三角形，在进行 Delaunay 三角剖分后，属于超级三角形的三角形会被去除。
+Triangle DelaunayTriangulator::superTriangle(std::span<const Node> nodes) {
+    assert(!nodes.empty());
+    // C++20 std::ranges::minmax_element 配合投影函数，一行代码求出 x/y 轴极值范围
+    auto [min_x_it, max_x_it] = std::ranges::minmax_element(nodes, {}, [](const Node &n) { return n.x(); });
+    auto [min_y_it, max_y_it] = std::ranges::minmax_element(nodes, {}, [](const Node &n) { return n.y(); });
+
+    const double xmin = min_x_it->x();
+    const double xmax = max_x_it->x();
+    const double ymin = min_y_it->y();
+    const double ymax = max_y_it->y();
 
     const double dx = xmax - xmin;
     const double dy = ymax - ymin;
@@ -43,7 +44,7 @@ Triangle DelaunayTriangulator::superTriangle(const std::vector<Node> &nodes) {
 /* ----------------------------- 公有方法 ----------------------------- */
 // 目的为了构建一个超级大三角形，完成包含所有点的工作，做这个工作的原因保证后续三角剖分的正确性与完整性
 
-TriangleSet DelaunayTriangulator::compute(const std::vector<Node> &nodes) {
+TriangleSet DelaunayTriangulator::compute(std::span<const Node> nodes) {
     if (nodes.size() < 3)
         return {};
     //创建一个TriangleSet对象用于存储三角剖分结果

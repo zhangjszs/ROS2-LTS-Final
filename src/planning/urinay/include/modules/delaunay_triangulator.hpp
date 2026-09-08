@@ -12,6 +12,7 @@
 
 #include <cmath>
 #include <iostream>
+#include <span>
 #include <vector>
 
 #include "structures/Triangle.hpp"
@@ -25,16 +26,16 @@ class DelaunayTriangulator {
     /**
      * @brief 构建并返回一个包含 nodes 中所有节点的三角形。
      *
-     * @param[in] nodes
+     * @param[in] nodes C++20 非拥有型节点切片视图
      */
-    static Triangle superTriangle(const std::vector<Node> &nodes);
+    static Triangle superTriangle(std::span<const Node> nodes);
 
    public:
     /**
      * @brief 使用 Bowyer-Watson 算法实现计算 Delaunay 三角网集合，
      * 以在给定点集的情况下找到 Delaunay 三角剖分。时间复杂度 O(nlogn)。
      *
-     * @param nodes
+     * @param nodes C++20 非拥有型节点切片视图
      */
-    static TriangleSet compute(const std::vector<Node> &nodes);
+    static TriangleSet compute(std::span<const Node> nodes);
 };

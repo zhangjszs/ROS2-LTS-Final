@@ -10,7 +10,9 @@
 
 #include "structures/Way.hpp"
 
+#include <algorithm>
 #include <cassert>
+#include <ranges>
 
 /* ----------------------------- 私有方法 ---------------------------- */
 
@@ -234,18 +236,18 @@ bool Way::containsEdge(const Edge &e) const {
 std::vector<Point> Way::getPath() const {
     std::vector<Point> res;
     res.reserve(this->path_.size());
-    for (const Edge &e : this->path_) {
-        res.push_back(e.midPointGlobal());
-    }
+    std::ranges::transform(this->path_, std::back_inserter(res), [](const Edge &e) {
+        return e.midPointGlobal();
+    });
     return res;
 }
 
 std::vector<Point> Way::getPathLocal() const {
     std::vector<Point> res;
     res.reserve(this->path_.size());
-    for (const Edge &e : this->path_) {
-        res.push_back(e.midPoint());
-    }
+    std::ranges::transform(this->path_, std::back_inserter(res), [](const Edge &e) {
+        return e.midPoint();
+    });
     return res;
 }
 
