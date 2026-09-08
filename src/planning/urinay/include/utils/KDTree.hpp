@@ -15,6 +15,7 @@
 #include <initializer_list>
 #include <limits>
 #include <list>
+#include <optional>
 #include <ranges>
 #include <set>
 #include <type_traits>
@@ -91,36 +92,12 @@ struct ManhattanMetric {
     }
 };
 
-// Optional wrapper（与原版 KDTData 接口完全一致）
-template <class T>
-class KDTData {
-    bool valid_ = false;
-    T val_{};
-
-   public:
-    KDTData() = default;
-    explicit KDTData(const T& v) : valid_(true), val_(v) {}
-    KDTData& operator=(const T& v) {
-        valid_ = true;
-        val_ = v;
-        return *this;
-    }
-    explicit operator bool() const noexcept {
-        return valid_;
-    }
-    T& operator*() noexcept {
-        return val_;
-    }
-    const T& operator*() const noexcept {
-        return val_;
-    }
-    T* operator->() noexcept {
-        return &val_;
-    }
-    const T* operator->() const noexcept {
-        return &val_;
-    }
-};
+/**
+ * @brief C++20 淘汰手写 Optional，使用标准库 std::optional。
+ * 保留 KDTData 类型别名以保障旧接口与旧测试 100% 向后兼容。
+ */
+template <typename T>
+using KDTData = std::optional<T>;
 
 /**
  * @brief 泛型平坦连续数组 KD-Tree
@@ -258,32 +235,32 @@ class BasicKDTree {
         : BasicKDTree(std::vector<PointT>(init), metric) {}
 
     template <urinay::concepts::Point2DLike QueryPointT>
-    KDTData<size_t> nearest_index(const QueryPointT& pt, const std::set<size_t>& excs = {}) const {
+    [[nodiscard]] std::optional<size_t> nearest_index(const QueryPointT& pt, const std::set<size_t>& excs = {}) const {
         if (nodes_.empty())
-            return KDTData<size_t>();
+            return std::nullopt;
         int best = -1;
         double bestDist = std::numeric_limits<double>::max();
         double q[2] = {static_cast<double>(pt.x), static_cast<double>(pt.y)};
         searchNN(0, q, 0, best, bestDist, excs);
         if (best < 0)
-            return KDTData<size_t>();
-        return KDTData<size_t>(nodes_[best].idx);
+            return std::nullopt;
+        return nodes_[best].idx;
     }
 
     template <urinay::concepts::Point2DLike QueryPointT>
-    KDTData<PointT> nearest_point(const QueryPointT& pt, const std::set<size_t>& excs = {}) const {
+    [[nodiscard]] std::optional<PointT> nearest_point(const QueryPointT& pt, const std::set<size_t>& excs = {}) const {
         auto idx = nearest_index(pt, excs);
         if (!idx)
-            return KDTData<PointT>();
-        return KDTData<PointT>(pts_[*idx]);
+            return std::nullopt;
+        return pts_[*idx];
     }
 
     template <urinay::concepts::Point2DLike QueryPointT>
-    KDTData<point_index> nearest_pointIndex(const QueryPointT& pt, const std::set<size_t>& excs = {}) const {
+    [[nodiscard]] std::optional<point_index> nearest_pointIndex(const QueryPointT& pt, const std::set<size_t>& excs = {}) const {
         auto idx = nearest_index(pt, excs);
         if (!idx)
-            return KDTData<point_index>();
-        return KDTData<point_index>(point_index(pts_[*idx], *idx));
+            return std::nullopt;
+        return point_index(pts_[*idx], *idx);
     }
 
     template <urinay::concepts::Point2DLike QueryPointT>

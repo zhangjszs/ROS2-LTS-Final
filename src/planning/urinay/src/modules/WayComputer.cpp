@@ -147,12 +147,12 @@ void WayComputer::AppendPointsToPath(const std::vector<Point> &pts, common_msgs:
 }
 
 void WayComputer::FillTracklimits(common_msgs::msg::HuatPathLimits &res) const {
-    Tracklimits tracklimits = this->wayToPublish_.getTracklimits();
+    const Tracklimits tracklimits = this->wayToPublish_.getTracklimits();
     res.tracklimits.header.stamp = this->lastStamp_;
-    res.tracklimits.left.reserve(tracklimits.first.size());
-    for (const Node &n : tracklimits.first)
+    res.tracklimits.left.reserve(tracklimits.left.size());
+    for (const Node &n : tracklimits.left)
         res.tracklimits.left.push_back(n.cone());
-    for (const Node &n : tracklimits.second)
+    for (const Node &n : tracklimits.right)
         res.tracklimits.right.push_back(n.cone());
     res.tracklimits.replan = this->way_.quinEhLobjetiuDeLaSevaDiresio(this->lastWay_);
 }

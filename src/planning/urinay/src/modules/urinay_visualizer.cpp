@@ -167,14 +167,14 @@ void UrinayVisualizer::visualize(const Way &way) const {
     ma.markers.push_back(mMidpoints);
 
     mRight.id = id++;
-    Tracklimits tracklimits = way.getTracklimits();
+    const Tracklimits tracklimits = way.getTracklimits();
 
-    for (const Node &n : tracklimits.first) {
+    for (const Node &n : tracklimits.left) {
         mLeft.points.push_back(n.pointGlobal().gmPoint());
     }
     ma.markers.push_back(mLeft);
 
-    for (const Node &n : tracklimits.second) {
+    for (const Node &n : tracklimits.right) {
         mRight.points.push_back(n.pointGlobal().gmPoint());
     }
     ma.markers.push_back(mRight);

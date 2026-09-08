@@ -7,6 +7,7 @@
 #include <set>
 #include <vector>
 
+#include "structures/Circle.hpp"
 #include "structures/Edge.hpp"
 #include "structures/Node.hpp"
 #include "structures/Point.hpp"
@@ -206,3 +207,52 @@ TEST(ThreeWayComparisonTest, WaySpaceshipAndEquality) {
     auto cmp_way = (w1 <=> w2);
     EXPECT_TRUE(cmp_way == std::strong_ordering::equal);
 }
+
+// ==============================================================================
+// 6. Circle 三路比较器测试 (std::partial_ordering)
+// ==============================================================================
+
+TEST(ThreeWayComparisonTest, CircleSpaceshipAndEquality) {
+    Node n0(0.0, 0.0, 0.0, 0.0, 1);
+    Node n1(1.0, 0.0, 1.0, 0.0, 2);
+    Node n2(0.0, 1.0, 0.0, 1.0, 3);
+    Node n3(2.0, 2.0, 2.0, 2.0, 4);
+
+    Circle c1(n0, n1, n2);
+    Circle c2(n0, n1, n2);
+    Circle c3(n0, n1, n3);
+
+    EXPECT_TRUE(c1 == c2);
+    EXPECT_FALSE(c1 != c2);
+    EXPECT_TRUE(c1 != c3);
+
+    auto cmp_res = (c1 <=> c2);
+    static_assert(std::is_same_v<decltype(cmp_res), std::partial_ordering>,
+                  "Circle <=> must return std::partial_ordering");
+    EXPECT_TRUE(cmp_res == std::partial_ordering::equivalent);
+}
+
+// ==============================================================================
+// 7. Vector 三路比较器测试 (std::partial_ordering)
+// ==============================================================================
+
+TEST(ThreeWayComparisonTest, VectorSpaceshipAndEquality) {
+    Vector v1{1.0, 2.0};
+    Vector v2{1.0, 2.0};
+    Vector v3{1.0, 3.0};
+    Vector v4{2.0, 1.0};
+
+    EXPECT_TRUE(v1 == v2);
+    EXPECT_FALSE(v1 != v2);
+    EXPECT_TRUE(v1 < v3);
+    EXPECT_TRUE(v4 > v1);
+
+    auto cmp_res = (v1 <=> v2);
+    static_assert(std::is_same_v<decltype(cmp_res), std::partial_ordering>,
+                  "Vector <=> must return std::partial_ordering");
+    EXPECT_TRUE(cmp_res == std::partial_ordering::equivalent);
+
+    auto cmp_less = (v1 <=> v3);
+    EXPECT_TRUE(cmp_less == std::partial_ordering::less);
+}
+

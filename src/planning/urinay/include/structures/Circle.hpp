@@ -11,6 +11,7 @@
 #pragma once
 
 #include <cmath>
+#include <compare>
 #include <iostream>
 
 #include "structures/Node.hpp"
@@ -28,9 +29,23 @@ class Circle {
     /**
      * @brief 圆的半径的平方。
      */
-    double radSq_;
+    double radSq_{0.0};
 
    public:
+    constexpr Circle() noexcept = default;
+
+    /**
+     * @brief C++20 宇宙飞船操作符 <=> 默认合成。
+     * 由于包含 Point 与 double 成员，返回类型为 std::partial_ordering。
+     * 自动合成 <, <=, >, >=。
+     */
+    [[nodiscard]] constexpr auto operator<=>(const Circle &) const noexcept = default;
+
+    /**
+     * @brief C++20 默认相等比较操作符，自动合成 == 与 !=。
+     */
+    [[nodiscard]] constexpr bool operator==(const Circle &) const noexcept = default;
+
     /**
      * @brief 构造一个新的 Circle 对象。
      * n0, n1, n2 是位于圆周上的 3 个节点。
@@ -46,15 +61,22 @@ class Circle {
      *
      * @param n
      */
-    bool containsNode(const Node &n) const;
+    [[nodiscard]] bool containsNode(const Node &n) const;
 
     /**
      * @brief 返回局部坐标系下的圆心。
      */
-    const Point &center() const;
+    [[nodiscard]] const Point &center() const noexcept;
 
     /**
      * @brief 返回全局坐标系下的圆心。
      */
-    const Point &centerGlobal() const;
+    [[nodiscard]] const Point &centerGlobal() const noexcept;
+
+    /**
+     * @brief 返回圆半径的平方。
+     */
+    [[nodiscard]] constexpr double radSq() const noexcept {
+        return radSq_;
+    }
 };

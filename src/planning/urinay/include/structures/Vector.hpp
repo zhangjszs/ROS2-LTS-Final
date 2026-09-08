@@ -21,7 +21,7 @@ class Vector : public Point {
     /**
      * @brief 构造一个新的 Vector 对象。
      */
-    Vector() = default;
+    constexpr Vector() noexcept : Point() {}
 
     [[nodiscard]] constexpr auto operator<=>(const Vector &) const noexcept = default;
     [[nodiscard]] constexpr bool operator==(const Vector &) const noexcept = default;
@@ -32,7 +32,7 @@ class Vector : public Point {
      * @param[in] a
      * @param[in] b
      */
-    Vector(const Point &a, const Point &b);
+    constexpr Vector(const Point &a, const Point &b) noexcept : Point(b - a) {}
 
     /**
      * @brief 从两个坐标构造一个新的 Vector 对象。
@@ -40,21 +40,23 @@ class Vector : public Point {
      * @param[in] x
      * @param[in] y
      */
-    Vector(const double &x, const double &y);
+    constexpr Vector(double x_val, double y_val) noexcept : Point(x_val, y_val) {}
 
     /**
      * @brief 返回隐式向量与 v 之间的点积。
      *
      * @param[in] v
      */
-    inline double dot(const Vector &v) const;
+    [[nodiscard]] constexpr double dot(const Vector &v) const noexcept {
+        return this->x * v.x + this->y * v.y;
+    }
 
     /**
      * @brief 返回隐式向量与 v 之间的夹角。
      *
      * @param[in] v
      */
-    double angleWith(const Vector &v) const;
+    [[nodiscard]] double angleWith(const Vector &v) const;
 
     /**
      * @brief 检查点 actPos 是否沿着方向 dir 在 futPos 的后方。
@@ -63,15 +65,21 @@ class Vector : public Point {
      * @param[in] actPos
      * @param[in] dir
      */
-    static bool pointBehind(const Point &futPos, const Point &actPos, const Vector &dir);
+    [[nodiscard]] static constexpr bool pointBehind(const Point &futPos, const Point &actPos, const Vector &dir) noexcept {
+        return Vector(actPos, futPos).dot(dir) < 0.0;
+    }
 
     /**
      * @brief 返回顺时针旋转 90 度的向量。
      */
-    Vector rotClock() const;
+    [[nodiscard]] constexpr Vector rotClock() const noexcept {
+        return Vector(this->y, -this->x);
+    }
 
     /**
      * @brief 返回逆时针旋转 90 度的向量。
      */
-    Vector rotCounterClock() const;
+    [[nodiscard]] constexpr Vector rotCounterClock() const noexcept {
+        return Vector(-this->y, this->x);
+    }
 };

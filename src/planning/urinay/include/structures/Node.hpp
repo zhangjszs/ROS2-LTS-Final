@@ -72,7 +72,7 @@ class Node {
      * @param[in] x
      * @param[in] y
      */
-    Node(const double &x, const double &y);
+    Node(double x, double y);
 
    public:
 
@@ -85,24 +85,24 @@ class Node {
      * @param[in] yGlobal
      * @param[in] id
      */
-    Node(const double &x, const double &y, const double &xGlobal, const double &yGlobal, const uint32_t &id);
+    Node(double x, double y, double xGlobal, double yGlobal, uint32_t id);
 
     /**
      * @brief 从 as_msgs::Cone 构造一个新的 Node 对象。
      *
      * @param[in] c
      */
-    Node(const common_msgs::msg::HuatCone &c);
+    explicit Node(const common_msgs::msg::HuatCone &c);
 
     /**
      * @brief 返回节点的局部 x 坐标。
      */
-    const double &x() const;
+    [[nodiscard]] double x() const noexcept;
 
     /**
      * @brief 返回节点的局部 y 坐标。
      */
-    const double &y() const;
+    [[nodiscard]] double y() const noexcept;
 
     /**
      * @brief C++20 宇宙飞船操作符 <=>。
@@ -127,12 +127,12 @@ class Node {
      * @param[in] x
      * @param[in] y
      */
-    static Node superTriangleNode(const double &x, const double &y);
+    [[nodiscard]] static Node superTriangleNode(double x, double y);
 
     /**
      * @brief 检查该节点是否属于超级三角形。
      */
-    const bool &belongsToSuperTriangle() const;
+    [[nodiscard]] bool belongsToSuperTriangle() const noexcept;
 
     /**
      * @brief 更新节点的局部坐标。
@@ -144,19 +144,19 @@ class Node {
     /**
      * @brief 返回局部坐标系下的点。
      */
-    const Point &point() const;
+    [[nodiscard]] const Point &point() const noexcept;
 
     /**
      * @brief 返回全局坐标系下的点。
      */
-    const Point &pointGlobal() const;
+    [[nodiscard]] const Point &pointGlobal() const noexcept;
 
     /**
      * @brief 返回从节点局部点到 p 的距离平方。
      *
      * @param[in] p
      */
-    double distSq(const Point &p) const;
+    [[nodiscard]] double distSq(const Point &p) const noexcept;
 
     /**
      * @brief 返回该节点与节点 n0 和 n1 形成的角度。
@@ -164,12 +164,12 @@ class Node {
      * @param[in] n0
      * @param[in] n1
      */
-    double angleWith(const Node &n0, const Node &n1) const;
+    [[nodiscard]] double angleWith(const Node &n0, const Node &n1) const;
 
     /**
      * @brief 将节点转换为 as_msgs::Cone 并返回。
      */
-    common_msgs::msg::HuatCone cone() const;
+    [[nodiscard]] common_msgs::msg::HuatCone cone() const;
 
     /**
      * @brief 输出流运算符。

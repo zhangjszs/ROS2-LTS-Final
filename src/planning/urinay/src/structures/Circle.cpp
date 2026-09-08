@@ -56,10 +56,10 @@ bool Circle::containsNode(const Node &n) const {
     return n.distSq(this->center_) < this->radSq_;
 }
 
-const Point &Circle::center() const {
+const Point &Circle::center() const noexcept {
     return this->center_;
 }
 
-const Point &Circle::centerGlobal() const {
+const Point &Circle::centerGlobal() const noexcept {
     return this->centerGlobal_;
 }

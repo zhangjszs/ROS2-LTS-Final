@@ -10,26 +10,6 @@
 
 #include "structures/Point.hpp"
 
-Point Point::operator+(const Point &p) const {
-    return Point(this->x + p.x, this->y + p.y);
-}
-
-Point Point::operator-(const Point &p) const {
-    return Point(this->x - p.x, this->y - p.y);
-}
-
-Point &Point::operator+=(const Point &p) {
-    this->x += p.x;
-    this->y += p.y;
-    return *this;
-}
-
-Point &Point::operator-=(const Point &p) {
-    this->x -= p.x;
-    this->y -= p.y;
-    return *this;
-}
-
 std::ostream &operator<<(std::ostream &os, const Point &p) {
     return os << "P(" << p.x << ", " << p.y << ")\n";
 }
@@ -46,17 +26,4 @@ geometry_msgs::msg::Point Point::gmPoint() const {
     res.y = this->y;
     res.z = 0.0;
     return res;
-}
-
-const double &Point::at(const size_t &ind) const {
-    switch (ind) {
-        case 0:
-            return this->x;
-        default:
-            return this->y;
-    }
-}
-
-size_t Point::size() const {
-    return 2;
 }

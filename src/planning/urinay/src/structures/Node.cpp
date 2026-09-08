@@ -15,7 +15,7 @@ uint32_t Node::superTriangleNodeNum = 0;
 
 /* ----------------------------- 私有方法 ---------------------------- */
 
-Node::Node(const double &x, const double &y)
+Node::Node(double x, double y)
     : id(SUPERTRIANGLE_BASEID + superTriangleNodeNum), point_(x, y), belongsToSuperTriangle_(true) {
     superTriangleNodeNum++;
     superTriangleNodeNum %= 3;
@@ -23,7 +23,7 @@ Node::Node(const double &x, const double &y)
 
 /* ----------------------------- 公有方法 ----------------------------- */
 
-Node::Node(const double &x, const double &y, const double &xGlobal, const double &yGlobal, const uint32_t &id)
+Node::Node(double x, double y, double xGlobal, double yGlobal, uint32_t id)
     : id(id), point_(x, y), pointGlobal_(xGlobal, yGlobal), belongsToSuperTriangle_(false) {
     if (this->id >= (1 << HASH_SHIFT_NUM) - 3)
         RCLCPP_ERROR(rclcpp::get_logger("urinay"), "[urinay] Cone ID exceeds allowed threshold, check utils/constants.hpp/HASH_SHIFT_NUM");
@@ -32,19 +32,19 @@ Node::Node(const double &x, const double &y, const double &xGlobal, const double
 Node::Node(const common_msgs::msg::HuatCone &c)
     : Node(c.position_base_link.x, c.position_base_link.y, c.position_global.x, c.position_global.y, c.id) {}
 
-const double &Node::x() const {
+double Node::x() const noexcept {
     return this->point_.x;
 }
 
-const double &Node::y() const {
+double Node::y() const noexcept {
     return this->point_.y;
 }
 
-Node Node::superTriangleNode(const double &x, const double &y) {
+Node Node::superTriangleNode(double x, double y) {
     return Node(x, y);
 }
 
-const bool &Node::belongsToSuperTriangle() const {
+bool Node::belongsToSuperTriangle() const noexcept {
     return belongsToSuperTriangle_;
 }
 
@@ -52,15 +52,15 @@ void Node::updateLocal(const Eigen::Affine3d &tf) const {
     this->point_ = this->pointGlobal().transformed(tf);
 }
 
-const Point &Node::point() const {
+const Point &Node::point() const noexcept {
     return this->point_;
 }
 
-const Point &Node::pointGlobal() const {  //构造函数可直接赋值
+const Point &Node::pointGlobal() const noexcept {  //构造函数可直接赋值
     return this->pointGlobal_;
 }
 
-double Node::distSq(const Point &p) const {
+double Node::distSq(const Point &p) const noexcept {
     return (this->x() - p.x) * (this->x() - p.x) + (this->y() - p.y) * (this->y() - p.y);
 }
 

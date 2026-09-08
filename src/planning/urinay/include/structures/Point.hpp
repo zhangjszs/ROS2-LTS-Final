@@ -100,21 +100,35 @@ class Point {
 
     /* ---------------------------- 公共方法 ---------------------------- */
 
-    Point operator+(const Point &p) const;
-    Point operator-(const Point &p) const;
+    [[nodiscard]] constexpr Point operator+(const Point &p) const noexcept {
+        return Point(this->x + p.x, this->y + p.y);
+    }
+
+    [[nodiscard]] constexpr Point operator-(const Point &p) const noexcept {
+        return Point(this->x - p.x, this->y - p.y);
+    }
 
     template <urinay::concepts::ArithmeticScalar T>
-    constexpr Point operator*(const T &num) const noexcept {
+    [[nodiscard]] constexpr Point operator*(const T &num) const noexcept {
         return Point(this->x * static_cast<double>(num), this->y * static_cast<double>(num));
     }
 
     template <urinay::concepts::ArithmeticScalar T>
-    constexpr Point operator/(const T &num) const noexcept {
+    [[nodiscard]] constexpr Point operator/(const T &num) const noexcept {
         return Point(this->x / static_cast<double>(num), this->y / static_cast<double>(num));
     }
 
-    Point &operator+=(const Point &p);
-    Point &operator-=(const Point &p);
+    constexpr Point &operator+=(const Point &p) noexcept {
+        this->x += p.x;
+        this->y += p.y;
+        return *this;
+    }
+
+    constexpr Point &operator-=(const Point &p) noexcept {
+        this->x -= p.x;
+        this->y -= p.y;
+        return *this;
+    }
 
     template <urinay::concepts::ArithmeticScalar T>
     constexpr Point &operator*=(const T &num) noexcept {
@@ -194,14 +208,16 @@ class Point {
     }
 
     /**
-     * @brief 返回由 ind 指定的位置的坐标。
-     *
-     * @param[in] ind
+     * @brief 返回由 ind 指定的位置的坐标（0 为 x，其他为 y）。
      */
-    const double &at(const size_t &ind) const;
+    [[nodiscard]] constexpr double at(size_t ind) const noexcept {
+        return (ind == 0) ? this->x : this->y;
+    }
 
     /**
-     * @brief 返回 2。
+     * @brief 返回点维度（2）。
      */
-    size_t size() const;
+    [[nodiscard]] static constexpr size_t size() noexcept {
+        return 2;
+    }
 };

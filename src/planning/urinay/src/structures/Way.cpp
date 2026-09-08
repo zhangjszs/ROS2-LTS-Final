@@ -251,8 +251,8 @@ std::vector<Point> Way::getPathLocal() const {
 
 Tracklimits Way::getTracklimits() const {
     Tracklimits res;
-    res.first.reserve(this->size());
-    res.second.reserve(this->size());
+    res.left.reserve(this->size());
+    res.right.reserve(this->size());
     Point pAnt = this->empty() ? Point(0, 0)
                                : Point(-50, this->front().midPointGlobal().y);  // 仅在全局坐标系下有效，-50 为任意值
 
@@ -280,17 +280,17 @@ Tracklimits Way::getTracklimits() const {
 
         // 仅追加尚未添加过的节点（去重）
         // 移除了方向过滤（pointBehind），避免 C 型弯中段锥桶因行进方向翻转而被误判跳过
-        if (res.first.empty() or *left != res.first.back()) {
+        if (res.left.empty() or *left != res.left.back()) {
             if (*left == *firstLeft) {
-                res.first.push_back(*firstLeft);
+                res.left.push_back(*firstLeft);
             } else
-                res.first.push_back(*left);
+                res.left.push_back(*left);
         }
-        if (res.second.empty() or *right != res.second.back()) {
+        if (res.right.empty() or *right != res.right.back()) {
             if (*right == *firstRight) {
-                res.second.push_back(*firstRight);
+                res.right.push_back(*firstRight);
             } else
-                res.second.push_back(*right);
+                res.right.push_back(*right);
         }
 
         pAnt = e.midPointGlobal();
@@ -373,11 +373,11 @@ uint32_t Way::sizeAheadOfCar() const {
 }
 
 std::ostream &operator<<(std::ostream &os, const Way &way) {
-    Tracklimits tracklimits = way.getTracklimits();
-    for (const Node &n : tracklimits.first) {
+    const Tracklimits tracklimits = way.getTracklimits();
+    for (const Node &n : tracklimits.left) {
         os << n.pointGlobal().x << ' ' << n.pointGlobal().y << ' ' << 0 << ' ' << n.id << std::endl;
     }
-    for (const Node &n : tracklimits.second) {
+    for (const Node &n : tracklimits.right) {
         os << n.pointGlobal().x << ' ' << n.pointGlobal().y << ' ' << 1 << ' ' << n.id << std::endl;
     }
     return os;
