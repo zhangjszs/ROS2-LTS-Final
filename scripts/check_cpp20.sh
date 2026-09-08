@@ -7,7 +7,15 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WORKSPACE_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
-echo "=== [1/2] Checking C++20 compliance with cppcheck ==="
+echo "=== [1/3] Checking C++20 code formatting with clang-format ==="
+if command -v clang-format &> /dev/null; then
+    find "${WORKSPACE_ROOT}/src" -type f \( -name "*.cpp" -o -name "*.h" -o -name "*.hpp" \) | xargs clang-format --dry-run --Werror
+    echo "✔ clang-format passed with 0 formatting violations!"
+else
+    echo "⚠ clang-format is not installed. Skipping format check."
+fi
+
+echo "=== [2/3] Checking C++20 compliance with cppcheck ==="
 if command -v cppcheck &> /dev/null; then
     cppcheck \
         --language=c++ \
@@ -22,7 +30,7 @@ else
     echo "⚠ cppcheck is not installed. Skipping cppcheck scan."
 fi
 
-echo "=== [2/2] Checking compilation with -std=c++20 and strict flags ==="
+echo "=== [3/3] Checking compilation with -std=c++20 and strict flags ==="
 cd "${WORKSPACE_ROOT}"
 colcon build --symlink-install --cmake-args -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DBUILD_TESTING=ON
 

@@ -21,7 +21,7 @@
  */
 class UrinayParams {
    public:
-    UrinayParams(rclcpp::Node *const nh);
+    UrinayParams(rclcpp::Node* const nh);
     struct Main {
         std::string input_cones_topic, input_pose_topic, output_topic, stop_topic;
         std::string markers_full_topic, markers_partial_topic;

@@ -40,19 +40,11 @@ class MatrixView {
     [[nodiscard]] constexpr size_t size() const noexcept { return rows_ * cols_; }
     [[nodiscard]] constexpr bool empty() const noexcept { return rows_ == 0 || cols_ == 0; }
 
-    [[nodiscard]] constexpr T& operator()(size_t r, size_t c) noexcept {
-        return data_[r * cols_ + c];
-    }
-    [[nodiscard]] constexpr const T& operator()(size_t r, size_t c) const noexcept {
-        return data_[r * cols_ + c];
-    }
+    [[nodiscard]] constexpr T& operator()(size_t r, size_t c) noexcept { return data_[r * cols_ + c]; }
+    [[nodiscard]] constexpr const T& operator()(size_t r, size_t c) const noexcept { return data_[r * cols_ + c]; }
 
-    [[nodiscard]] constexpr std::span<T> row(size_t r) noexcept {
-        return data_.subspan(r * cols_, cols_);
-    }
-    [[nodiscard]] constexpr std::span<const T> row(size_t r) const noexcept {
-        return data_.subspan(r * cols_, cols_);
-    }
+    [[nodiscard]] constexpr std::span<T> row(size_t r) noexcept { return data_.subspan(r * cols_, cols_); }
+    [[nodiscard]] constexpr std::span<const T> row(size_t r) const noexcept { return data_.subspan(r * cols_, cols_); }
 
     [[nodiscard]] constexpr std::span<T> data() noexcept { return data_; }
     [[nodiscard]] constexpr std::span<const T> data() const noexcept { return data_; }
@@ -91,16 +83,10 @@ class FlatMatrix {
     [[nodiscard]] size_t size() const noexcept { return data_.size(); }
     [[nodiscard]] bool empty() const noexcept { return data_.empty(); }
 
-    [[nodiscard]] T& operator()(size_t r, size_t c) noexcept {
-        return data_[r * cols_ + c];
-    }
-    [[nodiscard]] const T& operator()(size_t r, size_t c) const noexcept {
-        return data_[r * cols_ + c];
-    }
+    [[nodiscard]] T& operator()(size_t r, size_t c) noexcept { return data_[r * cols_ + c]; }
+    [[nodiscard]] const T& operator()(size_t r, size_t c) const noexcept { return data_[r * cols_ + c]; }
 
-    [[nodiscard]] std::span<T> row(size_t r) noexcept {
-        return std::span<T>(data_).subspan(r * cols_, cols_);
-    }
+    [[nodiscard]] std::span<T> row(size_t r) noexcept { return std::span<T>(data_).subspan(r * cols_, cols_); }
     [[nodiscard]] std::span<const T> row(size_t r) const noexcept {
         return std::span<const T>(data_).subspan(r * cols_, cols_);
     }
@@ -108,22 +94,12 @@ class FlatMatrix {
     [[nodiscard]] std::vector<T>& raw_vector() noexcept { return data_; }
     [[nodiscard]] const std::vector<T>& raw_vector() const noexcept { return data_; }
 
-    [[nodiscard]] MatrixView<T> view() noexcept {
-        return MatrixView<T>(data_, rows_, cols_);
-    }
-    [[nodiscard]] MatrixView<const T> view() const noexcept {
-        return MatrixView<const T>(data_, rows_, cols_);
-    }
-    [[nodiscard]] MatrixView<const T> const_view() const noexcept {
-        return MatrixView<const T>(data_, rows_, cols_);
-    }
+    [[nodiscard]] MatrixView<T> view() noexcept { return MatrixView<T>(data_, rows_, cols_); }
+    [[nodiscard]] MatrixView<const T> view() const noexcept { return MatrixView<const T>(data_, rows_, cols_); }
+    [[nodiscard]] MatrixView<const T> const_view() const noexcept { return MatrixView<const T>(data_, rows_, cols_); }
 
-    operator MatrixView<const T>() const noexcept {
-        return view();
-    }
-    operator MatrixView<T>() noexcept {
-        return view();
-    }
+    operator MatrixView<const T>() const noexcept { return view(); }
+    operator MatrixView<T>() noexcept { return view(); }
 
    private:
     size_t rows_{0};
@@ -139,7 +115,7 @@ class FlatMatrix {
 std::vector<int> HungarianAssign(MatrixView<const double> cost_view, double inf_cost);
 
 template <typename T>
-    requires (!std::same_as<T, const double> && std::convertible_to<T*, const double*>)
+    requires(!std::same_as<T, const double> && std::convertible_to<T*, const double*>)
 inline std::vector<int> HungarianAssign(MatrixView<T> cost_view, double inf_cost) {
     return HungarianAssign(MatrixView<const double>(cost_view), inf_cost);
 }
@@ -158,11 +134,11 @@ double ComputeDynamicAlpha(double current_speed, double speed_ref, double alpha_
 
 // 保留距 (origin_x, origin_y) 平方距离 ≤ radius_sq 的下标。xs/ys 长度取较短者。
 // C++20 重构：使用 std::span<const double> 统一非拥有式视图，解耦 std::vector，兼容 array/裸指针/切片
-std::vector<size_t> FilterIndicesByRadiusSq(std::span<const double> xs, std::span<const double> ys,
-                                            double origin_x, double origin_y, double radius_sq);
+std::vector<size_t> FilterIndicesByRadiusSq(std::span<const double> xs, std::span<const double> ys, double origin_x,
+                                            double origin_y, double radius_sq);
 
 // Point2D 结构体视图重载：直接处理坐标点连续集合，提升感知接口通用性
-std::vector<size_t> FilterIndicesByRadiusSq(std::span<const Point2D> points,
-                                            double origin_x, double origin_y, double radius_sq);
+std::vector<size_t> FilterIndicesByRadiusSq(std::span<const Point2D> points, double origin_x, double origin_y,
+                                            double radius_sq);
 
 }  // namespace cone_dedup_algo

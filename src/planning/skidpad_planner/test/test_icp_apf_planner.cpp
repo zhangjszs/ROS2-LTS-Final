@@ -77,10 +77,7 @@ TEST(IcpApfPlanner, TransformPointsRanges) {
     skidpad::IcpApfConfig cfg;
     skidpad::IcpApfPlanner planner(cfg);
 
-    std::vector<skidpad::Point2D> pts = {
-        {1.0, 0.0},
-        {0.0, 1.0}
-    };
+    std::vector<skidpad::Point2D> pts = {{1.0, 0.0}, {0.0, 1.0}};
 
     // Rotate 90 deg counter-clockwise, translate dx=2.0, dy=3.0
     double rot = std::numbers::pi_v<double> / 2.0;

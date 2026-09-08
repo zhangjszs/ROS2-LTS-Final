@@ -26,11 +26,7 @@ enum class Color : uint32_t {
 /**
  * @brief 现代 C++20 强类型锥桶尺寸枚举 (Scoped Enumeration)
  */
-enum class Size : uint8_t {
-    Unknown = 0,
-    Large = 1,
-    Small = 2
-};
+enum class Size : uint8_t { Unknown = 0, Large = 1, Small = 2 };
 
 /**
  * @brief C++20 辅助工具函数：安全提取枚举底层类型数值
@@ -89,8 +85,8 @@ inline constexpr uint8_t SIZE_SMALL = to_underlying(Size::Small);
  * @brief 视觉颜色与雷达尺寸融合算法 (原始数值重载，保持 ABI 与旧调用 100% 兼容)
  */
 [[nodiscard]] constexpr uint32_t MergeVisionColorWithLidarSize(uint8_t vision_color, uint8_t lidar_size) noexcept {
-    return to_underlying(MergeVisionColorWithLidarSize(
-        static_cast<Color>(vision_color), static_cast<Size>(lidar_size)));
+    return to_underlying(
+        MergeVisionColorWithLidarSize(static_cast<Color>(vision_color), static_cast<Size>(lidar_size)));
 }
 
 }  // namespace huat_cone

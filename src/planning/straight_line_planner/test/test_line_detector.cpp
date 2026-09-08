@@ -78,13 +78,9 @@ TEST(LineDetector, ClusterConesWithRanges) {
     cfg.center_margin = 0.3;
     LineDetector detector(cfg);
 
-    std::vector<common_msgs::msg::HuatCone> cones = {
-        MakeCone(2.0, -1.8),
-        MakeCone(3.0, 1.2),
-        MakeCone(1.0, 0.0),   // near center
-        MakeCone(4.0, -1.5),
-        MakeCone(5.0, 1.6)
-    };
+    std::vector<common_msgs::msg::HuatCone> cones = {MakeCone(2.0, -1.8), MakeCone(3.0, 1.2),
+                                                     MakeCone(1.0, 0.0),  // near center
+                                                     MakeCone(4.0, -1.5), MakeCone(5.0, 1.6)};
 
     std::vector<common_msgs::msg::HuatCone> left, right;
     detector.ClusterCones(cones, left, right);
@@ -122,13 +118,8 @@ TEST(LineDetector, RansacFitWithRangesSorting) {
     LineDetector detector(cfg);
 
     // Cones along y = -2.0 with slight jitter and out-of-order x values
-    std::vector<common_msgs::msg::HuatCone> cones = {
-        MakeCone(8.0, -2.01),
-        MakeCone(2.0, -1.99),
-        MakeCone(6.0, -2.0),
-        MakeCone(4.0, -2.0),
-        MakeCone(10.0, -2.0)
-    };
+    std::vector<common_msgs::msg::HuatCone> cones = {MakeCone(8.0, -2.01), MakeCone(2.0, -1.99), MakeCone(6.0, -2.0),
+                                                     MakeCone(4.0, -2.0), MakeCone(10.0, -2.0)};
 
     LineParams params = detector.RansacFit(cones);
     EXPECT_TRUE(params.valid);

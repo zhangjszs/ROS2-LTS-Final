@@ -276,8 +276,7 @@ TEST(FrameProfilerFormatTest, WarnMessageWithNoData) {
 
 TEST(FrameProfilerFormatTest, WarnMessageWithoutNoData) {
     std::string warn_msg = FrameProfiler::formatWarnMessage(35.2, 30.0, 1, -1);
-    EXPECT_EQ(warn_msg,
-              "[lidar_cluster] Frame time 35.20 ms exceeds WARN threshold 30.00 ms (consecutive=1)");
+    EXPECT_EQ(warn_msg, "[lidar_cluster] Frame time 35.20 ms exceeds WARN threshold 30.00 ms (consecutive=1)");
 }
 
 TEST(FrameProfilerFormatTest, ErrorMessageFormat) {
@@ -368,16 +367,29 @@ TEST(PointCloudPreprocessorSpanTest, SlicePointCloudEmpty) {
 
 TEST(PointCloudPreprocessorSpanTest, CountValidPointsInRoi) {
     std::vector<PointType> pts(5);
-    pts[0].x = 5.0f; pts[0].y = 0.0f; pts[0].z = 0.0f;   // inside
-    pts[1].x = -5.0f; pts[1].y = 0.0f; pts[1].z = 0.0f;  // outside x
-    pts[2].x = 10.0f; pts[2].y = 2.0f; pts[2].z = 0.5f;  // inside
-    pts[3].x = 10.0f; pts[3].y = 10.0f; pts[3].z = 0.0f; // outside y
-    pts[4].x = 1.0f; pts[4].y = 0.0f; pts[4].z = 2.0f;   // outside z
+    pts[0].x = 5.0f;
+    pts[0].y = 0.0f;
+    pts[0].z = 0.0f;  // inside
+    pts[1].x = -5.0f;
+    pts[1].y = 0.0f;
+    pts[1].z = 0.0f;  // outside x
+    pts[2].x = 10.0f;
+    pts[2].y = 2.0f;
+    pts[2].z = 0.5f;  // inside
+    pts[3].x = 10.0f;
+    pts[3].y = 10.0f;
+    pts[3].z = 0.0f;  // outside y
+    pts[4].x = 1.0f;
+    pts[4].y = 0.0f;
+    pts[4].z = 2.0f;  // outside z
 
     PointCloudPreprocessor::RoiBounds roi;
-    roi.x_min = 0.0; roi.x_max = 20.0;
-    roi.y_min = -5.0; roi.y_max = 5.0;
-    roi.z_min = -1.0; roi.z_max = 1.0;
+    roi.x_min = 0.0;
+    roi.x_max = 20.0;
+    roi.y_min = -5.0;
+    roi.y_max = 5.0;
+    roi.z_min = -1.0;
+    roi.z_max = 1.0;
 
     size_t count = PointCloudPreprocessor::countValidPointsInRoi(pts, roi);
     EXPECT_EQ(count, 2u);

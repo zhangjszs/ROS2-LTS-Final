@@ -58,15 +58,12 @@ struct SquaredEuclideanMetric {
 
     template <urinay::concepts::Point2DLike P1, urinay::concepts::Point2DLike P2>
     constexpr double axis_distance(const P1& a, const P2& b, size_t dim) const noexcept {
-        const double diff = (dim == 0)
-            ? (static_cast<double>(a.x) - static_cast<double>(b.x))
-            : (static_cast<double>(a.y) - static_cast<double>(b.y));
+        const double diff = (dim == 0) ? (static_cast<double>(a.x) - static_cast<double>(b.x))
+                                       : (static_cast<double>(a.y) - static_cast<double>(b.y));
         return diff * diff;
     }
 
-    constexpr double to_metric_radius(double rad) const noexcept {
-        return rad * rad;
-    }
+    constexpr double to_metric_radius(double rad) const noexcept { return rad * rad; }
 };
 
 /**
@@ -82,14 +79,11 @@ struct ManhattanMetric {
 
     template <urinay::concepts::Point2DLike P1, urinay::concepts::Point2DLike P2>
     constexpr double axis_distance(const P1& a, const P2& b, size_t dim) const noexcept {
-        return (dim == 0)
-            ? std::abs(static_cast<double>(a.x) - static_cast<double>(b.x))
-            : std::abs(static_cast<double>(a.y) - static_cast<double>(b.y));
+        return (dim == 0) ? std::abs(static_cast<double>(a.x) - static_cast<double>(b.x))
+                          : std::abs(static_cast<double>(a.y) - static_cast<double>(b.y));
     }
 
-    constexpr double to_metric_radius(double rad) const noexcept {
-        return rad;
-    }
+    constexpr double to_metric_radius(double rad) const noexcept { return rad; }
 };
 
 /**
@@ -121,8 +115,8 @@ class BasicKDTree {
         int right = -1;
     };
 
-    std::vector<Node> nodes_;   // 平坦存储，构建后无堆指针寻址，内存局部性极佳
-    std::vector<PointT> pts_;   // 原始 PointT 数据
+    std::vector<Node> nodes_;  // 平坦存储，构建后无堆指针寻址，内存局部性极佳
+    std::vector<PointT> pts_;  // 原始 PointT 数据
     MetricT metric_{};
 
     using Entry = std::pair<std::array<double, 2>, size_t>;
@@ -133,8 +127,8 @@ class BasicKDTree {
             return -1;
 
         int mid = lo + (hi - lo) / 2;
-        std::ranges::nth_element(tmp.begin() + lo, tmp.begin() + mid, tmp.begin() + hi,
-                                 {}, [lv](const Entry& e) { return e.first[lv]; });
+        std::ranges::nth_element(tmp.begin() + lo, tmp.begin() + mid, tmp.begin() + hi, {},
+                                 [lv](const Entry& e) { return e.first[lv]; });
 
         int ni = static_cast<int>(nodes_.size());
         nodes_.push_back(Node{});
@@ -150,13 +144,14 @@ class BasicKDTree {
         return ni;
     }
 
-    void searchNN(int ni, const double q[2], int lv, int& best, double& bestDist,
-                  const std::set<size_t>& excs) const {
+    void searchNN(int ni, const double q[2], int lv, int& best, double& bestDist, const std::set<size_t>& excs) const {
         if (ni < 0)
             return;
         const Node& n = nodes_[ni];
 
-        struct QueryProxy { double x, y; };
+        struct QueryProxy {
+            double x, y;
+        };
         QueryProxy q_pt{q[0], q[1]};
         QueryProxy n_pt{n.c[0], n.c[1]};
 
@@ -187,7 +182,9 @@ class BasicKDTree {
             return;
         const Node& n = nodes_[ni];
 
-        struct QueryProxy { double x, y; };
+        struct QueryProxy {
+            double x, y;
+        };
         QueryProxy q_pt{q[0], q[1]};
         QueryProxy n_pt{n.c[0], n.c[1]};
 
@@ -256,7 +253,8 @@ class BasicKDTree {
     }
 
     template <urinay::concepts::Point2DLike QueryPointT>
-    [[nodiscard]] std::optional<point_index> nearest_pointIndex(const QueryPointT& pt, const std::set<size_t>& excs = {}) const {
+    [[nodiscard]] std::optional<point_index> nearest_pointIndex(const QueryPointT& pt,
+                                                                const std::set<size_t>& excs = {}) const {
         auto idx = nearest_index(pt, excs);
         if (!idx)
             return std::nullopt;
@@ -313,4 +311,3 @@ using indexArr = std::vector<size_t>;
 using pointIndex = std::pair<Point, size_t>;
 using pointIndexArr = std::vector<pointIndex>;
 using pointIndexV = KDTData<pointIndex>;
-

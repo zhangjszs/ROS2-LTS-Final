@@ -1,8 +1,7 @@
 #pragma once
 
-#include <common_msgs/msg/huat_ins_p2.hpp>
-
 #include <Eigen/Dense>
+#include <common_msgs/msg/huat_ins_p2.hpp>
 #include <imu_data.hpp>
 class ImuSubscriber {
    public:

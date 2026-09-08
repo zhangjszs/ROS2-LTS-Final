@@ -63,12 +63,7 @@ TEST(ThreeWayComparisonTest, PointNaNPartialOrdering) {
 }
 
 TEST(ThreeWayComparisonTest, PointRangesSort) {
-    std::vector<Point> points{
-        {3.0, 1.0},
-        {1.0, 5.0},
-        {1.0, 2.0},
-        {2.0, 0.0}
-    };
+    std::vector<Point> points{{3.0, 1.0}, {1.0, 5.0}, {1.0, 2.0}, {2.0, 0.0}};
 
     std::ranges::sort(points);
 
@@ -98,8 +93,7 @@ TEST(ThreeWayComparisonTest, NodeSpaceshipAndEquality) {
     EXPECT_TRUE(n3 > n1);
 
     auto cmp_res = (n1 <=> n2);
-    static_assert(std::is_same_v<decltype(cmp_res), std::strong_ordering>,
-                  "Node <=> must return std::strong_ordering");
+    static_assert(std::is_same_v<decltype(cmp_res), std::strong_ordering>, "Node <=> must return std::strong_ordering");
     EXPECT_TRUE(cmp_res == std::strong_ordering::equal);
 }
 
@@ -255,4 +249,3 @@ TEST(ThreeWayComparisonTest, VectorSpaceshipAndEquality) {
     auto cmp_less = (v1 <=> v3);
     EXPECT_TRUE(cmp_less == std::partial_ordering::less);
 }
-

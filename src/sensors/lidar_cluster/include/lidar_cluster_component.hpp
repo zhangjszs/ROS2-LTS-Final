@@ -1,9 +1,9 @@
 #pragma once
 
 #include <lidar_cluster.h>
-#include <rclcpp/rclcpp.hpp>
 
 #include <memory>
+#include <rclcpp/rclcpp.hpp>
 #include <stop_token>
 #include <string>
 #include <thread>
@@ -17,9 +17,9 @@ class LidarClusterComponent : public rclcpp::Node {
    public:
     LidarClusterComponent() : LidarClusterComponent(rclcpp::NodeOptions()) {}
 
-    explicit LidarClusterComponent(const rclcpp::NodeOptions & options)
-        : rclcpp::Node("lidar_cluster_node", options) {
-        // C++20 现代架构改进：直接传递当前 Node 指针 (this) 传递非拥有观测权，彻底杜绝构造期调用 shared_from_this() 导致的 std::bad_weak_ptr 崩溃
+    explicit LidarClusterComponent(const rclcpp::NodeOptions& options) : rclcpp::Node("lidar_cluster_node", options) {
+        // C++20 现代架构改进：直接传递当前 Node 指针 (this) 传递非拥有观测权，彻底杜绝构造期调用 shared_from_this()
+        // 导致的 std::bad_weak_ptr 崩溃
         lc_ = std::make_unique<LidarCluster>(this);
         poll_thread_ = std::jthread([this](std::stop_token st) { algoPoll(st); });
     }
@@ -34,9 +34,7 @@ class LidarClusterComponent : public rclcpp::Node {
         }
     }
 
-    [[nodiscard]] bool isRunning() const noexcept {
-        return lc_ != nullptr;
-    }
+    [[nodiscard]] bool isRunning() const noexcept { return lc_ != nullptr; }
 
    private:
     void algoPoll(std::stop_token st) {

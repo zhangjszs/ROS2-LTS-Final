@@ -1,4 +1,5 @@
 #include <gtest/gtest.h>
+
 #include <rclcpp/rclcpp.hpp>
 
 #include "lidar_cluster.h"
@@ -26,9 +27,7 @@ TEST_F(LidarClusterComponentTest, ConstructWithoutBadWeakPtr) {
     rclcpp::NodeOptions options;
     std::shared_ptr<lidar_cluster::LidarClusterComponent> component;
 
-    EXPECT_NO_THROW({
-        component = std::make_shared<lidar_cluster::LidarClusterComponent>(options);
-    });
+    EXPECT_NO_THROW({ component = std::make_shared<lidar_cluster::LidarClusterComponent>(options); });
 
     ASSERT_NE(component, nullptr);
     EXPECT_TRUE(component->isRunning());
@@ -40,7 +39,5 @@ TEST_F(LidarClusterComponentTest, DirectLidarClusterInstantiation) {
     rclcpp::NodeOptions options;
     auto node = std::make_shared<rclcpp::Node>("test_host_node", options);
 
-    EXPECT_NO_THROW({
-        LidarCluster lc(node.get());
-    });
+    EXPECT_NO_THROW({ LidarCluster lc(node.get()); });
 }

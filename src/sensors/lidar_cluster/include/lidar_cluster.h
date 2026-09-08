@@ -1,33 +1,33 @@
 #pragma once
 
-#include <common_msgs/msg/huat_asensing.hpp>
-#include <common_msgs/msg/huat_carstate.hpp>
-#include <common_msgs/msg/huat_cone_cluster.hpp>
-#include <common_msgs/msg/huat_ins_p2.hpp>
-#include <geometry_msgs/msg/pose_stamped.hpp>
 #include <ground_segmentation/ground_segmentation_strategy.h>
 #include <lidar_cluster_scoring.h>
-#include <nav_msgs/msg/path.hpp>
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
 #include <preprocessor/point_cloud_preprocessor.h>
-#include <rclcpp/rclcpp.hpp>
-#include <sensor_msgs/msg/point_cloud.hpp>
-#include <sensor_msgs/msg/point_cloud2.hpp>
-#include <std_msgs/msg/header.hpp>
-#include <visualization_msgs/msg/marker.hpp>
-#include <visualization_msgs/msg/marker_array.hpp>
 
 #include <Eigen/Dense>
 #include <atomic>
 #include <chrono>
 #include <cmath>
+#include <common_msgs/msg/huat_asensing.hpp>
+#include <common_msgs/msg/huat_carstate.hpp>
+#include <common_msgs/msg/huat_cone_cluster.hpp>
+#include <common_msgs/msg/huat_ins_p2.hpp>
 #include <condition_variable>
 #include <distortion_adjuster.hpp>
+#include <geometry_msgs/msg/pose_stamped.hpp>
 #include <imu_subscriber.hpp>
 #include <mutex>
+#include <nav_msgs/msg/path.hpp>
+#include <rclcpp/rclcpp.hpp>
+#include <sensor_msgs/msg/point_cloud.hpp>
+#include <sensor_msgs/msg/point_cloud2.hpp>
+#include <std_msgs/msg/header.hpp>
 #include <string>
 #include <vector>
+#include <visualization_msgs/msg/marker.hpp>
+#include <visualization_msgs/msg/marker_array.hpp>
 
 #include "profiler/frame_profiler.h"
 
@@ -264,23 +264,23 @@ class LidarCluster {
     // ------------------------------------------------------------------
     void ClusterMethod();
     void EuclideanClusterMethod(pcl::PointCloud<PointType>::Ptr inputcloud,
-                                std::vector<pcl::PointIndices> &cluster_indices, const double &max_cluster_dis);
+                                std::vector<pcl::PointIndices>& cluster_indices, const double& max_cluster_dis);
     void EuclideanAdaptiveClusterMethod(pcl::PointCloud<PointType>::Ptr inputcloud,
-                                        std::vector<std::vector<pcl::PointIndices>> &cluster_indices);
-    bool ProcessCluster(const pcl::PointCloud<PointType>::Ptr &cloud_cluster, common_msgs::msg::HuatConeCluster &position,
-                        pcl::PointCloud<PointType>::Ptr &final_cluster);
-    void SingleFrameDedup(common_msgs::msg::HuatConeCluster &position);
+                                        std::vector<std::vector<pcl::PointIndices>>& cluster_indices);
+    bool ProcessCluster(const pcl::PointCloud<PointType>::Ptr& cloud_cluster,
+                        common_msgs::msg::HuatConeCluster& position, pcl::PointCloud<PointType>::Ptr& final_cluster);
+    void SingleFrameDedup(common_msgs::msg::HuatConeCluster& position);
 
     // ------------------------------------------------------------------
     // 私有方法：地面分割
     // ------------------------------------------------------------------
-    void ComputeGroundSegParams(GroundSegParams &params);
+    void ComputeGroundSegParams(GroundSegParams& params);
     ScoringParams MakeScoringParams() const;
 
     // ------------------------------------------------------------------
     // 私有方法：畸变校正
     // ------------------------------------------------------------------
-    void ApplyDistortionAdjustment(pcl::PointCloud<PointType>::Ptr &cloud);
+    void ApplyDistortionAdjustment(pcl::PointCloud<PointType>::Ptr& cloud);
 
     // ------------------------------------------------------------------
     // 私有方法：时序累积
@@ -298,7 +298,7 @@ class LidarCluster {
     // ------------------------------------------------------------------
     // 私有方法：工具
     // ------------------------------------------------------------------
-    void SplitString(const std::string &in_string, std::vector<double> &out_array);
+    void SplitString(const std::string& in_string, std::vector<double>& out_array);
     double GetConfidence(PointType max, PointType min, Eigen::Vector4f centroid,
-                         const pcl::PointCloud<PointType>::Ptr &cluster_cloud);
+                         const pcl::PointCloud<PointType>::Ptr& cluster_cloud);
 };

@@ -14,51 +14,49 @@
 
 /* ----------------------------- 私有方法 ---------------------------- */
 
-bool WayComputer::ShouldRemoveTriangle(const Triangle &t) const {
-    for (const Edge &e : t.edges)
+bool WayComputer::ShouldRemoveTriangle(const Triangle& t) const {
+    for (const Edge& e : t.edges)
         if (e.len > this->params_.max_triangle_edge_len)
             return true;
-    for (const double &angle : t.angles())
+    for (const double& angle : t.angles())
         if (angle < this->params_.min_triangle_angle)
             return true;
     return false;
 }
 
-void WayComputer::filterTriangulation(TriangleSet &triangulation) const {
-    std::erase_if(triangulation, [this](const Triangle &t) {
-        return ShouldRemoveTriangle(t);
-    });
+void WayComputer::filterTriangulation(TriangleSet& triangulation) const {
+    std::erase_if(triangulation, [this](const Triangle& t) { return ShouldRemoveTriangle(t); });
 }
 
-void WayComputer::filterMidpoints(EdgeSet &edges, const TriangleSet &triangulation) const {
+void WayComputer::filterMidpoints(EdgeSet& edges, const TriangleSet& triangulation) const {
     std::vector<Point> circums;
     circums.reserve(triangulation.size());
-    for (const Triangle &t : triangulation) {
+    for (const Triangle& t : triangulation) {
         circums.push_back(t.circumCenter());
     }
     KDTree circumKDTree(circums);
 
     const double max_dist_sq = this->params_.max_dist_circum_midPoint * this->params_.max_dist_circum_midPoint;
-    std::erase_if(edges, [&](const Edge &e) {
+    std::erase_if(edges, [&](const Edge& e) {
         Point midPoint = e.midPoint();
         std::optional<size_t> nearestCC = circumKDTree.nearest_index(midPoint);
         return nearestCC.has_value() && Point::distSq(circums[*nearestCC], midPoint) > max_dist_sq;
     });
 }
 
-double WayComputer::getHeuristic(const Point &actPos, const Point &nextPos, const Vector &dir,
-                                 const UrinayParams::WayComputer::Search &params) const {
-    double distHeur = Point::dist(actPos, nextPos);  //距离
+double WayComputer::getHeuristic(const Point& actPos, const Point& nextPos, const Vector& dir,
+                                 const UrinayParams::WayComputer::Search& params) const {
+    double distHeur = Point::dist(actPos, nextPos);  // 距离
 
     double angle = Vector(actPos, nextPos).angleWith(dir);
     constexpr double kHalfPi = std::numbers::pi_v<double> / 2.0;
-    double angleHeur = -std::log(
-        std::max(1e-9, ((kHalfPi - std::abs(angle)) / kHalfPi) - 0.2));  //这个计算过程的目的是将夹角越接近0，启发式函数值越大
+    double angleHeur = -std::log(std::max(
+        1e-9, ((kHalfPi - std::abs(angle)) / kHalfPi) - 0.2));  // 这个计算过程的目的是将夹角越接近0，启发式函数值越大
 
     return params.heur_dist_ponderation * distHeur + (1 - params.heur_dist_ponderation) * angleHeur;
 }
 
-inline double WayComputer::avgEdgeLen(const Trace *trace) const {
+inline double WayComputer::avgEdgeLen(const Trace* trace) const {
     if (not trace or trace->empty())
         return this->way_.getAvgEdgeLen();
     else if (this->way_.empty())
@@ -68,9 +66,9 @@ inline double WayComputer::avgEdgeLen(const Trace *trace) const {
                ((this->way_.getAvgEdgeLen() * this->way_.size()) / (trace->size() + this->way_.size()));
 }
 
-bool WayComputer::shouldExcludeEdge(const Edge &candidate, const Edge *actEdge, const Point &actPos,
-                                    const Point &lastPos, const Vector &dir, const Trace *actTrace,
-                                    const UrinayParams::WayComputer::Search &params) const {
+bool WayComputer::shouldExcludeEdge(const Edge& candidate, const Edge* actEdge, const Point& actPos,
+                                    const Point& lastPos, const Vector& dir, const Trace* actTrace,
+                                    const UrinayParams::WayComputer::Search& params) const {
     if (not actEdge)
         return false;
     // 1. 移除自身
@@ -100,8 +98,8 @@ bool WayComputer::shouldExcludeEdge(const Edge &candidate, const Edge *actEdge, 
     return false;
 }
 
-void WayComputer::ResolveSearchContext(const Trace *actTrace, const std::vector<Edge> &edges, const Edge *&actEdge,
-                                       Point &actPos, Point &lastPos, Vector &dir) const {
+void WayComputer::ResolveSearchContext(const Trace* actTrace, const std::vector<Edge>& edges, const Edge*& actEdge,
+                                       Point& actPos, Point& lastPos, Vector& dir) const {
     actEdge = nullptr;
     actPos = Point(0, 0);
     lastPos = Point(0, 0);
@@ -133,32 +131,28 @@ void WayComputer::ResolveSearchContext(const Trace *actTrace, const std::vector<
         dir = Vector(1, 0);
 }
 
-void WayComputer::AppendPointsToPath(const std::vector<Point> &pts, common_msgs::msg::HuatPathLimits &res) {
+void WayComputer::AppendPointsToPath(const std::vector<Point>& pts, common_msgs::msg::HuatPathLimits& res) {
     res.path.reserve(res.path.size() + pts.size());
-    std::ranges::transform(pts, std::back_inserter(res.path), [](const Point &p) {
-        return p.gmPoint();
-    });
+    std::ranges::transform(pts, std::back_inserter(res.path), [](const Point& p) { return p.gmPoint(); });
 }
 
-void WayComputer::FillTracklimits(common_msgs::msg::HuatPathLimits &res) const {
+void WayComputer::FillTracklimits(common_msgs::msg::HuatPathLimits& res) const {
     const Tracklimits tracklimits = this->wayToPublish_.getTracklimits();
     res.tracklimits.header.stamp = this->lastStamp_;
     res.tracklimits.left.reserve(tracklimits.left.size());
-    std::ranges::transform(tracklimits.left, std::back_inserter(res.tracklimits.left), [](const Node &n) {
-        return n.cone();
-    });
+    std::ranges::transform(tracklimits.left, std::back_inserter(res.tracklimits.left),
+                           [](const Node& n) { return n.cone(); });
     res.tracklimits.right.reserve(tracklimits.right.size());
-    std::ranges::transform(tracklimits.right, std::back_inserter(res.tracklimits.right), [](const Node &n) {
-        return n.cone();
-    });
+    std::ranges::transform(tracklimits.right, std::back_inserter(res.tracklimits.right),
+                           [](const Node& n) { return n.cone(); });
     res.tracklimits.replan = this->way_.quinEhLobjetiuDeLaSevaDiresio(this->lastWay_);
 }
 
-void WayComputer::findNextEdges(std::vector<HeurInd> &nextEdges, const Trace *actTrace, const KDTree &midpointsKDT,
-                                const std::vector<Edge> &edges, const UrinayParams::WayComputer::Search &params) const {
+void WayComputer::findNextEdges(std::vector<HeurInd>& nextEdges, const Trace* actTrace, const KDTree& midpointsKDT,
+                                const std::vector<Edge>& edges, const UrinayParams::WayComputer::Search& params) const {
     nextEdges.clear();
 
-    const Edge *actEdge;
+    const Edge* actEdge;
     Point actPos, lastPos;
     Vector dir;
     ResolveSearchContext(actTrace, edges, actEdge, actPos, lastPos, dir);
@@ -172,7 +166,7 @@ void WayComputer::findNextEdges(std::vector<HeurInd> &nextEdges, const Trace *ac
 
     std::vector<HeurInd> privilege_runner;
     privilege_runner.reserve(nextPossibleEdges.size());
-    for (const size_t &nextPossibleEdgeInd : nextPossibleEdges) {
+    for (const size_t& nextPossibleEdgeInd : nextPossibleEdges) {
         double heuristic = this->getHeuristic(actPos, edges[nextPossibleEdgeInd].midPoint(), dir, params);
         if (heuristic <= params.max_next_heuristic)
             privilege_runner.emplace_back(heuristic, nextPossibleEdgeInd);
@@ -182,7 +176,7 @@ void WayComputer::findNextEdges(std::vector<HeurInd> &nextEdges, const Trace *ac
     std::partial_sort_copy(privilege_runner.begin(), privilege_runner.end(), nextEdges.begin(), nextEdges.end());
 }
 
-Trace WayComputer::computeBestTraceWithFinishedT(const Trace &best, const Trace &t) const {
+Trace WayComputer::computeBestTraceWithFinishedT(const Trace& best, const Trace& t) const {
     // 最长的路径胜出；长度相同时，累计启发值更小的胜出
     if (t.size() > best.size() or (t.size() == best.size() and t.sumHeur() < best.sumHeur())) {
         return t;
@@ -190,10 +184,10 @@ Trace WayComputer::computeBestTraceWithFinishedT(const Trace &best, const Trace 
         return best;
 }
 
-size_t WayComputer::treeSearch(std::vector<HeurInd> &nextEdges, const KDTree &midpointsKDT,
-                               const std::vector<Edge> &edges, const UrinayParams::WayComputer::Search &params) const {
+size_t WayComputer::treeSearch(std::vector<HeurInd>& nextEdges, const KDTree& midpointsKDT,
+                               const std::vector<Edge>& edges, const UrinayParams::WayComputer::Search& params) const {
     std::queue<Trace> cua;
-    for (const HeurInd &nextEdge : nextEdges) {
+    for (const HeurInd& nextEdge : nextEdges) {
         bool closesLoop = this->way_.closesLoopWith(edges[nextEdge.second]);
         cua.emplace(nextEdge.second, nextEdge.first, edges[nextEdge.second].len, closesLoop);
     }
@@ -222,7 +216,7 @@ size_t WayComputer::treeSearch(std::vector<HeurInd> &nextEdges, const KDTree &mi
         if (trace_at_max_height or nextEdges.empty()) {
             best = this->computeBestTraceWithFinishedT(best, t);
         } else {
-            for (const HeurInd &nextEdge : nextEdges) {
+            for (const HeurInd& nextEdge : nextEdges) {
                 Point actPos = edges[t.edgeInd()].midPoint();
                 bool closesLoop = this->way_.closesLoopWith(edges[nextEdge.second], &actPos);
                 Trace aux = t;
@@ -234,7 +228,7 @@ size_t WayComputer::treeSearch(std::vector<HeurInd> &nextEdges, const KDTree &mi
     return best.first().edgeInd();
 }
 
-void WayComputer::computeWay(const std::vector<Edge> &edges, const UrinayParams::WayComputer::Search &params) {
+void WayComputer::computeWay(const std::vector<Edge>& edges, const UrinayParams::WayComputer::Search& params) {
     this->way_.trimByLocal();
 
     std::vector<Point> midpoints(edges.size());
@@ -245,7 +239,8 @@ void WayComputer::computeWay(const std::vector<Edge> &edges, const UrinayParams:
     this->findNextEdges(nextEdges, nullptr, midpointsKDT, edges, params);
 
     while (rclcpp::ok() and not nextEdges.empty() and
-           (params.max_way_horizon_size <= 0 or this->way_.sizeAheadOfCar() <= static_cast<uint32_t>(params.max_way_horizon_size))) {
+           (params.max_way_horizon_size <= 0 or
+            this->way_.sizeAheadOfCar() <= static_cast<uint32_t>(params.max_way_horizon_size))) {
         size_t nextEdgeInd = this->treeSearch(nextEdges, midpointsKDT, edges, params);
         this->way_.addEdge(edges[nextEdgeInd]);
 
@@ -265,7 +260,7 @@ void WayComputer::computeWay(const std::vector<Edge> &edges, const UrinayParams:
 
 /* ----------------------------- 公有方法 ----------------------------- */
 
-WayComputer::WayComputer(const UrinayParams::WayComputer &params) : params_(params) {
+WayComputer::WayComputer(const UrinayParams::WayComputer& params) : params_(params) {
     Way::init(params.way);
     this->generalFailsafe_.initGeneral(this->params_.search, this->params_.general_failsafe_safetyFactor,
                                        this->params_.failsafe_max_way_horizon_size);
@@ -295,7 +290,7 @@ void WayComputer::stateCallback(common_msgs::msg::HuatCarstate::ConstSharedPtr i
     this->localTfValid_ = true;
 }
 
-void WayComputer::update(TriangleSet &triangulation, const rclcpp::Time &stamp) {
+void WayComputer::update(TriangleSet& triangulation, const rclcpp::Time& stamp) {
     Eigen::Affine3d local_tf_snapshot;
     {
         std::scoped_lock lock(state_mutex_);
@@ -308,7 +303,7 @@ void WayComputer::update(TriangleSet &triangulation, const rclcpp::Time &stamp) 
 
     // #0: 更新上一条路径（用于计算 replan 标志）。
     //     并更新时间戳。
-    //根据代码，`this->way_` 可以认为是一个不断累加的全局路径，而 `this->lastWay_` 用于存储上一次的全局路径
+    // 根据代码，`this->way_` 可以认为是一个不断累加的全局路径，而 `this->lastWay_` 用于存储上一次的全局路径
     this->lastWay_ = this->way_;  // Way构造函数直接赋值  表示路径
     this->lastStamp_ = stamp;
 
@@ -321,10 +316,10 @@ void WayComputer::update(TriangleSet &triangulation, const rclcpp::Time &stamp) 
     // 使用 EdgeSet = std::unordered_set<Edge>;
     // `std::unordered_set` 实现了一个无序集合，其中元素类型为 `Edge`
     EdgeSet edgeSet;  // 方便地存储并检索一组不重复的边对象
-    for (const Triangle &t : triangulation) {
-        for (const Edge &e : t.edges) {
-            edgeSet.insert(e);  //调用 insert() 函数，将边e插入到edgeSet中，如果
-                                // e已经存在于集合中，则不会重复插入，刚好解决了中点不被获取两次的问题
+    for (const Triangle& t : triangulation) {
+        for (const Edge& e : t.edges) {
+            edgeSet.insert(e);  // 调用 insert() 函数，将边e插入到edgeSet中，如果
+                                //  e已经存在于集合中，则不会重复插入，刚好解决了中点不被获取两次的问题
         }
     }
 
@@ -333,12 +328,12 @@ void WayComputer::update(TriangleSet &triangulation, const rclcpp::Time &stamp) 
 
     std::vector<Edge> edgeVec;
     edgeVec.reserve(edgeSet.size());
-    for (const Edge &e : edgeSet) {
+    for (const Edge& e : edgeSet) {
         edgeVec.push_back(e);
     }
 
     this->way_.updateLocal(local_tf_snapshot);
-    for (const Edge &e : edgeVec) {
+    for (const Edge& e : edgeVec) {
         e.updateLocal(local_tf_snapshot);
     }
 
@@ -362,12 +357,12 @@ void WayComputer::update(TriangleSet &triangulation, const rclcpp::Time &stamp) 
     UrinayVisualizer::getInstance().visualize(waySnapshot);
 }
 
-const bool &WayComputer::isLoopClosed() const {
+const bool& WayComputer::isLoopClosed() const {
     std::scoped_lock lock(way_mutex_);
     return this->isLoopClosed_;
 }
 
-void WayComputer::writeWayToFile(const std::string &file_path) const {
+void WayComputer::writeWayToFile(const std::string& file_path) const {
     std::scoped_lock lock(way_mutex_);
     std::ofstream oStreamToWrite(file_path);
     if (!oStreamToWrite.is_open()) {

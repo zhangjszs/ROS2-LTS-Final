@@ -1,8 +1,8 @@
 #include "pure_pursuit/vehicle_command_encoder.h"
 
 common_msgs::msg::HuatVehicleCmd VehicleCommandEncoder::encode(int steering, int brake_force, int pedal_ratio,
-                                                           int gear_position, int working_mode, int racing_num,
-                                                           int racing_status) const {
+                                                               int gear_position, int working_mode, int racing_num,
+                                                               int racing_status) const {
     common_msgs::msg::HuatVehicleCmd cmd;
     setHeader(cmd);
     cmd.steering = steering;
@@ -21,7 +21,7 @@ common_msgs::msg::HuatVehicleCmd VehicleCommandEncoder::encodeBrake(int racing_n
 }
 
 common_msgs::msg::HuatVehicleCmd VehicleCommandEncoder::encodeDrive(int steering, int pedal_ratio, int racing_num,
-                                                                int racing_status) const {
+                                                                    int racing_status) const {
     return encode(steering, 0, pedal_ratio, 1, 1, racing_num, racing_status);
 }
 

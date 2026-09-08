@@ -35,9 +35,8 @@ static void FilterCloudAabb(pcl::PointCloud<PointType>::Ptr cloud, const PointCl
     const float z_max = static_cast<float>(roi.z_max);
     auto& pts = cloud->points;
     std::erase_if(pts, [&](const PointType& p) {
-        return !std::isfinite(p.x) || !std::isfinite(p.y) || !std::isfinite(p.z) ||
-               p.x < x_min || p.x > x_max || p.y < y_min || p.y > y_max || p.z < z_min ||
-               p.z > z_max;
+        return !std::isfinite(p.x) || !std::isfinite(p.y) || !std::isfinite(p.z) || p.x < x_min || p.x > x_max ||
+               p.y < y_min || p.y > y_max || p.z < z_min || p.z > z_max;
     });
     CompactPoints(cloud);
 }
@@ -73,8 +72,8 @@ size_t PointCloudPreprocessor::countValidPointsInRoi(PointSpan points, const Roi
     const float z_max = static_cast<float>(roi.z_max);
 
     return static_cast<size_t>(std::ranges::count_if(points, [&](const PointType& p) {
-        return std::isfinite(p.x) && std::isfinite(p.y) && std::isfinite(p.z) &&
-               p.x >= x_min && p.x <= x_max && p.y >= y_min && p.y <= y_max && p.z >= z_min && p.z <= z_max;
+        return std::isfinite(p.x) && std::isfinite(p.y) && std::isfinite(p.z) && p.x >= x_min && p.x <= x_max &&
+               p.y >= y_min && p.y <= y_max && p.z >= z_min && p.z <= z_max;
     }));
 }
 
@@ -160,7 +159,8 @@ PointCloudPreprocessor::PointCloudPreprocessor(rclcpp::Node* node) {
         splitString(voxel_leaf_sizes_str_, voxel_leaf_sizes_);
         if (voxel_ranges_.empty() || voxel_leaf_sizes_.empty() ||
             voxel_leaf_sizes_.size() != voxel_ranges_.size() + 1) {
-            RCLCPP_WARN(rclcpp::get_logger("lidar_cluster"), "[lidar_cluster] Invalid adaptive voxel config, adaptive voxel disabled");
+            RCLCPP_WARN(rclcpp::get_logger("lidar_cluster"),
+                        "[lidar_cluster] Invalid adaptive voxel config, adaptive voxel disabled");
             enable_adaptive_voxel_ = false;
         }
     }
@@ -265,8 +265,9 @@ void PointCloudPreprocessor::adaptiveVoxelGrid(pcl::PointCloud<PointType>::Ptr& 
     if (!result->empty()) {
         cloud = result;
     } else {
-        RCLCPP_WARN_THROTTLE(rclcpp::get_logger("lidar_cluster"), clock_, 5000, "[lidar_cluster] Adaptive voxel produced empty cloud, keeping original (%zu pts)",
-                          cloud->size());
+        RCLCPP_WARN_THROTTLE(rclcpp::get_logger("lidar_cluster"), clock_, 5000,
+                             "[lidar_cluster] Adaptive voxel produced empty cloud, keeping original (%zu pts)",
+                             cloud->size());
     }
 }
 
@@ -282,7 +283,8 @@ void PointCloudPreprocessor::applySOR(pcl::PointCloud<PointType>::Ptr& cloud) {
 
 void PointCloudPreprocessor::process(pcl::PointCloud<PointType>::Ptr& cloud_filtered, bool frp_active,
                                      double current_pitch, double current_speed) {
-    RCLCPP_DEBUG(rclcpp::get_logger("lidar_cluster"), "[lidar_cluster] Points before PassThrough: %zu", cloud_filtered->points.size());
+    RCLCPP_DEBUG(rclcpp::get_logger("lidar_cluster"), "[lidar_cluster] Points before PassThrough: %zu",
+                 cloud_filtered->points.size());
 
     RoiBounds roi = computeDynamicROIBounds(current_pitch, current_speed);
 
@@ -291,9 +293,8 @@ void PointCloudPreprocessor::process(pcl::PointCloud<PointType>::Ptr& cloud_filt
         const float z_min = static_cast<float>(roi.z_min);
         const float z_max = static_cast<float>(roi.z_max);
         auto& pts = cloud_filtered->points;
-        std::erase_if(pts, [z_min, z_max](const PointType& p) {
-            return !std::isfinite(p.z) || p.z < z_min || p.z > z_max;
-        });
+        std::erase_if(pts,
+                      [z_min, z_max](const PointType& p) { return !std::isfinite(p.z) || p.z < z_min || p.z > z_max; });
         CompactPoints(cloud_filtered);
     } else if (road_type_ == 2 || road_type_ == 3) {
         FilterCloudAabb(cloud_filtered, roi);
@@ -301,7 +302,8 @@ void PointCloudPreprocessor::process(pcl::PointCloud<PointType>::Ptr& cloud_filt
         throw std::runtime_error("[lidar_cluster] Undefined road_type: " + std::to_string(road_type_));
     }
 
-    RCLCPP_DEBUG(rclcpp::get_logger("lidar_cluster"), "[lidar_cluster] Points before downsample: %zu", cloud_filtered->points.size());
+    RCLCPP_DEBUG(rclcpp::get_logger("lidar_cluster"), "[lidar_cluster] Points before downsample: %zu",
+                 cloud_filtered->points.size());
 
     if (enable_adaptive_voxel_) {
         adaptiveVoxelGrid(cloud_filtered, frp_active);

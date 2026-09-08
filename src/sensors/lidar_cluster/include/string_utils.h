@@ -1,9 +1,8 @@
 #pragma once
 
-#include <rclcpp/rclcpp.hpp>
-
 #include <cctype>
 #include <format>
+#include <rclcpp/rclcpp.hpp>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -17,9 +16,8 @@ inline void parseCsvDoubles(std::string_view in_string, std::vector<double>& out
     size_t start = 0;
     while (start < in_string.size()) {
         size_t end = in_string.find(',', start);
-        std::string_view token = (end == std::string_view::npos)
-                                     ? in_string.substr(start)
-                                     : in_string.substr(start, end - start);
+        std::string_view token =
+            (end == std::string_view::npos) ? in_string.substr(start) : in_string.substr(start, end - start);
 
         // 去除前后空白字符
         while (!token.empty() && std::isspace(static_cast<unsigned char>(token.front()))) {
@@ -34,8 +32,8 @@ inline void parseCsvDoubles(std::string_view in_string, std::vector<double>& out
                 out_array.push_back(std::stod(std::string(token)));
             } catch (const std::exception& e) {
                 RCLCPP_ERROR(rclcpp::get_logger("lidar_cluster"), "%s",
-                             std::format("[lidar_cluster] Failed to parse token '{}' in config string '{}': {}",
-                                         token, in_string, e.what())
+                             std::format("[lidar_cluster] Failed to parse token '{}' in config string '{}': {}", token,
+                                         in_string, e.what())
                                  .c_str());
             }
         }

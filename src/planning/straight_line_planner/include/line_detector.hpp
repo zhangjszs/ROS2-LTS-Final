@@ -2,7 +2,6 @@
 
 #include <common_msgs/msg/huat_cone.hpp>
 #include <geometry_msgs/msg/point.hpp>
-
 #include <vector>
 
 struct LineParams {
@@ -11,9 +10,7 @@ struct LineParams {
     bool valid;
     LineParams() : slope(0.0), intercept(0.0), valid(false) {}
     LineParams(double m, double b) : slope(m), intercept(b), valid(true) {}
-    double YAt(double x) const {
-        return slope * x + intercept;
-    }
+    double YAt(double x) const { return slope * x + intercept; }
 };
 
 struct DetectedBoundaries {
@@ -55,8 +52,8 @@ class LineDetector {
 
     DetectedBoundaries Detect(const std::vector<common_msgs::msg::HuatCone>& cones);
 
-    void ClusterCones(const std::vector<common_msgs::msg::HuatCone>& cones, std::vector<common_msgs::msg::HuatCone>& left,
-                      std::vector<common_msgs::msg::HuatCone>& right);
+    void ClusterCones(const std::vector<common_msgs::msg::HuatCone>& cones,
+                      std::vector<common_msgs::msg::HuatCone>& left, std::vector<common_msgs::msg::HuatCone>& right);
 
     LineParams HoughFit(const std::vector<common_msgs::msg::HuatCone>& cones);
     LineParams RansacFit(const std::vector<common_msgs::msg::HuatCone>& cones);

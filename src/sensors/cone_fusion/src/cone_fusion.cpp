@@ -5,8 +5,7 @@
 #include <functional>
 #include <ranges>
 
-ConeFusion::ConeFusion(rclcpp::Node::SharedPtr node)
-    : node_(node), diag_updater_(node) {
+ConeFusion::ConeFusion(rclcpp::Node::SharedPtr node) : node_(node), diag_updater_(node) {
     node_->declare_parameter("enable_vehicle_state_jump_check", true);
     node_->declare_parameter("vehicle_state_base_jump_threshold", 2.0);
     node_->declare_parameter("vehicle_state_speed_margin", 2.0);
@@ -95,7 +94,7 @@ ConeFusion::ConeFusion(rclcpp::Node::SharedPtr node)
     sync_ = std::make_unique<message_filters::Synchronizer<ApproxSyncPolicy>>(
         ApproxSyncPolicy(static_cast<uint32_t>(approx_queue)), cone_sub_mf_, car_state_sub_mf_);
     sync_->registerCallback([this](const common_msgs::msg::HuatConeCluster::ConstSharedPtr& lidar_msg,
-                                  const common_msgs::msg::HuatCarstate::ConstSharedPtr& state_msg) {
+                                   const common_msgs::msg::HuatCarstate::ConstSharedPtr& state_msg) {
         OnSyncedMessages(lidar_msg, state_msg);
     });
 
@@ -104,26 +103,26 @@ ConeFusion::ConeFusion(rclcpp::Node::SharedPtr node)
             vision_detections_topic, 1,
             [this](const autodrive_msgs::msg::HuatVisionDetections::ConstSharedPtr msg) { OnVisionMessage(msg); });
         RCLCPP_INFO(node_->get_logger(), "[cone_fusion] Vision color injection ENABLED (topic=%s, fx=%.1f fy=%.1f)",
-                 vision_detections_topic.c_str(), cam_fx_, cam_fy_);
+                    vision_detections_topic.c_str(), cam_fx_, cam_fy_);
     } else {
-        RCLCPP_INFO(node_->get_logger(), "[cone_fusion] Vision color injection disabled (enable_vision_color_injection=false)");
+        RCLCPP_INFO(node_->get_logger(),
+                    "[cone_fusion] Vision color injection disabled (enable_vision_color_injection=false)");
     }
     transformed_pub_ = node_->create_publisher<common_msgs::msg::HuatMap>(transformed_cones_topic, 10);
     global_map_pub_ = node_->create_publisher<sensor_msgs::msg::PointCloud2>(global_map_topic, 10);
 
     diag_updater_.add("Cone Fusion Health", this, &ConeFusion::DiagnoseHealth);
     diag_updater_.setHardwareID("cone_fusion");
-    RCLCPP_INFO(
-        node_->get_logger(),
-        "[cone_fusion] Started with ApproximateTime sync (in=%s, state=%s, out=%s, map=%s, "
-        "jump_check=%s, base_jump=%.2fm, speed_margin=%.2f, dt=[%.2f,%.2f]s, heading=%.2frad, queue=%d)",
-        input_cones_topic.c_str(), vehicle_state_topic.c_str(), transformed_cones_topic.c_str(),
-        global_map_topic.c_str(), enable_vehicle_state_jump_check_ ? "true" : "false",
-        vehicle_state_base_jump_threshold_, vehicle_state_speed_margin_, vehicle_state_min_dt_, vehicle_state_max_dt_,
-        vehicle_state_heading_threshold_, approx_queue);
+    RCLCPP_INFO(node_->get_logger(),
+                "[cone_fusion] Started with ApproximateTime sync (in=%s, state=%s, out=%s, map=%s, "
+                "jump_check=%s, base_jump=%.2fm, speed_margin=%.2f, dt=[%.2f,%.2f]s, heading=%.2frad, queue=%d)",
+                input_cones_topic.c_str(), vehicle_state_topic.c_str(), transformed_cones_topic.c_str(),
+                global_map_topic.c_str(), enable_vehicle_state_jump_check_ ? "true" : "false",
+                vehicle_state_base_jump_threshold_, vehicle_state_speed_margin_, vehicle_state_min_dt_,
+                vehicle_state_max_dt_, vehicle_state_heading_threshold_, approx_queue);
 }
 
-void ConeFusion::DiagnoseHealth(diagnostic_updater::DiagnosticStatusWrapper &stat) {
+void ConeFusion::DiagnoseHealth(diagnostic_updater::DiagnosticStatusWrapper& stat) {
     if (!had_received_) {
         stat.summary(diagnostic_msgs::msg::DiagnosticStatus::STALE, "No synchronized messages received");
     } else if (err_data_) {
@@ -142,24 +141,20 @@ void ConeFusion::DiagnoseHealth(diagnostic_updater::DiagnosticStatusWrapper &sta
     stat.add("diag_best_match_delta_sec", diag_best_match_delta_sec_);
 }
 
-uint32_t ConeFusion::ConfidenceToPercent(const common_msgs::msg::HuatConeCluster &msg, size_t index) {
+uint32_t ConeFusion::ConfidenceToPercent(const common_msgs::msg::HuatConeCluster& msg, size_t index) {
     return cone_fusion_utils::ConfidenceToPercent(msg.confidence.data(), msg.confidence.size(), index);
 }
 
-bool ConeFusion::IsVehicleStateJumpAbnormal(const common_msgs::msg::HuatCarstate &last_state,
-                                            const common_msgs::msg::HuatCarstate &current_state, double dt) {
-    cone_fusion_utils::VehicleState last_vs{
-        .x = last_state.car_state.x,
-        .y = last_state.car_state.y,
-        .theta = last_state.car_state.theta,
-        .v = static_cast<double>(last_state.v)
-    };
-    cone_fusion_utils::VehicleState curr_vs{
-        .x = current_state.car_state.x,
-        .y = current_state.car_state.y,
-        .theta = current_state.car_state.theta,
-        .v = static_cast<double>(current_state.v)
-    };
+bool ConeFusion::IsVehicleStateJumpAbnormal(const common_msgs::msg::HuatCarstate& last_state,
+                                            const common_msgs::msg::HuatCarstate& current_state, double dt) {
+    cone_fusion_utils::VehicleState last_vs{.x = last_state.car_state.x,
+                                            .y = last_state.car_state.y,
+                                            .theta = last_state.car_state.theta,
+                                            .v = static_cast<double>(last_state.v)};
+    cone_fusion_utils::VehicleState curr_vs{.x = current_state.car_state.x,
+                                            .y = current_state.car_state.y,
+                                            .theta = current_state.car_state.theta,
+                                            .v = static_cast<double>(current_state.v)};
     return cone_fusion_utils::IsVehicleStateJumpAbnormal(
         last_vs, curr_vs, dt, vehicle_state_base_jump_threshold_, vehicle_state_speed_margin_, vehicle_state_min_dt_,
         vehicle_state_max_dt_, vehicle_state_heading_threshold_, &err_reason_);
@@ -174,7 +169,9 @@ void ConeFusion::OnSyncedMessages(const common_msgs::msg::HuatConeCluster::Const
         empty_map.header.frame_id = "map";
         transformed_pub_->publish(empty_map);
         last_car_state_ = *state;
-        last_car_state_stamp_ = (state->header.stamp.sec == 0 && state->header.stamp.nanosec == 0) ? node_->now() : rclcpp::Time(state->header.stamp);
+        last_car_state_stamp_ = (state->header.stamp.sec == 0 && state->header.stamp.nanosec == 0)
+                                    ? node_->now()
+                                    : rclcpp::Time(state->header.stamp);
         had_received_ = true;
         last_cone_count_ = 0;
         diag_updater_.force_update();
@@ -183,13 +180,16 @@ void ConeFusion::OnSyncedMessages(const common_msgs::msg::HuatConeCluster::Const
 
     // 时间同步诊断快照：ApproximateTime 保证 delta 通常 < 10ms
     diag_cone_stamp_ = cones->header.stamp;
-    diag_vehicle_state_stamp_ = (state->header.stamp.sec == 0 && state->header.stamp.nanosec == 0) ? node_->now() : rclcpp::Time(state->header.stamp);
+    diag_vehicle_state_stamp_ = (state->header.stamp.sec == 0 && state->header.stamp.nanosec == 0)
+                                    ? node_->now()
+                                    : rclcpp::Time(state->header.stamp);
     diag_stamp_delta_sec_ = (diag_cone_stamp_ - diag_vehicle_state_stamp_).seconds();
     diag_best_match_delta_sec_ = diag_stamp_delta_sec_;
     diag_latest_vs_age_sec_ = diag_stamp_delta_sec_;
 
     if (std::fabs(diag_stamp_delta_sec_) > 0.1) {
-        RCLCPP_WARN_THROTTLE(node_->get_logger(), *node_->get_clock(), 1000, "[cone_fusion] ApproxTime sync delta=%.3fs (>0.1s)", diag_stamp_delta_sec_);
+        RCLCPP_WARN_THROTTLE(node_->get_logger(), *node_->get_clock(), 1000,
+                             "[cone_fusion] ApproxTime sync delta=%.3fs (>0.1s)", diag_stamp_delta_sec_);
     }
 
     // 跳变检测（使用 ApproximateTime 匹配的位姿，与上一帧对比）
@@ -207,7 +207,8 @@ void ConeFusion::OnSyncedMessages(const common_msgs::msg::HuatConeCluster::Const
 
     if (err_data_) {
         err_data_ = false;
-        RCLCPP_WARN_THROTTLE(node_->get_logger(), *node_->get_clock(), 1000, "[cone_fusion] Vehicle state jump detected, skipping frame (%s)", err_reason_.c_str());
+        RCLCPP_WARN_THROTTLE(node_->get_logger(), *node_->get_clock(), 1000,
+                             "[cone_fusion] Vehicle state jump detected, skipping frame (%s)", err_reason_.c_str());
         return;
     }
 
@@ -236,27 +237,29 @@ void ConeFusion::OnSyncedMessages(const common_msgs::msg::HuatConeCluster::Const
     // C++20 惰性流式清洗流水线：按需组合距离、视场角和置信度过滤，无中间 vector 堆分配
     auto indices = std::views::iota(size_t{0}, total_points);
 
-    auto valid_cone_indices = indices
-        | std::views::filter([&](size_t i) {
-            const auto &p = cones->points[i];
-            return std::isfinite(p.x) && std::isfinite(p.y) && std::isfinite(p.z);
-        })
-        | std::views::filter([&](size_t i) {
-            if (!enable_cone_filtering_) return true;
-            const auto &p = cones->points[i];
-            const double d2 = p.x * p.x + p.y * p.y;
-            return d2 >= min_dist_sq && d2 <= max_dist_sq;
-        })
-        | std::views::filter([&](size_t i) {
-            if (!enable_cone_filtering_) return true;
-            const auto &p = cones->points[i];
-            const double angle = std::atan2(p.y, p.x);
-            return angle >= min_fov_rad_ && angle <= max_fov_rad_;
-        })
-        | std::views::filter([&](size_t i) {
-            if (!enable_cone_filtering_) return true;
-            return ConfidenceToPercent(*cones, i) >= static_cast<uint32_t>(min_confidence_);
-        });
+    auto valid_cone_indices = indices | std::views::filter([&](size_t i) {
+                                  const auto& p = cones->points[i];
+                                  return std::isfinite(p.x) && std::isfinite(p.y) && std::isfinite(p.z);
+                              }) |
+                              std::views::filter([&](size_t i) {
+                                  if (!enable_cone_filtering_)
+                                      return true;
+                                  const auto& p = cones->points[i];
+                                  const double d2 = p.x * p.x + p.y * p.y;
+                                  return d2 >= min_dist_sq && d2 <= max_dist_sq;
+                              }) |
+                              std::views::filter([&](size_t i) {
+                                  if (!enable_cone_filtering_)
+                                      return true;
+                                  const auto& p = cones->points[i];
+                                  const double angle = std::atan2(p.y, p.x);
+                                  return angle >= min_fov_rad_ && angle <= max_fov_rad_;
+                              }) |
+                              std::views::filter([&](size_t i) {
+                                  if (!enable_cone_filtering_)
+                                      return true;
+                                  return ConfidenceToPercent(*cones, i) >= static_cast<uint32_t>(min_confidence_);
+                              });
 
     for (size_t i : valid_cone_indices) {
         Eigen::Vector2d local_xy(cones->points[i].x, cones->points[i].y);
@@ -296,7 +299,9 @@ void ConeFusion::OnSyncedMessages(const common_msgs::msg::HuatConeCluster::Const
     diag_updater_.force_update();
 
     sensor_msgs::msg::PointCloud2 global_cloud_msg;
-    pcl::PCLPointCloud2 pcl_pc2_global; pcl::toPCLPointCloud2(*global_cloud, pcl_pc2_global); pcl_conversions::fromPCL(pcl_pc2_global, global_cloud_msg);
+    pcl::PCLPointCloud2 pcl_pc2_global;
+    pcl::toPCLPointCloud2(*global_cloud, pcl_pc2_global);
+    pcl_conversions::fromPCL(pcl_pc2_global, global_cloud_msg);
     global_cloud_msg.header.frame_id = "map";
     global_cloud_msg.header.stamp = cones->header.stamp;
     global_map_pub_->publish(global_cloud_msg);
@@ -308,7 +313,7 @@ void ConeFusion::OnVisionMessage(const autodrive_msgs::msg::HuatVisionDetections
     has_vision_ = true;
 }
 
-void ConeFusion::InjectVisionColor(common_msgs::msg::HuatMap &map, const std::vector<uint8_t> &lidar_sizes) {
+void ConeFusion::InjectVisionColor(common_msgs::msg::HuatMap& map, const std::vector<uint8_t>& lidar_sizes) {
     if (cam_fx_ <= 0.0 || cam_fy_ <= 0.0) {
         return;
     }
@@ -327,7 +332,8 @@ void ConeFusion::InjectVisionColor(common_msgs::msg::HuatMap &map, const std::ve
 
     double age = (rclcpp::Time(map.header.stamp) - rclcpp::Time(vision.header.stamp)).seconds();
     if (std::fabs(age) > vision_max_age_sec_) {
-        RCLCPP_DEBUG(node_->get_logger(), "[cone_fusion] Vision message stale (age=%.3fs), skipping color injection", age);
+        RCLCPP_DEBUG(node_->get_logger(), "[cone_fusion] Vision message stale (age=%.3fs), skipping color injection",
+                     age);
         return;
     }
 
@@ -340,7 +346,7 @@ void ConeFusion::InjectVisionColor(common_msgs::msg::HuatMap &map, const std::ve
         return;
 
     for (size_t i = 0; i < map.cone.size(); ++i) {
-        auto &cone = map.cone[i];
+        auto& cone = map.cone[i];
         double cx = cone.position_base_link.x - cam_offset_x_;
         double cy = cone.position_base_link.y - cam_offset_y_;
         double cz = cone.position_base_link.z - cam_offset_z_;

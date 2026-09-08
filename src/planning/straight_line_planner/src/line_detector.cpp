@@ -9,15 +9,16 @@
 LineDetector::LineDetector(const LineDetectorConfig& cfg) : cfg_(cfg) {}
 
 void LineDetector::ClusterCones(const std::vector<common_msgs::msg::HuatCone>& cones,
-                                std::vector<common_msgs::msg::HuatCone>& left, std::vector<common_msgs::msg::HuatCone>& right) {
+                                std::vector<common_msgs::msg::HuatCone>& left,
+                                std::vector<common_msgs::msg::HuatCone>& right) {
     left.clear();
     right.clear();
-    std::ranges::copy_if(cones, std::back_inserter(left),
-                         [this](float y) { return y < -cfg_.center_margin; },
-                         [](const common_msgs::msg::HuatCone& c) { return c.position_base_link.y; });
-    std::ranges::copy_if(cones, std::back_inserter(right),
-                         [this](float y) { return y > cfg_.center_margin; },
-                         [](const common_msgs::msg::HuatCone& c) { return c.position_base_link.y; });
+    std::ranges::copy_if(
+        cones, std::back_inserter(left), [this](float y) { return y < -cfg_.center_margin; },
+        [](const common_msgs::msg::HuatCone& c) { return c.position_base_link.y; });
+    std::ranges::copy_if(
+        cones, std::back_inserter(right), [this](float y) { return y > cfg_.center_margin; },
+        [](const common_msgs::msg::HuatCone& c) { return c.position_base_link.y; });
 }
 
 LineParams LineDetector::HoughFit(const std::vector<common_msgs::msg::HuatCone>& cones) {
@@ -98,12 +99,12 @@ LineParams LineDetector::HoughFit(const std::vector<common_msgs::msg::HuatCone>&
     return LineParams(slope, intercept);
 }
 
-bool LineDetector::IsLineGood(const LineParams& line, const std::vector<common_msgs::msg::HuatCone>& cones, double thresh) {
+bool LineDetector::IsLineGood(const LineParams& line, const std::vector<common_msgs::msg::HuatCone>& cones,
+                              double thresh) {
     if (!line.valid || cones.empty())
         return false;
     auto inliers = std::ranges::count_if(
-        cones,
-        [thresh](double d) { return d < thresh; },
+        cones, [thresh](double d) { return d < thresh; },
         [&](const common_msgs::msg::HuatCone& c) {
             return PointToLineDistance(c.position_base_link, line.slope, line.intercept);
         });
@@ -141,11 +142,8 @@ LineParams LineDetector::RansacFit(const std::vector<common_msgs::msg::HuatCone>
         double b = p1.y - m * p1.x;
 
         size_t inliers = static_cast<size_t>(std::ranges::count_if(
-            cones,
-            [this](double d) { return d < cfg_.ransac_inlier_threshold; },
-            [&](const common_msgs::msg::HuatCone& c) {
-                return PointToLineDistance(c.position_base_link, m, b);
-            }));
+            cones, [this](double d) { return d < cfg_.ransac_inlier_threshold; },
+            [&](const common_msgs::msg::HuatCone& c) { return PointToLineDistance(c.position_base_link, m, b); }));
         if (inliers > best_inliers) {
             best_inliers = inliers;
             best = LineParams(m, b);
@@ -161,8 +159,7 @@ LineParams LineDetector::RansacFit(const std::vector<common_msgs::msg::HuatCone>
     std::vector<common_msgs::msg::HuatCone> inlier_cones;
     inlier_cones.reserve(best_inliers);
     std::ranges::copy_if(
-        cones, std::back_inserter(inlier_cones),
-        [this](double d) { return d < cfg_.ransac_inlier_threshold; },
+        cones, std::back_inserter(inlier_cones), [this](double d) { return d < cfg_.ransac_inlier_threshold; },
         [&best](const common_msgs::msg::HuatCone& c) {
             return PointToLineDistance(c.position_base_link, best.slope, best.intercept);
         });
@@ -264,7 +261,8 @@ DetectedBoundaries LineDetector::Detect(const std::vector<common_msgs::msg::Huat
     std::vector<common_msgs::msg::HuatCone> left_cones, right_cones;
     ClusterCones(cones, left_cones, right_cones);
 
-    auto FitSide = [&](const std::vector<common_msgs::msg::HuatCone>& side_cones, const char* /*side_name*/) -> LineParams {
+    auto FitSide = [&](const std::vector<common_msgs::msg::HuatCone>& side_cones,
+                       const char* /*side_name*/) -> LineParams {
         if (side_cones.size() < 2) {
             return LineParams();
         }

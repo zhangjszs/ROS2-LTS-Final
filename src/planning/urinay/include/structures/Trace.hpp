@@ -69,7 +69,7 @@ class Trace {
          * @param[in] loopClosed
          * @param[in] before
          */
-        Connection(const size_t &edgeInd, const double &heur, const double &edgeLen, const bool &loopClosed,
+        Connection(const size_t& edgeInd, const double& heur, const double& edgeLen, const bool& loopClosed,
                    std::shared_ptr<Connection> before);
 
         /**
@@ -77,7 +77,7 @@ class Trace {
          *
          * @param[in] _edgeInd
          */
-        bool containsEdge(const size_t &_edgeInd) const;
+        bool containsEdge(const size_t& _edgeInd) const;
 
         /**
          * @brief 输出流运算符。
@@ -85,7 +85,7 @@ class Trace {
          * @param[in,out] os
          * @param[in] conn
          */
-        friend std::ostream &operator<<(std::ostream &os, const Connection &conn) {
+        friend std::ostream& operator<<(std::ostream& os, const Connection& conn) {
             if (conn.before != nullptr) {
                 os << *(conn.before);
             }
@@ -119,7 +119,7 @@ class Trace {
      * @param[in] edgeLen
      * @param[in] loopClosed
      */
-    Trace(const size_t &edgeInd, const double &heur, const double &edgeLen, const bool &loopClosed = false);
+    Trace(const size_t& edgeInd, const double& heur, const double& edgeLen, const bool& loopClosed = false);
 
     /**
      * @brief 将一条边作为 Connection 追加，使用以下数据。
@@ -129,7 +129,7 @@ class Trace {
      * @param[in] edgeLen
      * @param[in] loopClosed
      */
-    void addEdge(const size_t &edgeInd, const double &heur, const double &edgeLen, const bool &loopClosed = false);
+    void addEdge(const size_t& edgeInd, const double& heur, const double& edgeLen, const bool& loopClosed = false);
 
     /**
      * @brief 查询 Trace 是否为空。
@@ -154,12 +154,12 @@ class Trace {
     /**
      * @brief 返回最后一条边的索引。
      */
-    const size_t &edgeInd() const;
+    const size_t& edgeInd() const;
 
     /**
      * @brief 返回最后一个连接的启发式值。
      */
-    const double &heur() const;
+    const double& heur() const;
 
     /**
      * @brief 返回最后一个连接的平均边长。
@@ -181,7 +181,7 @@ class Trace {
      *
      * @param[in] edgeInd
      */
-    bool containsEdge(const size_t &edgeInd) const;
+    bool containsEdge(const size_t& edgeInd) const;
 
     /**
      * @brief 清空连接链。
@@ -194,5 +194,5 @@ class Trace {
      * @param[in,out] os
      * @param[in] trace
      */
-    friend std::ostream &operator<<(std::ostream &os, const Trace &trace);
+    friend std::ostream& operator<<(std::ostream& os, const Trace& trace);
 };

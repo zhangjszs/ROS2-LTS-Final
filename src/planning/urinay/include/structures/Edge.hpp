@@ -11,6 +11,7 @@
 #pragma once
 
 #include <compare>
+
 #include "structures/Node.hpp"
 #include "utils/constants.hpp"
 
@@ -41,7 +42,7 @@ class Edge {
      * @param[in] n0
      * @param[in] n1
      */
-    static uint64_t computeHash(const Node &n0, const Node &n1);
+    static uint64_t computeHash(const Node& n0, const Node& n1);
 
     /**
      * @brief 返回由 n0 和 n1 定义的边的长度。
@@ -49,25 +50,24 @@ class Edge {
      * @param[in] n0
      * @param[in] n1
      */
-    static double computeLen(const Node &n0, const Node &n1);
+    static double computeLen(const Node& n0, const Node& n1);
     friend class std::hash<Edge>;
 
    public:
-
     /**
      * @brief 构造一个新的 Edge 对象。
      *
      * @param[in] n0
      * @param[in] n1
      */
-    Edge(const Node &n0, const Node &n1);
+    Edge(const Node& n0, const Node& n1);
 
     /**
      * @brief C++20 宇宙飞船操作符 <=>。
      * 根据边的唯一哈希值 hash_ 进行全序三路比较，返回 std::strong_ordering。
      * 自动合成 <, <=, >, >=，使 Edge 可直接用于 std::ranges::sort、std::set 等有序容器。
      */
-    [[nodiscard]] constexpr std::strong_ordering operator<=>(const Edge &e) const noexcept {
+    [[nodiscard]] constexpr std::strong_ordering operator<=>(const Edge& e) const noexcept {
         return this->hash_ <=> e.hash_;
     }
 
@@ -75,16 +75,14 @@ class Edge {
      * @brief 比较运算符。如果两条边的哈希值相同，则它们相等。
      * C++20 自动合成 != 运算符。
      */
-    [[nodiscard]] constexpr bool operator==(const Edge &e) const noexcept {
-        return this->hash_ == e.hash_;
-    }
+    [[nodiscard]] constexpr bool operator==(const Edge& e) const noexcept { return this->hash_ == e.hash_; }
 
     /**
      * @brief 更新两个节点的局部坐标。
      *
      * @param[in] tf
      */
-    void updateLocal(const Eigen::Affine3d &tf) const;
+    void updateLocal(const Eigen::Affine3d& tf) const;
 
     /**
      * @brief 返回局部坐标系下该边的中点。
@@ -107,12 +105,10 @@ class Edge {
      * @param[in,out] os
      * @param[int] e
      */
-    friend std::ostream &operator<<(std::ostream &os, const Edge &e);
+    friend std::ostream& operator<<(std::ostream& os, const Edge& e);
 };
 
 template <>
 struct std::hash<Edge> {
-    uint64_t operator()(const Edge &e) const {
-        return e.hash_;
-    }
+    uint64_t operator()(const Edge& e) const { return e.hash_; }
 };

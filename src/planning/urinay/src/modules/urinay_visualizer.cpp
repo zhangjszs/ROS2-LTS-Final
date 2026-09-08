@@ -12,18 +12,18 @@
 
 /* ----------------------------- 私有方法 ---------------------------- */
 
-void UrinayVisualizer::setTimestamp(const rclcpp::Time &stamp) {
+void UrinayVisualizer::setTimestamp(const rclcpp::Time& stamp) {
     this->stamp_ = stamp;
 }
 
 /* ------------------------------ 公有方法 ---------------------------- */
 
-UrinayVisualizer &UrinayVisualizer::getInstance() {
+UrinayVisualizer& UrinayVisualizer::getInstance() {
     static UrinayVisualizer vis;
     return vis;
 }
 
-void UrinayVisualizer::init(rclcpp::Node::SharedPtr node, const UrinayParams::Visualization &params) {
+void UrinayVisualizer::init(rclcpp::Node::SharedPtr node, const UrinayParams::Visualization& params) {
     params_ = params;
     if (params.publish_markers) {
         trianglesPub = node->create_publisher<visualization_msgs::msg::MarkerArray>(params_.triangulation_topic, 1);
@@ -32,7 +32,7 @@ void UrinayVisualizer::init(rclcpp::Node::SharedPtr node, const UrinayParams::Vi
     }
 }
 
-void UrinayVisualizer::visualize(const TriangleSet &triSet) const {
+void UrinayVisualizer::visualize(const TriangleSet& triSet) const {
     if (not this->params_.publish_markers)
         return;
     if (!trianglesPub || trianglesPub->get_subscription_count() == 0)
@@ -70,7 +70,7 @@ void UrinayVisualizer::visualize(const TriangleSet &triSet) const {
     mMidpoint.color.r = 0.0;
     mMidpoint.color.g = 1.0;
     mMidpoint.color.b = 0.0;
-    for (const Triangle &t : triSet) {
+    for (const Triangle& t : triSet) {
         // 三角形本身
         mTriangulation.points.clear();
         mTriangulation.points.reserve(4);
@@ -87,7 +87,7 @@ void UrinayVisualizer::visualize(const TriangleSet &triSet) const {
         ma.markers.push_back(mCircumCenter);
 
         // 边的中点
-        for (const Edge &e : t.edges) {
+        for (const Edge& e : t.edges) {
             mMidpoint.pose.position = e.midPointGlobal().gmPoint();
             mMidpoint.id = id++;
             ma.markers.push_back(mMidpoint);
@@ -96,7 +96,7 @@ void UrinayVisualizer::visualize(const TriangleSet &triSet) const {
     trianglesPub->publish(ma);
 }
 
-void UrinayVisualizer::visualize(const EdgeSet &edgeSet) const {
+void UrinayVisualizer::visualize(const EdgeSet& edgeSet) const {
     if (not this->params_.publish_markers)
         return;
     if (!midpointsPub || midpointsPub->get_subscription_count() == 0)
@@ -120,7 +120,7 @@ void UrinayVisualizer::visualize(const EdgeSet &edgeSet) const {
     ma.markers.push_back(mMidpoint);
     mMidpoint.action = visualization_msgs::msg::Marker::ADD;
 
-    for (const Edge &e : edgeSet) {
+    for (const Edge& e : edgeSet) {
         mMidpoint.pose.position = e.midPointGlobal().gmPoint();
         mMidpoint.id = id++;
         ma.markers.push_back(mMidpoint);
@@ -128,7 +128,7 @@ void UrinayVisualizer::visualize(const EdgeSet &edgeSet) const {
     midpointsPub->publish(ma);
 }
 
-void UrinayVisualizer::visualize(const Way &way) const {
+void UrinayVisualizer::visualize(const Way& way) const {
     if (not this->params_.publish_markers)
         return;
     if (!wayPub || wayPub->get_subscription_count() == 0)
@@ -161,7 +161,7 @@ void UrinayVisualizer::visualize(const Way &way) const {
 
     mMidpoints.color.a = 0.5;
     mMidpoints.id = id++;
-    for (const Point &p : way.getPath()) {
+    for (const Point& p : way.getPath()) {
         mMidpoints.points.push_back(p.gmPoint());
     }
     ma.markers.push_back(mMidpoints);
@@ -169,12 +169,12 @@ void UrinayVisualizer::visualize(const Way &way) const {
     mRight.id = id++;
     const Tracklimits tracklimits = way.getTracklimits();
 
-    for (const Node &n : tracklimits.left) {
+    for (const Node& n : tracklimits.left) {
         mLeft.points.push_back(n.pointGlobal().gmPoint());
     }
     ma.markers.push_back(mLeft);
 
-    for (const Node &n : tracklimits.right) {
+    for (const Node& n : tracklimits.right) {
         mRight.points.push_back(n.pointGlobal().gmPoint());
     }
     ma.markers.push_back(mRight);

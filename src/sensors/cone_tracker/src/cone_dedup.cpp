@@ -67,11 +67,9 @@ ConeDedup::ConeDedup(rclcpp::Node::SharedPtr node) : node_(node) {
     node_->get_parameter("status_topic", status_topic);
 
     transformed_sub_ = node_->create_subscription<common_msgs::msg::HuatMap>(
-        transformed_cones_topic, 1,
-        [this](common_msgs::msg::HuatMap::ConstSharedPtr msg) { OnTransformedCone(msg); });
+        transformed_cones_topic, 1, [this](common_msgs::msg::HuatMap::ConstSharedPtr msg) { OnTransformedCone(msg); });
     car_state_sub_ = node_->create_subscription<common_msgs::msg::HuatCarstate>(
-        vehicle_state_topic, 1,
-        [this](common_msgs::msg::HuatCarstate::ConstSharedPtr msg) { OnCarState(msg); });
+        vehicle_state_topic, 1, [this](common_msgs::msg::HuatCarstate::ConstSharedPtr msg) { OnCarState(msg); });
     fused_pub_ = node_->create_publisher<common_msgs::msg::HuatMap>(fused_cones_topic, 10);
     status_pub_ = node_->create_publisher<std_msgs::msg::String>(status_topic, 10);
 
@@ -114,13 +112,13 @@ double ConeDedup::ComputeDynamicAlpha() const {
     return cone_dedup_algo::ComputeDynamicAlpha(current_speed_, speed_ref_, alpha_min_, alpha_max_, ema_alpha_);
 }
 
-void ConeDedup::KalmanInit(TrackedCone &tc, double x, double y) {
+void ConeDedup::KalmanInit(TrackedCone& tc, double x, double y) {
     tc.kf_state << static_cast<float>(x), static_cast<float>(y), 0.0f, 0.0f;
     tc.kf_P = Eigen::Matrix4f::Identity() * 1.0f;
     tc.has_kalman = true;
 }
 
-void ConeDedup::KalmanPredict(TrackedCone &tc, double dt) {
+void ConeDedup::KalmanPredict(TrackedCone& tc, double dt) {
     if (!tc.has_kalman || dt <= 0.0)
         return;
     float dt_f = static_cast<float>(dt);
@@ -153,7 +151,7 @@ void ConeDedup::KalmanPredict(TrackedCone &tc, double dt) {
     }
 }
 
-void ConeDedup::KalmanUpdate(TrackedCone &tc, double x, double y) {
+void ConeDedup::KalmanUpdate(TrackedCone& tc, double x, double y) {
     if (!tc.has_kalman)
         return;
     float mx = static_cast<float>(x);
@@ -180,7 +178,7 @@ void ConeDedup::RebuildKdTree() {
         // 有增删：全量重建，重新分配 cloud_（点序与 tracked_cones_ 一致，索引可直接回查）
         cloud_->points.clear();
         cloud_->points.reserve(tracked_cones_.size());
-        for (const auto &tc : tracked_cones_) {
+        for (const auto& tc : tracked_cones_) {
             pcl::PointXYZ pt;
             pt.x = tc.cone.position_global.x;
             pt.y = tc.cone.position_global.y;
@@ -202,8 +200,8 @@ void ConeDedup::RebuildKdTree() {
     }
 }
 
-void ConeDedup::ApplyPositionUpdate(TrackedCone &tc, double obs_x, double obs_y, double obs_z,
-                                    const common_msgs::msg::HuatCone &src, const rclcpp::Time &stamp, double alpha) {
+void ConeDedup::ApplyPositionUpdate(TrackedCone& tc, double obs_x, double obs_y, double obs_z,
+                                    const common_msgs::msg::HuatCone& src, const rclcpp::Time& stamp, double alpha) {
     double dt = (stamp - tc.last_update).seconds();
     if (enable_kalman_ && tc.has_kalman && dt > 0.0) {
         KalmanPredict(tc, dt);
@@ -228,7 +226,7 @@ void ConeDedup::ApplyPositionUpdate(TrackedCone &tc, double obs_x, double obs_y,
 }
 
 std::vector<size_t> ConeDedup::FilterInputByDistance(std::span<const common_msgs::msg::HuatCone> cones,
-                                                     int &culled_count) const {
+                                                     int& culled_count) const {
     if (!has_car_state_) {
         std::vector<size_t> valid(cones.size());
         for (size_t i = 0; i < cones.size(); ++i)
@@ -251,8 +249,8 @@ std::vector<size_t> ConeDedup::FilterInputByDistance(std::span<const common_msgs
 }
 
 cone_dedup_algo::FlatMatrix<double> ConeDedup::BuildCostMatrix(std::span<const size_t> valid_idx,
-                                                            std::span<const common_msgs::msg::HuatCone> cones,
-                                                            int n_tracks, double inf_cost) const {
+                                                               std::span<const common_msgs::msg::HuatCone> cones,
+                                                               int n_tracks, double inf_cost) const {
     const int n_in = static_cast<int>(valid_idx.size());
     const double radius_sq = cone_match_radius_ * cone_match_radius_;
     cone_dedup_algo::FlatMatrix<double> cost_mat(static_cast<size_t>(n_in), static_cast<size_t>(n_tracks), inf_cost);
@@ -282,8 +280,9 @@ cone_dedup_algo::FlatMatrix<double> ConeDedup::BuildCostMatrix(std::span<const s
 
 void ConeDedup::ProcessUnmatchedInputs(std::span<const size_t> valid_input_idx,
                                        std::span<const common_msgs::msg::HuatCone> cones,
-                                       std::vector<bool> &matched_input, std::vector<bool> &matched_existing,
-                                       const rclcpp::Time &stamp, double alpha, double radius_sq, MatchDiagStats &stats) {
+                                       std::vector<bool>& matched_input, std::vector<bool>& matched_existing,
+                                       const rclcpp::Time& stamp, double alpha, double radius_sq,
+                                       MatchDiagStats& stats) {
     int anomaly_log_count = 0;
     std::vector<int> idx(kMaxMatchNeighbors);
     std::vector<float> dist(kMaxMatchNeighbors);
@@ -335,11 +334,12 @@ void ConeDedup::ProcessUnmatchedInputs(std::span<const size_t> valid_input_idx,
         }
     }
     if (stats.insert_suppressed > 0)
-        RCLCPP_INFO(node_->get_logger(), "[cone_dedup] insert dedup: suppressed %d near-duplicate cones", stats.insert_suppressed);
+        RCLCPP_INFO(node_->get_logger(), "[cone_dedup] insert dedup: suppressed %d near-duplicate cones",
+                    stats.insert_suppressed);
 }
 
-void ConeDedup::UpdateUnmatchedExistingTracks(const std::vector<bool> &matched_existing, size_t original_size,
-                                              const rclcpp::Time &stamp) {
+void ConeDedup::UpdateUnmatchedExistingTracks(const std::vector<bool>& matched_existing, size_t original_size,
+                                              const rclcpp::Time& stamp) {
     for (size_t i = 0; i < original_size; i++) {
         if (matched_existing[i])
             continue;
@@ -361,7 +361,7 @@ void ConeDedup::UpdateUnmatchedExistingTracks(const std::vector<bool> &matched_e
 int ConeDedup::RemoveStaleTracks() {
     int removed = 0;
     size_t before_size = tracked_cones_.size();
-    std::erase_if(tracked_cones_, [&](const TrackedCone &tc) {
+    std::erase_if(tracked_cones_, [&](const TrackedCone& tc) {
         if (has_car_state_) {
             double dx = tc.cone.position_global.x - car_x_;
             double dy = tc.cone.position_global.y - car_y_;
@@ -383,8 +383,8 @@ int ConeDedup::RemoveStaleTracks() {
     return removed;
 }
 
-void ConeDedup::CollectConfirmedCones(common_msgs::msg::HuatMap &out) const {
-    for (const auto &tc : tracked_cones_) {
+void ConeDedup::CollectConfirmedCones(common_msgs::msg::HuatMap& out) const {
+    for (const auto& tc : tracked_cones_) {
         if (tc.state != TrackState::CONFIRMED || tc.tracked_frames < min_track_frames_)
             continue;
         if (enable_sliding_window_ && has_car_state_) {
@@ -400,11 +400,10 @@ void ConeDedup::CollectConfirmedCones(common_msgs::msg::HuatMap &out) const {
 }
 
 void ConeDedup::ProcessMatchedPairs(std::span<const size_t> valid_input_idx,
-                                    std::span<const common_msgs::msg::HuatCone> cones,
-                                    std::span<const int> assignment,
+                                    std::span<const common_msgs::msg::HuatCone> cones, std::span<const int> assignment,
                                     cone_dedup_algo::MatrixView<const double> cost_mat,
-                                    std::vector<bool> &matched_existing, std::vector<bool> &matched_input,
-                                    const rclcpp::Time &stamp, double alpha, MatchDiagStats &stats) {
+                                    std::vector<bool>& matched_existing, std::vector<bool>& matched_input,
+                                    const rclcpp::Time& stamp, double alpha, MatchDiagStats& stats) {
     int n_in = static_cast<int>(valid_input_idx.size());
     for (int r = 0; r < n_in; ++r) {
         int tidx = assignment[static_cast<size_t>(r)];
@@ -414,20 +413,20 @@ void ConeDedup::ProcessMatchedPairs(std::span<const size_t> valid_input_idx,
         matched_existing[static_cast<size_t>(tidx)] = true;
         matched_input[i] = true;
         stats.record_match(std::sqrt(cost_mat(static_cast<size_t>(r), static_cast<size_t>(tidx))));
-        ApplyPositionUpdate(tracked_cones_[static_cast<size_t>(tidx)], cones[i].position_global.x, cones[i].position_global.y,
-                            cones[i].position_global.z, cones[i], stamp, alpha);
+        ApplyPositionUpdate(tracked_cones_[static_cast<size_t>(tidx)], cones[i].position_global.x,
+                            cones[i].position_global.y, cones[i].position_global.z, cones[i], stamp, alpha);
     }
     stats.matched = static_cast<int>(std::ranges::count(matched_input, true));
-    RCLCPP_DEBUG(node_->get_logger(), "[cone_dedup] match stats: input=%zu, matched=%d, unmatched=%zu, tracked=%zu", cones.size(),
-              stats.matched, cones.size() - stats.matched, tracked_cones_.size());
+    RCLCPP_DEBUG(node_->get_logger(), "[cone_dedup] match stats: input=%zu, matched=%d, unmatched=%zu, tracked=%zu",
+                 cones.size(), stats.matched, cones.size() - stats.matched, tracked_cones_.size());
 }
 
-void ConeDedup::PublishStatus(size_t input_size, const MatchDiagStats &s, size_t published_count) {
+void ConeDedup::PublishStatus(size_t input_size, const MatchDiagStats& s, size_t published_count) {
     double avg_confidence = 0.0;
     int tentative_count = 0, confirmed_count = 0;
     if (!tracked_cones_.empty()) {
         double sum_conf = 0.0;
-        for (const auto &tc : tracked_cones_) {
+        for (const auto& tc : tracked_cones_) {
             sum_conf += tc.cone.confidence;
             if (tc.state == TrackState::CONFIRMED)
                 confirmed_count++;
@@ -468,7 +467,7 @@ void ConeDedup::OnTransformedCone(const common_msgs::msg::HuatMap::ConstSharedPt
         std::scoped_lock lock(mtx_);
 
         if (msgs->cone.empty()) {
-            for (auto &tc : tracked_cones_) {
+            for (auto& tc : tracked_cones_) {
                 tc.missed_frames++;
                 if (tc.consecutive_matches > 0)
                     tc.consecutive_matches--;
@@ -485,7 +484,7 @@ void ConeDedup::OnTransformedCone(const common_msgs::msg::HuatMap::ConstSharedPt
         } else if (!initialized_) {
             initialized_ = true;
             stats.new_cones = static_cast<int>(msgs->cone.size());
-            for (const auto &c : msgs->cone) {
+            for (const auto& c : msgs->cone) {
                 TrackedCone tc = CreateTrackedCone(c, msgs->header.stamp);
                 // F-P1-03: 首帧锥桶直接满足确认条件（CONFIRMED + tracked_frames >= min_track_frames），
                 // 避免起步时 /sensors/cones/fused 首帧为空导致规划器收不到锥桶。
@@ -509,8 +508,8 @@ void ConeDedup::OnTransformedCone(const common_msgs::msg::HuatMap::ConstSharedPt
                 BuildCostMatrix(valid_input_idx, msgs->cone, static_cast<int>(original_tracked_size), inf_cost);
             std::vector<int> assignment = cone_dedup_algo::HungarianAssign(cost_mat.view(), inf_cost);
 
-            ProcessMatchedPairs(valid_input_idx, msgs->cone, assignment, cost_mat.view(), matched_existing, matched_input,
-                                msgs->header.stamp, dynamic_alpha, stats);
+            ProcessMatchedPairs(valid_input_idx, msgs->cone, assignment, cost_mat.view(), matched_existing,
+                                matched_input, msgs->header.stamp, dynamic_alpha, stats);
             ProcessUnmatchedInputs(valid_input_idx, msgs->cone, matched_input, matched_existing, msgs->header.stamp,
                                    dynamic_alpha, radius_sq, stats);
             UpdateUnmatchedExistingTracks(matched_existing, original_tracked_size, msgs->header.stamp);
@@ -524,14 +523,14 @@ void ConeDedup::OnTransformedCone(const common_msgs::msg::HuatMap::ConstSharedPt
 
     if (fused_map.cone.empty() && !msgs->cone.empty()) {
         RCLCPP_WARN_THROTTLE(node_->get_logger(), *node_->get_clock(), 2000,
-                          "[cone_dedup] All %zu input cones are tentative (tracked_frames < %d), nothing published",
-                          msgs->cone.size(), min_track_frames_);
+                             "[cone_dedup] All %zu input cones are tentative (tracked_frames < %d), nothing published",
+                             msgs->cone.size(), min_track_frames_);
     }
 
     fused_pub_->publish(fused_map);
 }
 
-TrackedCone ConeDedup::CreateTrackedCone(const common_msgs::msg::HuatCone &cone, const rclcpp::Time &stamp) {
+TrackedCone ConeDedup::CreateTrackedCone(const common_msgs::msg::HuatCone& cone, const rclcpp::Time& stamp) {
     TrackedCone tc;
     tc.cone = cone;
     tc.cone.id = GetNewId();

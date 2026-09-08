@@ -184,9 +184,7 @@ TEST(JThreadCooperativeCancellationTest, RequestStopGracefulExit) {
     {
         std::jthread worker([&loop_count, &callback_triggered](std::stop_token st) {
             // 注册中断回调：当外部触发 request_stop() 时立即异步触发
-            std::stop_callback cb(st, [&callback_triggered]() {
-                callback_triggered = true;
-            });
+            std::stop_callback cb(st, [&callback_triggered]() { callback_triggered = true; });
 
             while (!st.stop_requested()) {
                 loop_count.fetch_add(1, std::memory_order_relaxed);

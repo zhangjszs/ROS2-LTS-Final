@@ -1,9 +1,8 @@
 #include "vehicle_state_estimator.h"
 
-#include <geometry_msgs/msg/transform_stamped.hpp>
-
 #include <cmath>
 #include <functional>
+#include <geometry_msgs/msg/transform_stamped.hpp>
 
 VehicleStateEstimator::VehicleStateEstimator(rclcpp::Node::SharedPtr node)
     : node_(node), tf_broadcaster_(*node), diag_updater_(node) {
@@ -20,14 +19,15 @@ VehicleStateEstimator::VehicleStateEstimator(rclcpp::Node::SharedPtr node)
     diag_updater_.setHardwareID("vehicle_state");
     diag_updater_.add("Vehicle State Health", this, &VehicleStateEstimator::DiagnoseHealth);
 
-    RCLCPP_INFO(node_->get_logger(), "[vehicle_state] Topics: ins=%s state=%s", ins_topic.c_str(), vehicle_state_topic.c_str());
+    RCLCPP_INFO(node_->get_logger(), "[vehicle_state] Topics: ins=%s state=%s", ins_topic.c_str(),
+                vehicle_state_topic.c_str());
 }
 
 void VehicleStateEstimator::UpdateDiagnostics() {
     diag_updater_.force_update();
 }
 
-void VehicleStateEstimator::DiagnoseHealth(diagnostic_updater::DiagnosticStatusWrapper &stat) {
+void VehicleStateEstimator::DiagnoseHealth(diagnostic_updater::DiagnosticStatusWrapper& stat) {
     if (receive_times_ == 0) {
         stat.summary(diagnostic_msgs::msg::DiagnosticStatus::STALE, "No INS messages received yet");
     } else if (!is_first_msg_received_) {
@@ -55,7 +55,7 @@ void VehicleStateEstimator::GeodeticToEnu(double lat, double lon, double h, doub
     constexpr double f = (a - b) / a;
     constexpr double e_sq = f * (2 - f);
 
-    auto ecef = [&](double la, double lo, double alt, double &X, double &Y, double &Z) {
+    auto ecef = [&](double la, double lo, double alt, double& X, double& Y, double& Z) {
         double s = sin(la);
         double N = a / sqrt(1 - e_sq * s * s);
         X = (alt + N) * cos(la) * cos(lo);
@@ -110,8 +110,8 @@ void VehicleStateEstimator::OnInsMessage(const common_msgs::msg::HuatASENSING::C
         if (azimuth_sample_count_ >= azimuth_init_frames_) {
             standard_azimuth_ = std::atan2(azimuth_sin_sum_, azimuth_cos_sum_) * 180.0 / kPi;
             azimuth_locked_ = true;
-            RCLCPP_INFO(node_->get_logger(), "[vehicle_state] standard_azimuth locked after %d frames: %.4f deg", azimuth_init_frames_,
-                     standard_azimuth_);
+            RCLCPP_INFO(node_->get_logger(), "[vehicle_state] standard_azimuth locked after %d frames: %.4f deg",
+                        azimuth_init_frames_, standard_azimuth_);
         } else {
             // 初始化阶段不发布零位姿，避免纯追踪把原点当有效 map 位姿
             if (!is_first_msg_received_) {
@@ -153,7 +153,7 @@ void VehicleStateEstimator::OnInsMessage(const common_msgs::msg::HuatASENSING::C
     PublishState();
 }
 
-void VehicleStateEstimator::BroadcastTF(const rclcpp::Time &stamp, double x, double y, double theta) {
+void VehicleStateEstimator::BroadcastTF(const rclcpp::Time& stamp, double x, double y, double theta) {
     geometry_msgs::msg::TransformStamped ts;
     ts.header.stamp = stamp;
     ts.header.frame_id = "map";

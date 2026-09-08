@@ -1,32 +1,32 @@
 #pragma once
 
-#include <diagnostic_msgs/msg/diagnostic_status.hpp>
-#include <diagnostic_updater/diagnostic_updater.hpp>
-#include <message_filters/subscriber.hpp>
-#include <message_filters/sync_policies/approximate_time.hpp>
-#include <message_filters/synchronizer.hpp>
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
-#include <rclcpp/rclcpp.hpp>
+#include <pcl_conversions/pcl_conversions/pcl_conversions.h>
 
 #include <Eigen/Dense>
 #include <cmath>
 #include <cstdint>
+#include <diagnostic_msgs/msg/diagnostic_status.hpp>
+#include <diagnostic_updater/diagnostic_updater.hpp>
 #include <limits>
 #include <memory>
+#include <message_filters/subscriber.hpp>
+#include <message_filters/sync_policies/approximate_time.hpp>
+#include <message_filters/synchronizer.hpp>
 #include <mutex>
+#include <rclcpp/rclcpp.hpp>
 #include <sstream>
 #include <string>
 #include <vector>
 
 #include "autodrive_msgs/msg/huat_vision_detections.hpp"
 #include "common_msgs/msg/huat_carstate.hpp"
-#include "common_msgs/msg/huat_cone_cluster.hpp"
 #include "common_msgs/msg/huat_cone.hpp"
+#include "common_msgs/msg/huat_cone_cluster.hpp"
 #include "common_msgs/msg/huat_map.hpp"
-#include "cone_types.h"
 #include "cone_fusion_utils.h"
-#include <pcl_conversions/pcl_conversions/pcl_conversions.h>
+#include "cone_types.h"
 #include "sensor_msgs/msg/point_cloud2.hpp"
 
 class ConeFusion {
@@ -34,8 +34,8 @@ class ConeFusion {
     explicit ConeFusion(rclcpp::Node::SharedPtr node);
 
    private:
-    using ApproxSyncPolicy =
-        message_filters::sync_policies::ApproximateTime<common_msgs::msg::HuatConeCluster, common_msgs::msg::HuatCarstate>;
+    using ApproxSyncPolicy = message_filters::sync_policies::ApproximateTime<common_msgs::msg::HuatConeCluster,
+                                                                             common_msgs::msg::HuatCarstate>;
 
     void OnSyncedMessages(const common_msgs::msg::HuatConeCluster::ConstSharedPtr cones,
                           const common_msgs::msg::HuatCarstate::ConstSharedPtr state);
@@ -82,12 +82,12 @@ class ConeFusion {
     double diag_best_match_delta_sec_ = 0.0;
 
     void OnVisionMessage(const autodrive_msgs::msg::HuatVisionDetections::ConstSharedPtr msgs);
-    void DiagnoseHealth(diagnostic_updater::DiagnosticStatusWrapper &stat);
-    bool IsVehicleStateJumpAbnormal(const common_msgs::msg::HuatCarstate &last_state,
-                                    const common_msgs::msg::HuatCarstate &current_state, double dt);
-    uint32_t ConfidenceToPercent(const common_msgs::msg::HuatConeCluster &msg, size_t index);
+    void DiagnoseHealth(diagnostic_updater::DiagnosticStatusWrapper& stat);
+    bool IsVehicleStateJumpAbnormal(const common_msgs::msg::HuatCarstate& last_state,
+                                    const common_msgs::msg::HuatCarstate& current_state, double dt);
+    uint32_t ConfidenceToPercent(const common_msgs::msg::HuatConeCluster& msg, size_t index);
 
-    void InjectVisionColor(common_msgs::msg::HuatMap &map, const std::vector<uint8_t> &lidar_sizes);
+    void InjectVisionColor(common_msgs::msg::HuatMap& map, const std::vector<uint8_t>& lidar_sizes);
 
     rclcpp::Subscription<autodrive_msgs::msg::HuatVisionDetections>::SharedPtr vision_sub_;
     std::mutex vision_mutex_;

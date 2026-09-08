@@ -95,4 +95,3 @@ struct std::formatter<StopAction> : std::formatter<std::string_view> {
 };
 
 #endif
-

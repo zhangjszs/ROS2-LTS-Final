@@ -13,14 +13,13 @@
 #include <common_msgs/msg/huat_carstate.hpp>
 #include <common_msgs/msg/huat_path_limits.hpp>
 #include <common_msgs/msg/huat_tracklimits.hpp>
+#include <fstream>
+#include <mutex>
+#include <queue>
 #include <rclcpp/rclcpp.hpp>
 #include <tf2/LinearMath/Quaternion.hpp>
 #include <tf2_eigen/tf2_eigen.hpp>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
-
-#include <fstream>
-#include <mutex>
-#include <queue>
 
 #include "modules/urinay_visualizer.hpp"
 #include "structures/Trace.hpp"
@@ -112,7 +111,7 @@ class WayComputer {
      *
      * @param[in,out] triangulation
      */
-    void filterTriangulation(TriangleSet &triangulation) const;
+    void filterTriangulation(TriangleSet& triangulation) const;
 
     /**
      * @brief 根据中点过滤边，移除所有不需要的边。
@@ -120,7 +119,7 @@ class WayComputer {
      * @param[in,out] edges
      * @param[in] triangulation
      */
-    void filterMidpoints(EdgeSet &edges, const TriangleSet &triangulation) const;
+    void filterMidpoints(EdgeSet& edges, const TriangleSet& triangulation) const;
 
     /**
      * @brief 基于角度和距离计算并返回启发式值。
@@ -131,15 +130,15 @@ class WayComputer {
      * @param[in] dir
      * @param[in] params
      */
-    double getHeuristic(const Point &actPos, const Point &nextPos, const Vector &dir,
-                        const UrinayParams::WayComputer::Search &params) const;
+    double getHeuristic(const Point& actPos, const Point& nextPos, const Vector& dir,
+                        const UrinayParams::WayComputer::Search& params) const;
 
     /**
      * @brief 返回路径（Way）和 Trace *trace（如果有）的平均边长。
      *
      * @param[in] trace
      */
-    inline double avgEdgeLen(const Trace *trace) const;
+    inline double avgEdgeLen(const Trace* trace) const;
 
     /**
      * @brief 根据所有指标和阈值找到所有可能的下一条边。
@@ -151,19 +150,19 @@ class WayComputer {
      * @param[in] edges
      * @param[in] params
      */
-    bool shouldExcludeEdge(const Edge &candidate, const Edge *actEdge, const Point &actPos, const Point &lastPos,
-                           const Vector &dir, const Trace *actTrace,
-                           const UrinayParams::WayComputer::Search &params) const;
+    bool shouldExcludeEdge(const Edge& candidate, const Edge* actEdge, const Point& actPos, const Point& lastPos,
+                           const Vector& dir, const Trace* actTrace,
+                           const UrinayParams::WayComputer::Search& params) const;
 
-    void findNextEdges(std::vector<HeurInd> &nextEdges, const Trace *actTrace, const KDTree &midpointsKDT,
-                       const std::vector<Edge> &edges, const UrinayParams::WayComputer::Search &params) const;
+    void findNextEdges(std::vector<HeurInd>& nextEdges, const Trace* actTrace, const KDTree& midpointsKDT,
+                       const std::vector<Edge>& edges, const UrinayParams::WayComputer::Search& params) const;
 
-    void ResolveSearchContext(const Trace *actTrace, const std::vector<Edge> &edges, const Edge *&actEdge,
-                              Point &actPos, Point &lastPos, Vector &dir) const;
+    void ResolveSearchContext(const Trace* actTrace, const std::vector<Edge>& edges, const Edge*& actEdge,
+                              Point& actPos, Point& lastPos, Vector& dir) const;
 
-    void FillTracklimits(common_msgs::msg::HuatPathLimits &res) const;
-    bool ShouldRemoveTriangle(const Triangle &t) const;
-    static void AppendPointsToPath(const std::vector<Point> &pts, common_msgs::msg::HuatPathLimits &res);
+    void FillTracklimits(common_msgs::msg::HuatPathLimits& res) const;
+    bool ShouldRemoveTriangle(const Triangle& t) const;
+    static void AppendPointsToPath(const std::vector<Point>& pts, common_msgs::msg::HuatPathLimits& res);
 
     /**
      * @brief 从之前最优的 Trace 和候选 Trace 中计算出最优的 Trace。
@@ -172,7 +171,7 @@ class WayComputer {
      * @param t 最优 Trace 的候选
      * @return Trace 新的最优 Trace
      */
-    Trace computeBestTraceWithFinishedT(const Trace &best, const Trace &t) const;
+    Trace computeBestTraceWithFinishedT(const Trace& best, const Trace& t) const;
 
     /**
      * @brief 执行有限高度的启发式加权树搜索，并返回最佳下一条边的索引。
@@ -183,8 +182,8 @@ class WayComputer {
      * @param[in] edges
      * @param[in] params
      */
-    size_t treeSearch(std::vector<HeurInd> &nextEdges, const KDTree &midpointsKDT, const std::vector<Edge> &edges,
-                      const UrinayParams::WayComputer::Search &params) const;
+    size_t treeSearch(std::vector<HeurInd>& nextEdges, const KDTree& midpointsKDT, const std::vector<Edge>& edges,
+                      const UrinayParams::WayComputer::Search& params) const;
 
     /**
      * @brief 类的主函数，接收所有边并计算最佳的可能中心线（Way）。
@@ -193,7 +192,7 @@ class WayComputer {
      * @param[in] edges
      * @param[in] params
      */
-    void computeWay(const std::vector<Edge> &edges, const UrinayParams::WayComputer::Search &params);
+    void computeWay(const std::vector<Edge>& edges, const UrinayParams::WayComputer::Search& params);
 
    public:
     /**
@@ -201,7 +200,7 @@ class WayComputer {
      *
      * @param[in] params
      */
-    WayComputer(const UrinayParams::WayComputer &params);
+    WayComputer(const UrinayParams::WayComputer& params);
 
     /**
      * @brief 车辆状态的回调函数。
@@ -216,19 +215,19 @@ class WayComputer {
      * @param[in,out] triangulation
      * @param[in] stamp
      */
-    void update(TriangleSet &triangulation, const rclcpp::Time &stamp);
+    void update(TriangleSet& triangulation, const rclcpp::Time& stamp);
 
     /**
      * @brief 返回循环是否已经闭合。
      */
-    const bool &isLoopClosed() const;
+    const bool& isLoopClosed() const;
 
     /**
      * @brief 将路径（Way）写入指定的文件路径。
      *
      * @param[in] file_path
      */
-    void writeWayToFile(const std::string &file_path) const;
+    void writeWayToFile(const std::string& file_path) const;
 
     /**
      * @brief 返回属性 localTf 是否有效。

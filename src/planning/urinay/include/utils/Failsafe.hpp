@@ -23,7 +23,7 @@ class Failsafe : public T {
    private:
    public:
     Failsafe() = default;
-    Failsafe(const T &x) : T(x) {}
+    Failsafe(const T& x) : T(x) {}
 
     /**
      * @brief 将隐式对象设置为通用故障保护对象，使用其参数。
@@ -35,5 +35,5 @@ class Failsafe : public T {
      * @param safetyFactor
      * @param failsafe_max_way_horizon_size
      */
-    void initGeneral(const T &params, const double &safetyFactor, const int &failsafe_max_way_horizon_size);
+    void initGeneral(const T& params, const double& safetyFactor, const int& failsafe_max_way_horizon_size);
 };

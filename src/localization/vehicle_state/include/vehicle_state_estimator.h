@@ -3,14 +3,13 @@
 #include <diagnostic_msgs/msg/diagnostic_status.hpp>
 #include <diagnostic_updater/diagnostic_updater.hpp>
 #include <geometry_msgs/msg/transform_stamped.hpp>
+#include <iostream>
+#include <numbers>
 #include <rclcpp/rclcpp.hpp>
+#include <string>
 #include <tf2/LinearMath/Quaternion.hpp>
 #include <tf2/LinearMath/Transform.hpp>
 #include <tf2_ros/transform_broadcaster.hpp>
-
-#include <iostream>
-#include <numbers>
-#include <string>
 #include <vector>
 
 #include "common_msgs/msg/huat_asensing.hpp"
@@ -80,8 +79,8 @@ class VehicleStateEstimator {
    private:
     // 纯坐标变换：大地坐标 → ENU，无发布副作用
     void GeodeticToEnu(double lat, double lon, double h, double lat0, double lon0, double h0, double enu_xyz[3]);
-    void DiagnoseHealth(diagnostic_updater::DiagnosticStatusWrapper &stat);
-    void BroadcastTF(const rclcpp::Time &stamp, double x, double y, double theta);
+    void DiagnoseHealth(diagnostic_updater::DiagnosticStatusWrapper& stat);
+    void BroadcastTF(const rclcpp::Time& stamp, double x, double y, double theta);
     void PublishState();
 
     diagnostic_updater::Updater diag_updater_;

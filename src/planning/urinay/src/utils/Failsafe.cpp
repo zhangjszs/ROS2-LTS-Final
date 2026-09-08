@@ -17,7 +17,7 @@
 /* ----------------------------- 公有方法  ---------------------------- */
 
 template <typename T>
-void Failsafe<T>::initGeneral(const T &params, const double &safetyFactor, const int &failsafe_max_way_horizon_size) {
+void Failsafe<T>::initGeneral(const T& params, const double& safetyFactor, const int& failsafe_max_way_horizon_size) {
     *this = Failsafe<T>(params);
     this->max_way_horizon_size = failsafe_max_way_horizon_size;
 
@@ -27,5 +27,5 @@ void Failsafe<T>::initGeneral(const T &params, const double &safetyFactor, const
     this->edge_len_diff_factor *= safetyFactor;
     this->max_next_heuristic *= safetyFactor;
 }
-template void Failsafe<UrinayParams::WayComputer::Search>::initGeneral(const UrinayParams::WayComputer::Search &,
-                                                                       const double &, const int &);
+template void Failsafe<UrinayParams::WayComputer::Search>::initGeneral(const UrinayParams::WayComputer::Search&,
+                                                                       const double&, const int&);

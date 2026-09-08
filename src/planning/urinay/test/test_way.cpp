@@ -38,17 +38,13 @@ TEST(WayEmpty, QuinEhOnTwoEmptyWaysIsFalse) {
 
 TEST(DelaunayTriangulatorTest, SpanAndArraySupport) {
     // 验证 std::span 支持固定大小 std::array
-    std::array<Node, 4> nodes = {
-        Node(0.0, 0.0, 0.0, 0.0, 0),
-        Node(2.0, 0.0, 2.0, 0.0, 1),
-        Node(1.0, 2.0, 1.0, 2.0, 2),
-        Node(1.0, 1.0, 1.0, 1.0, 3)
-    };
+    std::array<Node, 4> nodes = {Node(0.0, 0.0, 0.0, 0.0, 0), Node(2.0, 0.0, 2.0, 0.0, 1), Node(1.0, 2.0, 1.0, 2.0, 2),
+                                 Node(1.0, 1.0, 1.0, 1.0, 3)};
 
     // 隐式转换为 std::span<const Node>
     auto triangles = DelaunayTriangulator::compute(nodes);
     EXPECT_FALSE(triangles.empty());
-    for (const auto &t : triangles) {
+    for (const auto& t : triangles) {
         EXPECT_FALSE(t.anyNodeInSuperTriangle());
     }
 

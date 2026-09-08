@@ -31,7 +31,7 @@ class Time {
      *
      * @param[in] clockName
      */
-    static void tick(const std::string &clockName);
+    static void tick(const std::string& clockName);
 
     /**
      * @brief 停止名为 clockName 的时钟，返回持续时间
@@ -39,5 +39,5 @@ class Time {
      *
      * @param[in] clockName
      */
-    static std::chrono::duration<double> tock(const std::string &clockName);
+    static std::chrono::duration<double> tock(const std::string& clockName);
 };

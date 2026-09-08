@@ -42,13 +42,13 @@ void Way::updateClosestToCarElem() {
     this->closestToCarElem_ = smallestDWFIt;
 }
 
-bool Way::segmentsIntersect(const Point &A, const Point &B, const Point &C, const Point &D) {
+bool Way::segmentsIntersect(const Point& A, const Point& B, const Point& C, const Point& D) {
     return Point::ccw(A, C, D) != Point::ccw(B, C, D) and Point::ccw(A, B, C) != Point::ccw(A, B, D);
 }
 
 /* ----------------------------- 公有方法 ---------------------------- */
 
-void Way::init(const UrinayParams::WayComputer::Way &params) {
+void Way::init(const UrinayParams::WayComputer::Way& params) {
     params_ = params;
 }
 
@@ -58,17 +58,11 @@ Way::Way() : avgEdgeLen_(0.0) {
     sizeToCar_ = 0;
 }
 
-Way::Way(const Way &way)
-    : path_(way.path_),
-      avgEdgeLen_(way.avgEdgeLen_),
-      sizeToCar_(way.sizeToCar_) {
+Way::Way(const Way& way) : path_(way.path_), avgEdgeLen_(way.avgEdgeLen_), sizeToCar_(way.sizeToCar_) {
     updateClosestToCarElem();
 }
 
-Way::Way(Way &&way) noexcept
-    : path_(std::move(way.path_)),
-      avgEdgeLen_(way.avgEdgeLen_),
-      sizeToCar_(way.sizeToCar_) {
+Way::Way(Way&& way) noexcept : path_(std::move(way.path_)), avgEdgeLen_(way.avgEdgeLen_), sizeToCar_(way.sizeToCar_) {
     updateClosestToCarElem();
 }
 
@@ -80,28 +74,28 @@ size_t Way::size() const {
     return this->path_.size();
 }
 
-const Edge &Way::back() const {
+const Edge& Way::back() const {
     return this->path_.back();
 }
 
-const Edge &Way::beforeBack() const {
+const Edge& Way::beforeBack() const {
     assert(this->size() >= 2);
     return *(++this->path_.rbegin());
 }
 
-const Edge &Way::front() const {
+const Edge& Way::front() const {
     return this->path_.front();
 }
 
-void Way::updateLocal(const Eigen::Affine3d &tf) {
-    for (Edge &e : this->path_) {
+void Way::updateLocal(const Eigen::Affine3d& tf) {
+    for (Edge& e : this->path_) {
         e.updateLocal(tf);
     }
     // 更新最近点
     this->updateClosestToCarElem();
 }
 
-void Way::addEdge(const Edge &edge) {
+void Way::addEdge(const Edge& edge) {
     this->path_.push_back(edge);
     if (this->path_.size() == 1)
         closestToCarElem_ = this->path_.cbegin();
@@ -162,7 +156,7 @@ bool Way::closesLoop() const {
 // c. 使用路径第一个点和第二个点的中点构造两个向量，计算其夹角绝对值（角度差），
 //    检查角度差是否小于等于 params_.max_angle_diff_loop_closure（角度条件）。
 // 若以上所有条件均满足，则返回 true，否则返回 false。
-bool Way::closesLoopWith(const Edge &e, const Point *lastPosInTrace) const {
+bool Way::closesLoopWith(const Edge& e, const Point* lastPosInTrace) const {
     Point actPos = lastPosInTrace ? *lastPosInTrace : this->back().midPoint();
     return
         // 必须满足最小长度
@@ -172,7 +166,7 @@ bool Way::closesLoopWith(const Edge &e, const Point *lastPosInTrace) const {
             params_.max_dist_loop_closure * params_.max_dist_loop_closure and
         // 检查与第一个点的闭合角度
         std::abs(Vector(this->front().midPoint(), (++this->path_.begin())->midPoint())
-                .angleWith(Vector(actPos, e.midPoint()))) <= params_.max_angle_diff_loop_closure;
+                     .angleWith(Vector(actPos, e.midPoint()))) <= params_.max_angle_diff_loop_closure;
 }
 
 Way Way::restructureClosure() const {
@@ -206,7 +200,7 @@ Way Way::restructureClosure() const {
     return res;
 }
 
-bool Way::intersectsWith(const Edge &e) const {
+bool Way::intersectsWith(const Edge& e) const {
     if (this->size() <= 2)
         return false;
     Point s1p1, s1p2;
@@ -225,8 +219,8 @@ bool Way::intersectsWith(const Edge &e) const {
     return false;
 }
 
-bool Way::containsEdge(const Edge &e) const {
-    for (const Edge &edge : this->path_) {
+bool Way::containsEdge(const Edge& e) const {
+    for (const Edge& edge : this->path_) {
         if (e == edge)
             return true;
     }
@@ -236,18 +230,14 @@ bool Way::containsEdge(const Edge &e) const {
 std::vector<Point> Way::getPath() const {
     std::vector<Point> res;
     res.reserve(this->path_.size());
-    std::ranges::transform(this->path_, std::back_inserter(res), [](const Edge &e) {
-        return e.midPointGlobal();
-    });
+    std::ranges::transform(this->path_, std::back_inserter(res), [](const Edge& e) { return e.midPointGlobal(); });
     return res;
 }
 
 std::vector<Point> Way::getPathLocal() const {
     std::vector<Point> res;
     res.reserve(this->path_.size());
-    std::ranges::transform(this->path_, std::back_inserter(res), [](const Edge &e) {
-        return e.midPoint();
-    });
+    std::ranges::transform(this->path_, std::back_inserter(res), [](const Edge& e) { return e.midPoint(); });
     return res;
 }
 
@@ -262,7 +252,7 @@ Tracklimits Way::getTracklimits() const {
     const Node *right, *firstRight;
 
     size_t edgeInd = 0;
-    for (const Edge &e : this->path_) {
+    for (const Edge& e : this->path_) {
         Vector pAntPAct(pAnt, e.midPointGlobal());
 
         // 检查边两个节点的左右侧
@@ -301,7 +291,7 @@ Tracklimits Way::getTracklimits() const {
     return res;
 }
 
-Way &Way::operator=(const Way &way) {
+Way& Way::operator=(const Way& way) {
     if (this != &way) {
         this->path_ = std::list<Edge>(way.path_);
         this->avgEdgeLen_ = way.avgEdgeLen_;
@@ -311,7 +301,7 @@ Way &Way::operator=(const Way &way) {
     return *this;
 }
 
-Way &Way::operator=(Way &&way) noexcept {
+Way& Way::operator=(Way&& way) noexcept {
     if (this != &way) {
         this->path_ = std::move(way.path_);
         this->avgEdgeLen_ = way.avgEdgeLen_;
@@ -321,7 +311,7 @@ Way &Way::operator=(Way &&way) noexcept {
     return *this;
 }
 
-bool Way::quinEhLobjetiuDeLaSevaDiresio(const Way &way) const {
+bool Way::quinEhLobjetiuDeLaSevaDiresio(const Way& way) const {
     if (this->empty() != way.empty())
         return true;
     if (this->empty())
@@ -355,11 +345,11 @@ bool Way::quinEhLobjetiuDeLaSevaDiresio(const Way &way) const {
 
     // 当两个 Way 中有一个到达末尾时，可以检查在 vital_num_midpoints 范围内
     // 是否一个比另一个长并据此返回，但这种情况由规划器自身处理更好
-    //（当没有中点时会重新规划）。
+    // （当没有中点时会重新规划）。
     return false;
 }
 
-const double &Way::getAvgEdgeLen() const {
+const double& Way::getAvgEdgeLen() const {
     return this->avgEdgeLen_;
 }
 
@@ -374,12 +364,12 @@ uint32_t Way::sizeAheadOfCar() const {
     return this->path_.size() - this->sizeToCar_;
 }
 
-std::ostream &operator<<(std::ostream &os, const Way &way) {
+std::ostream& operator<<(std::ostream& os, const Way& way) {
     const Tracklimits tracklimits = way.getTracklimits();
-    for (const Node &n : tracklimits.left) {
+    for (const Node& n : tracklimits.left) {
         os << n.pointGlobal().x << ' ' << n.pointGlobal().y << ' ' << 0 << ' ' << n.id << std::endl;
     }
-    for (const Node &n : tracklimits.right) {
+    for (const Node& n : tracklimits.right) {
         os << n.pointGlobal().x << ' ' << n.pointGlobal().y << ' ' << 1 << ' ' << n.id << std::endl;
     }
     return os;
@@ -449,7 +439,7 @@ std::vector<geometry_msgs::msg::Point> Way::getPathFullInterpolation() {
     auto lastIt = it;
     double diffX, diffY;
     geometry_msgs::msg::Point p;
-    it++;  //跳到下一个
+    it++;  // 跳到下一个
     for (size_t j = 0; j + 1 < path_.size(); ++j) {
         diffX = (it->midPointGlobal().x - lastIt->midPointGlobal().x) / 10.0;
         diffY = (it->midPointGlobal().y - lastIt->midPointGlobal().y) / 10.0;
@@ -465,7 +455,8 @@ std::vector<geometry_msgs::msg::Point> Way::getPathFullInterpolation() {
     return res;
 }
 
-std::vector<geometry_msgs::msg::Point> Way::getPathInterpolationLocal([[maybe_unused]] double x, [[maybe_unused]] double y) {
+std::vector<geometry_msgs::msg::Point> Way::getPathInterpolationLocal([[maybe_unused]] double x,
+                                                                      [[maybe_unused]] double y) {
     deleteWayPassed();
     std::vector<geometry_msgs::msg::Point> res;
     if (path_.empty())
@@ -508,7 +499,7 @@ std::vector<geometry_msgs::msg::Point> Way::getPathFullInterpolationLocal() {
     auto lastIt = it;
     double diffX, diffY;
     geometry_msgs::msg::Point p;
-    it++;  //跳到下一个
+    it++;  // 跳到下一个
     for (size_t j = 0; j + 1 < path_.size(); ++j) {
         diffX = (it->midPoint().x - lastIt->midPoint().x) / 10.0;
         diffY = (it->midPoint().y - lastIt->midPoint().y) / 10.0;

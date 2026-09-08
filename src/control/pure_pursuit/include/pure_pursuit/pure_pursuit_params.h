@@ -2,7 +2,6 @@
 #define PURE_PURSUIT_PURE_PURSUIT_PARAMS_H
 
 #include <rclcpp/rclcpp.hpp>
-
 #include <string>
 
 struct PurePursuitParams {

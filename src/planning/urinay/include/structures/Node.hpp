@@ -10,16 +10,16 @@
 
 #pragma once
 
-#include <geometry_msgs/msg/point.hpp>
-#include <rclcpp/rclcpp.hpp>
+#include <cone_types.h>
 
 #include <Eigen/Geometry>
 #include <cmath>
-#include <compare>
-#include <iostream>
-
 #include <common_msgs/msg/huat_cone.hpp>
-#include <cone_types.h>
+#include <compare>
+#include <geometry_msgs/msg/point.hpp>
+#include <iostream>
+#include <rclcpp/rclcpp.hpp>
+
 #include "structures/Point.hpp"
 #include "structures/Vector.hpp"
 #include "utils/constants.hpp"
@@ -75,7 +75,6 @@ class Node {
     Node(double x, double y);
 
    public:
-
     /**
      * @brief 构造一个新的 Node 对象。
      *
@@ -92,7 +91,7 @@ class Node {
      *
      * @param[in] c
      */
-    explicit Node(const common_msgs::msg::HuatCone &c);
+    explicit Node(const common_msgs::msg::HuatCone& c);
 
     /**
      * @brief 返回节点的局部 x 坐标。
@@ -109,17 +108,13 @@ class Node {
      * 当且仅当两个节点的 ID 相同时判定相同/顺序，返回 std::strong_ordering 全序。
      * 自动合成 <, <=, >, >=。
      */
-    [[nodiscard]] constexpr std::strong_ordering operator<=>(const Node &n) const noexcept {
-        return this->id <=> n.id;
-    }
+    [[nodiscard]] constexpr std::strong_ordering operator<=>(const Node& n) const noexcept { return this->id <=> n.id; }
 
     /**
      * @brief 比较运算符。当且仅当两个节点的 ID 相同时，它们相等。
      * C++20 自动合成 != 运算符。
      */
-    [[nodiscard]] constexpr bool operator==(const Node &n) const noexcept {
-        return this->id == n.id;
-    }
+    [[nodiscard]] constexpr bool operator==(const Node& n) const noexcept { return this->id == n.id; }
 
     /**
      * @brief 返回一个局部坐标为 (x, y) 的超级三角形节点。
@@ -139,24 +134,24 @@ class Node {
      *
      * @param[in] tf
      */
-    void updateLocal(const Eigen::Affine3d &tf) const;
+    void updateLocal(const Eigen::Affine3d& tf) const;
 
     /**
      * @brief 返回局部坐标系下的点。
      */
-    [[nodiscard]] const Point &point() const noexcept;
+    [[nodiscard]] const Point& point() const noexcept;
 
     /**
      * @brief 返回全局坐标系下的点。
      */
-    [[nodiscard]] const Point &pointGlobal() const noexcept;
+    [[nodiscard]] const Point& pointGlobal() const noexcept;
 
     /**
      * @brief 返回从节点局部点到 p 的距离平方。
      *
      * @param[in] p
      */
-    [[nodiscard]] double distSq(const Point &p) const noexcept;
+    [[nodiscard]] double distSq(const Point& p) const noexcept;
 
     /**
      * @brief 返回该节点与节点 n0 和 n1 形成的角度。
@@ -164,7 +159,7 @@ class Node {
      * @param[in] n0
      * @param[in] n1
      */
-    [[nodiscard]] double angleWith(const Node &n0, const Node &n1) const;
+    [[nodiscard]] double angleWith(const Node& n0, const Node& n1) const;
 
     /**
      * @brief 将节点转换为 as_msgs::Cone 并返回。
@@ -177,5 +172,5 @@ class Node {
      * @param[in,out] os
      * @param[in] n
      */
-    friend std::ostream &operator<<(std::ostream &os, const Node &n);
+    friend std::ostream& operator<<(std::ostream& os, const Node& n);
 };

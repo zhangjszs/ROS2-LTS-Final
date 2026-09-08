@@ -23,18 +23,18 @@ LidarCluster::LidarCluster(rclcpp::Node* node) : node_(node) {
         sub_vehicle_state_ = node_->create_subscription<common_msgs::msg::HuatCarstate>(
             vehicle_state_topic_, 10,
             [this](const common_msgs::msg::HuatCarstate::ConstSharedPtr msg) { OnVehicleState(msg); });
-        RCLCPP_INFO(node_->get_logger(), "[lidar_cluster] Vehicle state subscriber active (dynamic_roi=%s, temporal_accum=%s)",
-                 enable_dynamic_roi_ ? "true" : "false", enable_temporal_accumulation_ ? "true" : "false");
+        RCLCPP_INFO(node_->get_logger(),
+                    "[lidar_cluster] Vehicle state subscriber active (dynamic_roi=%s, temporal_accum=%s)",
+                    enable_dynamic_roi_ ? "true" : "false", enable_temporal_accumulation_ ? "true" : "false");
     }
     if (enable_dynamic_roi_ || enable_ground_slope_compensation_) {
         sub_asensing_ = node_->create_subscription<common_msgs::msg::HuatASENSING>(
             ins_asensing_topic_, 10,
             [this](const common_msgs::msg::HuatASENSING::ConstSharedPtr msg) { OnAsensing(msg); });
         sub_ins_ = node_->create_subscription<common_msgs::msg::HuatInsP2>(
-            ins_p2_topic_, 10,
-            [this](const common_msgs::msg::HuatInsP2::ConstSharedPtr msg) { OnInsP2(msg); });
-        RCLCPP_INFO(node_->get_logger(), "[lidar_cluster] Pitch/ROI INS: ASENSING=%s ins_p2=%s", ins_asensing_topic_.c_str(),
-                 ins_p2_topic_.c_str());
+            ins_p2_topic_, 10, [this](const common_msgs::msg::HuatInsP2::ConstSharedPtr msg) { OnInsP2(msg); });
+        RCLCPP_INFO(node_->get_logger(), "[lidar_cluster] Pitch/ROI INS: ASENSING=%s ins_p2=%s",
+                    ins_asensing_topic_.c_str(), ins_p2_topic_.c_str());
     }
 
     // 初始化发布者
@@ -42,7 +42,8 @@ LidarCluster::LidarCluster(rclcpp::Node* node) : node_(node) {
 
     if (enable_debug_) {
         marker_pub_ = node_->create_publisher<visualization_msgs::msg::MarkerArray>(debug_bounding_boxes_topic_, 1);
-        marker_pub_all_ = node_->create_publisher<visualization_msgs::msg::MarkerArray>(debug_bounding_boxes_all_topic_, 1);
+        marker_pub_all_ =
+            node_->create_publisher<visualization_msgs::msg::MarkerArray>(debug_bounding_boxes_all_topic_, 1);
         pub_debug_passthrough_ = node_->create_publisher<sensor_msgs::msg::PointCloud2>(debug_passthrough_topic_, 1);
         pub_debug_clustered_ = node_->create_publisher<sensor_msgs::msg::PointCloud2>(debug_clustered_topic_, 1);
         pub_debug_ground_seg_ = node_->create_publisher<sensor_msgs::msg::PointCloud2>(debug_ground_seg_topic_, 1);
@@ -54,12 +55,13 @@ LidarCluster::LidarCluster(rclcpp::Node* node) : node_(node) {
         skidpad_detection = node_->create_publisher<sensor_msgs::msg::PointCloud2>(debug_skidpad_detection_topic_, 1);
         RCLCPP_INFO(node_->get_logger(), "[lidar_cluster] Debug topics enabled");
     }
-    RCLCPP_INFO(node_->get_logger(), "[lidar_cluster] Initialization complete (input=%s, input_queue=%d, cones=%s, debug_topics=%s)",
-             input_topic_.c_str(), point_cloud_queue_size_, output_cones_topic_.c_str(),
-             enable_debug_ ? "true" : "false");
+    RCLCPP_INFO(node_->get_logger(),
+                "[lidar_cluster] Initialization complete (input=%s, input_queue=%d, cones=%s, debug_topics=%s)",
+                input_topic_.c_str(), point_cloud_queue_size_, output_cones_topic_.c_str(),
+                enable_debug_ ? "true" : "false");
 }
 
-void LidarCluster::ComputeGroundSegParams(GroundSegParams &params) {
+void LidarCluster::ComputeGroundSegParams(GroundSegParams& params) {
     int effective_num_iter = num_iter_;
     double effective_th_dist = th_dist_;
     if (enable_ground_autotune_) {
@@ -67,25 +69,27 @@ void LidarCluster::ComputeGroundSegParams(GroundSegParams &params) {
         if (pc_size > static_cast<size_t>(dense_pc_threshold_)) {
             effective_num_iter = dense_num_iter_;
             effective_th_dist = dense_th_dist_;
-            RCLCPP_DEBUG(node_->get_logger(), "[lidar_cluster] Ground autotune: dense mode (pc=%zu, iter=%d, th=%.3f)", pc_size,
-                      effective_num_iter, effective_th_dist);
+            RCLCPP_DEBUG(node_->get_logger(), "[lidar_cluster] Ground autotune: dense mode (pc=%zu, iter=%d, th=%.3f)",
+                         pc_size, effective_num_iter, effective_th_dist);
         } else {
             effective_num_iter = sparse_num_iter_;
             effective_th_dist = sparse_th_dist_;
-            RCLCPP_DEBUG(node_->get_logger(), "[lidar_cluster] Ground autotune: sparse mode (pc=%zu, iter=%d, th=%.3f)", pc_size,
-                      effective_num_iter, effective_th_dist);
+            RCLCPP_DEBUG(node_->get_logger(), "[lidar_cluster] Ground autotune: sparse mode (pc=%zu, iter=%d, th=%.3f)",
+                         pc_size, effective_num_iter, effective_th_dist);
         }
     }
     if (enable_frame_rate_protection_ && frp_active_) {
         effective_num_iter = std::min(effective_num_iter, frp_reduce_num_iter_);
-        RCLCPP_DEBUG(node_->get_logger(), "[lidar_cluster] Frame-rate protection: reduced num_iter to %d", effective_num_iter);
+        RCLCPP_DEBUG(node_->get_logger(), "[lidar_cluster] Frame-rate protection: reduced num_iter to %d",
+                     effective_num_iter);
     }
 
     double effective_th_seeds = th_seeds_;
     if (enable_ground_slope_compensation_) {
         double pitch = std::min(std::fabs(scan_pitch_), slope_pitch_max_);
         effective_th_seeds += pitch * slope_th_seeds_scale_;
-        RCLCPP_DEBUG(node_->get_logger(), "[lidar_cluster] Slope compensation: pitch=%.2f th_seeds=%.4f", scan_pitch_, effective_th_seeds);
+        RCLCPP_DEBUG(node_->get_logger(), "[lidar_cluster] Slope compensation: pitch=%.2f th_seeds=%.4f", scan_pitch_,
+                     effective_th_seeds);
     }
 
     params.num_iter = effective_num_iter;
@@ -106,7 +110,7 @@ void LidarCluster::AccumulateTemporalFrames() {
 
     pcl::PointCloud<PointType>::Ptr current_far = std::make_shared<pcl::PointCloud<PointType>>();
     float d2_thresh = static_cast<float>(accumulation_min_distance_ * accumulation_min_distance_);
-    for (const auto &p : g_not_ground_pc->points) {
+    for (const auto& p : g_not_ground_pc->points) {
         if (p.x * p.x + p.y * p.y >= d2_thresh)
             current_far->push_back(p);
     }
@@ -117,7 +121,7 @@ void LidarCluster::AccumulateTemporalFrames() {
     }
 
     size_t extra = 0;
-    for (const auto &hist : accumulated_far_clouds_) {
+    for (const auto& hist : accumulated_far_clouds_) {
         if (hist.cloud != current_far)
             extra += hist.cloud->size();
     }
@@ -125,12 +129,12 @@ void LidarCluster::AccumulateTemporalFrames() {
 
     const double cos_cur = std::cos(-cur_theta);
     const double sin_cur = std::sin(-cur_theta);
-    for (const auto &hist : accumulated_far_clouds_) {
+    for (const auto& hist : accumulated_far_clouds_) {
         if (hist.cloud == current_far)
             continue;
         const double cos_old = std::cos(hist.car_theta);
         const double sin_old = std::sin(hist.car_theta);
-        for (const auto &p : hist.cloud->points) {
+        for (const auto& p : hist.cloud->points) {
             double gx = cos_old * p.x - sin_old * p.y + hist.car_x;
             double gy = sin_old * p.x + cos_old * p.y + hist.car_y;
             double dx = gx - cur_x;
@@ -152,10 +156,10 @@ void LidarCluster::AccumulateTemporalFrames() {
     }
 
     RCLCPP_DEBUG(node_->get_logger(), "[lidar_cluster] Temporal accum: %zu frames, far=%zu, total non-ground=%zu",
-              accumulated_far_clouds_.size(), current_far->size(), g_not_ground_pc->size());
+                 accumulated_far_clouds_.size(), current_far->size(), g_not_ground_pc->size());
 }
 
-void LidarCluster::ApplyDistortionAdjustment(pcl::PointCloud<PointType>::Ptr &cloud) {
+void LidarCluster::ApplyDistortionAdjustment(pcl::PointCloud<PointType>::Ptr& cloud) {
     if (!use_distortion_adjust_ || !imu_sub_ptr_ || !disAdjust)
         return;
     imu_sub_ptr_->ParseData(unsynced_imu_);
@@ -198,13 +202,15 @@ void LidarCluster::RunAlgorithm() {
 
     if (waiting_for_scan) {
         if (no_cloud_yet) {
-            RCLCPP_INFO_ONCE(node_->get_logger(), "[lidar_cluster] Waiting for first point cloud on %s", input_topic_.c_str());
+            RCLCPP_INFO_ONCE(node_->get_logger(), "[lidar_cluster] Waiting for first point cloud on %s",
+                             input_topic_.c_str());
         }
         return;
     }
     if (empty_cloud) {
         no_data_frames_++;
-        RCLCPP_WARN_THROTTLE(node_->get_logger(), *node_->get_clock(), 2000, "[lidar_cluster] Empty point cloud (no_data_frames=%d)", no_data_frames_);
+        RCLCPP_WARN_THROTTLE(node_->get_logger(), *node_->get_clock(), 2000,
+                             "[lidar_cluster] Empty point cloud (no_data_frames=%d)", no_data_frames_);
         common_msgs::msg::HuatConeCluster empty;
         empty.header = scan_header_;
         cone_pub_->publish(empty);
@@ -214,9 +220,9 @@ void LidarCluster::RunAlgorithm() {
 
     if (!scan_has_ins_ && (enable_dynamic_roi_ || enable_ground_slope_compensation_)) {
         RCLCPP_WARN_THROTTLE(node_->get_logger(), *node_->get_clock(), 10000,
-                          "[lidar_cluster] No INS pitch yet (ASENSING %s or ins_p2 %s) — "
-                          "pitch compensation and dynamic ROI are INACTIVE",
-                          ins_asensing_topic_.c_str(), ins_p2_topic_.c_str());
+                             "[lidar_cluster] No INS pitch yet (ASENSING %s or ins_p2 %s) — "
+                             "pitch compensation and dynamic ROI are INACTIVE",
+                             ins_asensing_topic_.c_str(), ins_p2_topic_.c_str());
     }
 
     ApplyDistortionAdjustment(processing_pc_);
@@ -230,7 +236,9 @@ void LidarCluster::RunAlgorithm() {
         1000.0;
 
     if (enable_debug_) {
-        pcl::PCLPointCloud2 pcl_pc2_filtered; pcl::toPCLPointCloud2(*cloud_filtered, pcl_pc2_filtered); pcl_conversions::fromPCL(pcl_pc2_filtered, pub_pc);
+        pcl::PCLPointCloud2 pcl_pc2_filtered;
+        pcl::toPCLPointCloud2(*cloud_filtered, pcl_pc2_filtered);
+        pcl_conversions::fromPCL(pcl_pc2_filtered, pub_pc);
         pub_pc.header = scan_header_;
         pub_debug_passthrough_->publish(pub_pc);
     }
@@ -238,8 +246,9 @@ void LidarCluster::RunAlgorithm() {
     if (enable_frame_rate_protection_) {
         frp_active_ = (last_frame_total_ms_ > frp_time_threshold_ms_);
         if (frp_active_)
-            RCLCPP_DEBUG(node_->get_logger(), "[lidar_cluster] Frame-rate protection active (last=%.2f ms > thresh=%.2f)", last_frame_total_ms_,
-                      frp_time_threshold_ms_);
+            RCLCPP_DEBUG(node_->get_logger(),
+                         "[lidar_cluster] Frame-rate protection active (last=%.2f ms > thresh=%.2f)",
+                         last_frame_total_ms_, frp_time_threshold_ms_);
     }
 
     auto startTimeSeg = std::chrono::steady_clock::now();
@@ -256,7 +265,9 @@ void LidarCluster::RunAlgorithm() {
         std::chrono::duration_cast<std::chrono::microseconds>(endTimeSeg - startTimeSeg).count() / 1000.0;
 
     if (enable_debug_) {
-        pcl::PCLPointCloud2 pcl_pc2_g_not_ground; pcl::toPCLPointCloud2(*g_not_ground_pc, pcl_pc2_g_not_ground); pcl_conversions::fromPCL(pcl_pc2_g_not_ground, pub_pc);
+        pcl::PCLPointCloud2 pcl_pc2_g_not_ground;
+        pcl::toPCLPointCloud2(*g_not_ground_pc, pcl_pc2_g_not_ground);
+        pcl_conversions::fromPCL(pcl_pc2_g_not_ground, pub_pc);
         pub_pc.header = scan_header_;
         pub_debug_ground_seg_->publish(pub_pc);
     }
@@ -327,7 +338,8 @@ void LidarCluster::OnInsP2(const common_msgs::msg::HuatInsP2::ConstSharedPtr msg
     std::scoped_lock lock(acc_pose_mutex_);
     if (!has_ins_p2_) {
         has_ins_p2_ = true;
-        RCLCPP_INFO(node_->get_logger(), "[lidar_cluster] %s received — pitch compensation active", ins_p2_topic_.c_str());
+        RCLCPP_INFO(node_->get_logger(), "[lidar_cluster] %s received — pitch compensation active",
+                    ins_p2_topic_.c_str());
     }
     current_pitch_ = static_cast<double>(msg->pitch);
 }
@@ -337,7 +349,7 @@ void LidarCluster::OnAsensing(const common_msgs::msg::HuatASENSING::ConstSharedP
     if (!has_ins_p2_) {
         has_ins_p2_ = true;
         RCLCPP_INFO(node_->get_logger(), "[lidar_cluster] %s received — pitch compensation active (pitch=%.2f deg)",
-                 ins_asensing_topic_.c_str(), msg->pitch);
+                    ins_asensing_topic_.c_str(), msg->pitch);
     }
     current_pitch_ = msg->pitch;
 }

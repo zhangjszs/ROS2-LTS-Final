@@ -1,9 +1,8 @@
 #include "straight_line_planner_node.hpp"
 
-#include <common_msgs/msg/huat_tracklimits.hpp>
-
 #include <algorithm>
 #include <cmath>
+#include <common_msgs/msg/huat_tracklimits.hpp>
 #include <ranges>
 
 #include "straight_line_geom.h"
@@ -82,7 +81,8 @@ StraightLinePlannerNode::StraightLinePlannerNode(rclcpp::Node::SharedPtr node)
     cone_map_sub_ = node_->create_subscription<common_msgs::msg::HuatMap>(
         input_topic_, 1, [this](const common_msgs::msg::HuatMap::ConstSharedPtr msg) { OnConeMapMessage(msg); });
     car_state_sub_ = node_->create_subscription<common_msgs::msg::HuatCarstate>(
-        vehicle_state_topic, 1, [this](const common_msgs::msg::HuatCarstate::ConstSharedPtr msg) { OnCarStateMessage(msg); });
+        vehicle_state_topic, 1,
+        [this](const common_msgs::msg::HuatCarstate::ConstSharedPtr msg) { OnCarStateMessage(msg); });
     path_limits_pub_ = node_->create_publisher<common_msgs::msg::HuatPathLimits>(output_topic_, 1);
 
     RCLCPP_INFO(node_->get_logger(),
@@ -115,29 +115,25 @@ bool StraightLinePlannerNode::IsBoundaryPlausible(const DetectedBoundaries& b) c
     if (!b.left.valid || !b.right.valid)
         return false;
     if (std::abs(b.left.slope) > plausibility_max_abs_slope_) {
-        RCLCPP_DEBUG(node_->get_logger(),
-                     "[straight_line_planner] Plausibility fail: left slope=%.3f > max=%.3f", b.left.slope,
-                     plausibility_max_abs_slope_);
+        RCLCPP_DEBUG(node_->get_logger(), "[straight_line_planner] Plausibility fail: left slope=%.3f > max=%.3f",
+                     b.left.slope, plausibility_max_abs_slope_);
         return false;
     }
     if (std::abs(b.right.slope) > plausibility_max_abs_slope_) {
-        RCLCPP_DEBUG(node_->get_logger(),
-                     "[straight_line_planner] Plausibility fail: right slope=%.3f > max=%.3f", b.right.slope,
-                     plausibility_max_abs_slope_);
+        RCLCPP_DEBUG(node_->get_logger(), "[straight_line_planner] Plausibility fail: right slope=%.3f > max=%.3f",
+                     b.right.slope, plausibility_max_abs_slope_);
         return false;
     }
     // 右侧截距应大于左侧截距（在 base_link 中右侧为 +y，左侧为 -y）
     if (!(b.right.intercept > b.left.intercept)) {
-        RCLCPP_DEBUG(node_->get_logger(),
-                     "[straight_line_planner] Plausibility fail: right_int=%.3f <= left_int=%.3f", b.right.intercept,
-                     b.left.intercept);
+        RCLCPP_DEBUG(node_->get_logger(), "[straight_line_planner] Plausibility fail: right_int=%.3f <= left_int=%.3f",
+                     b.right.intercept, b.left.intercept);
         return false;
     }
     double width_at_origin = b.right.intercept - b.left.intercept;
     if (width_at_origin < 0.5 || width_at_origin > 2.0 * plausibility_max_intercept_diff_) {
-        RCLCPP_DEBUG(node_->get_logger(),
-                     "[straight_line_planner] Plausibility fail: width=%.3f out of [0.5, %.3f]", width_at_origin,
-                     2.0 * plausibility_max_intercept_diff_);
+        RCLCPP_DEBUG(node_->get_logger(), "[straight_line_planner] Plausibility fail: width=%.3f out of [0.5, %.3f]",
+                     width_at_origin, 2.0 * plausibility_max_intercept_diff_);
         return false;
     }
     return true;
@@ -177,12 +173,12 @@ void StraightLinePlannerNode::BuildPathLimits(const DetectedBoundaries& boundari
 
     out.tracklimits.left.clear();
     out.tracklimits.right.clear();
-    std::ranges::copy_if(cones, std::back_inserter(out.tracklimits.left),
-                         [this](float y) { return y < -center_margin_; },
-                         [](const common_msgs::msg::HuatCone& c) { return c.position_base_link.y; });
-    std::ranges::copy_if(cones, std::back_inserter(out.tracklimits.right),
-                         [this](float y) { return y > center_margin_; },
-                         [](const common_msgs::msg::HuatCone& c) { return c.position_base_link.y; });
+    std::ranges::copy_if(
+        cones, std::back_inserter(out.tracklimits.left), [this](float y) { return y < -center_margin_; },
+        [](const common_msgs::msg::HuatCone& c) { return c.position_base_link.y; });
+    std::ranges::copy_if(
+        cones, std::back_inserter(out.tracklimits.right), [this](float y) { return y > center_margin_; },
+        [](const common_msgs::msg::HuatCone& c) { return c.position_base_link.y; });
     std::ranges::sort(out.tracklimits.left, {}, [](const auto& c) { return c.position_base_link.x; });
     std::ranges::sort(out.tracklimits.right, {}, [](const auto& c) { return c.position_base_link.x; });
     out.replan = true;
@@ -294,7 +290,8 @@ void StraightLinePlannerNode::OnConeMapMessage(const common_msgs::msg::HuatMap::
     if (msg->cone.empty()) {
         ++empty_count_;
         if (empty_count_ == max_empty_messages_ + 1)
-            RCLCPP_WARN(node_->get_logger(), "[straight_line_planner] Empty cone map for %d consecutive messages", empty_count_);
+            RCLCPP_WARN(node_->get_logger(), "[straight_line_planner] Empty cone map for %d consecutive messages",
+                        empty_count_);
         if (empty_count_ <= max_empty_messages_ && has_last_valid_) {
             last_valid_path_limits_.header.stamp = node_->now();
             path_limits_pub_->publish(last_valid_path_limits_);

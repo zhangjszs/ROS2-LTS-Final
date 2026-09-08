@@ -1,9 +1,8 @@
 #include "skidpad_planner_node.hpp"
 
 #include <algorithm>
-#include <ranges>
-
 #include <common_msgs/msg/huat_tracklimits.hpp>
+#include <ranges>
 
 namespace skidpad {
 
@@ -73,7 +72,8 @@ SkidpadPlannerNode::SkidpadPlannerNode(rclcpp::Node::SharedPtr node)
     cone_map_sub_ = node_->create_subscription<common_msgs::msg::HuatMap>(
         input_topic_, 1, [this](const common_msgs::msg::HuatMap::ConstSharedPtr msg) { OnConeMapMessage(msg); });
     car_state_sub_ = node_->create_subscription<common_msgs::msg::HuatCarstate>(
-        vehicle_state_topic_, 1, [this](const common_msgs::msg::HuatCarstate::ConstSharedPtr msg) { OnCarStateMessage(msg); });
+        vehicle_state_topic_, 1,
+        [this](const common_msgs::msg::HuatCarstate::ConstSharedPtr msg) { OnCarStateMessage(msg); });
     path_limits_pub_ = node_->create_publisher<common_msgs::msg::HuatPathLimits>(output_topic_, 1);
 
     RCLCPP_INFO(node_->get_logger(), "[skidpad_planner] Node initialized. road_type=%d", road_type_);
@@ -174,11 +174,11 @@ bool SkidpadPlannerNode::IsPrevPathFrozen(const std::vector<Point2D>& prev_path_
     const double freeze_threshold_sq = freeze_threshold * freeze_threshold;
     // 若没有任意一个点落在 freeze 阈值内（即全部点都在车辆前瞻外），判定路径已失效冻结
     const bool frozen = std::ranges::none_of(
-        prev_path_bl,
-        [freeze_threshold_sq](double d2) { return d2 <= freeze_threshold_sq; },
+        prev_path_bl, [freeze_threshold_sq](double d2) { return d2 <= freeze_threshold_sq; },
         [](const Point2D& p) { return p.x * p.x + p.y * p.y; });
     if (frozen) {
-        RCLCPP_WARN(node_->get_logger(), "[skidpad_planner] Prev path frozen (all pts > %.1fm), resetting", freeze_threshold);
+        RCLCPP_WARN(node_->get_logger(), "[skidpad_planner] Prev path frozen (all pts > %.1fm), resetting",
+                    freeze_threshold);
     }
     return frozen;
 }
@@ -204,7 +204,8 @@ void SkidpadPlannerNode::OnConeMapMessage(const common_msgs::msg::HuatMap::Const
             PublishEmptyPathLimits();
         }
         if (empty_count_ == max_empty_messages_ + 1) {
-            RCLCPP_WARN(node_->get_logger(), "[skidpad_planner] Empty cone map for %d consecutive messages", empty_count_);
+            RCLCPP_WARN(node_->get_logger(), "[skidpad_planner] Empty cone map for %d consecutive messages",
+                        empty_count_);
         }
         return;
     }
@@ -251,12 +252,12 @@ void SkidpadPlannerNode::OnConeMapMessage(const common_msgs::msg::HuatMap::Const
     std::ranges::transform(path, std::back_inserter(path_limits.path),
                            [](const Point2D& pt) { return MakePoint(pt.x, pt.y, 0.0); });
 
-    std::ranges::copy_if(cones, std::back_inserter(path_limits.tracklimits.left),
-                         [this](float y) { return y < -center_margin_; },
-                         [](const common_msgs::msg::HuatCone& c) { return c.position_base_link.y; });
-    std::ranges::copy_if(cones, std::back_inserter(path_limits.tracklimits.right),
-                         [this](float y) { return y > center_margin_; },
-                         [](const common_msgs::msg::HuatCone& c) { return c.position_base_link.y; });
+    std::ranges::copy_if(
+        cones, std::back_inserter(path_limits.tracklimits.left), [this](float y) { return y < -center_margin_; },
+        [](const common_msgs::msg::HuatCone& c) { return c.position_base_link.y; });
+    std::ranges::copy_if(
+        cones, std::back_inserter(path_limits.tracklimits.right), [this](float y) { return y > center_margin_; },
+        [](const common_msgs::msg::HuatCone& c) { return c.position_base_link.y; });
     std::ranges::sort(path_limits.tracklimits.left, {}, [](const auto& c) { return c.position_base_link.x; });
     std::ranges::sort(path_limits.tracklimits.right, {}, [](const auto& c) { return c.position_base_link.x; });
     path_limits.replan = true;

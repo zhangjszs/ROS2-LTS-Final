@@ -1,10 +1,9 @@
 #pragma once
 
-#include <rclcpp/rclcpp.hpp>
-
 #include <deque>
 #include <iostream>
 #include <mutex>
+#include <rclcpp/rclcpp.hpp>
 #include <thread>
 
 class ImuData {

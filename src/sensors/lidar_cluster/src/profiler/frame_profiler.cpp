@@ -2,7 +2,7 @@
 
 #include <format>
 
-FrameProfiler::FrameProfiler(rclcpp::Node* node, const std::string &topic, double warn_ms, double error_ms,
+FrameProfiler::FrameProfiler(rclcpp::Node* node, const std::string& topic, double warn_ms, double error_ms,
                              int consecutive_threshold)
     : warn_ms_(warn_ms), error_ms_(error_ms), consecutive_threshold_(consecutive_threshold) {
     pub_ = node->create_publisher<std_msgs::msg::Float64MultiArray>(topic, 10);
@@ -23,9 +23,8 @@ std::string FrameProfiler::formatWarnMessage(double total_ms, double warn_ms, in
             "(consecutive={}, no_data={})",
             total_ms, warn_ms, consecutive, no_data_frames);
     }
-    return std::format(
-        "[lidar_cluster] Frame time {:.2f} ms exceeds WARN threshold {:.2f} ms (consecutive={})",
-        total_ms, warn_ms, consecutive);
+    return std::format("[lidar_cluster] Frame time {:.2f} ms exceeds WARN threshold {:.2f} ms (consecutive={})",
+                       total_ms, warn_ms, consecutive);
 }
 
 std::string FrameProfiler::formatErrorMessage(double total_ms, double error_ms) {
@@ -49,11 +48,12 @@ void FrameProfiler::publish(double pt_ms, double seg_ms, double cluster_ms, doub
     } else if (total_ms > warn_ms_) {
         consecutive_timeout_count_++;
         if (consecutive_timeout_count_ >= consecutive_threshold_) {
-            RCLCPP_WARN_THROTTLE(logger, clock_, 1000, "%s",
-                              formatWarnMessage(total_ms, warn_ms_, consecutive_timeout_count_, no_data_frames).c_str());
+            RCLCPP_WARN_THROTTLE(
+                logger, clock_, 1000, "%s",
+                formatWarnMessage(total_ms, warn_ms_, consecutive_timeout_count_, no_data_frames).c_str());
         } else {
             RCLCPP_WARN_THROTTLE(logger, clock_, 1000, "%s",
-                              formatWarnMessage(total_ms, warn_ms_, consecutive_timeout_count_).c_str());
+                                 formatWarnMessage(total_ms, warn_ms_, consecutive_timeout_count_).c_str());
         }
     } else {
         if (consecutive_timeout_count_ > 0) {
@@ -63,5 +63,5 @@ void FrameProfiler::publish(double pt_ms, double seg_ms, double cluster_ms, doub
     }
 
     RCLCPP_INFO_THROTTLE(logger, clock_, 5000, "%s",
-                      formatSummary(pt_ms, seg_ms, cluster_ms, total_ms, no_data_frames).c_str());
+                         formatSummary(pt_ms, seg_ms, cluster_ms, total_ms, no_data_frames).c_str());
 }

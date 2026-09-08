@@ -30,9 +30,7 @@ struct Tracklimits {
     std::vector<Node> left{};
     std::vector<Node> right{};
 
-    [[nodiscard]] constexpr bool empty() const noexcept {
-        return left.empty() && right.empty();
-    }
+    [[nodiscard]] constexpr bool empty() const noexcept { return left.empty() && right.empty(); }
 
     void clear() noexcept {
         left.clear();

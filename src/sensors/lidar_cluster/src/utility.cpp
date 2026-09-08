@@ -45,7 +45,8 @@ void LidarCluster::LoadTopicParams() {
     node_->get_parameter("input_topic", input_topic_);
     node_->get_parameter("point_cloud_queue_size", point_cloud_queue_size_);
     if (point_cloud_queue_size_ < 1) {
-        RCLCPP_WARN(node_->get_logger(), "[lidar_cluster] Invalid point_cloud_queue_size=%d, clamping to 1", point_cloud_queue_size_);
+        RCLCPP_WARN(node_->get_logger(), "[lidar_cluster] Invalid point_cloud_queue_size=%d, clamping to 1",
+                    point_cloud_queue_size_);
         point_cloud_queue_size_ = 1;
     }
     node_->get_parameter("output_cones_topic", output_cones_topic_);
@@ -168,8 +169,8 @@ void LidarCluster::LoadFeatureParams() {
     node_->get_parameter("profiling_error_ms", profiling_error_ms);
     node_->get_parameter("profiling_warn_consecutive_threshold", profiling_warn_consecutive_threshold);
     if (enable_profiling_)
-        profiler_ = std::make_unique<FrameProfiler>(node_, profiling_topic_, profiling_warn_ms,
-                                                    profiling_error_ms, profiling_warn_consecutive_threshold);
+        profiler_ = std::make_unique<FrameProfiler>(node_, profiling_topic_, profiling_warn_ms, profiling_error_ms,
+                                                    profiling_warn_consecutive_threshold);
 
     node_->get_parameter("enable_temporal_accumulation", enable_temporal_accumulation_);
     node_->get_parameter("accumulation_frames", accumulation_frames_);
@@ -215,8 +216,9 @@ void LidarCluster::InitStrategy() {
         ground_strategy_.reset(new RansacGroundStrategy());
         RCLCPP_INFO(node_->get_logger(), "[lidar_cluster] Ground segmentation strategy: RANSAC");
     } else {
-        RCLCPP_WARN(node_->get_logger(), "[lidar_cluster] Unknown ground segmentation strategy '%s', falling back to SVD",
-                 ground_seg_strategy.c_str());
+        RCLCPP_WARN(node_->get_logger(),
+                    "[lidar_cluster] Unknown ground segmentation strategy '%s', falling back to SVD",
+                    ground_seg_strategy.c_str());
         ground_strategy_.reset(new SvdGroundStrategy());
     }
 
@@ -269,17 +271,19 @@ void LidarCluster::InitState() {
     if (use_distortion_adjust_) {
         imu_sub_ptr_ = std::make_shared<ImuSubscriber>(node_, imu_topic_, 100);
         disAdjust = std::make_shared<DistortionAdjuster>();
-        RCLCPP_INFO(node_->get_logger(), "[lidar_cluster] Distortion adjustment enabled (imu_topic=%s, scan_period=%.3f)", imu_topic_.c_str(),
-                 scan_period_);
+        RCLCPP_INFO(node_->get_logger(),
+                    "[lidar_cluster] Distortion adjustment enabled (imu_topic=%s, scan_period=%.3f)",
+                    imu_topic_.c_str(), scan_period_);
     } else {
         RCLCPP_INFO(node_->get_logger(), "[lidar_cluster] Distortion adjustment disabled");
     }
 }
 
-void LidarCluster::SingleFrameDedup(common_msgs::msg::HuatConeCluster &position) {
+void LidarCluster::SingleFrameDedup(common_msgs::msg::HuatConeCluster& position) {
     int removed = ::SingleFrameDedup(position, single_frame_dedup_radius_);
     if (removed > 0) {
-        RCLCPP_DEBUG(node_->get_logger(), "[lidar_cluster] single-frame dedup: removed %d near-duplicate cones", removed);
+        RCLCPP_DEBUG(node_->get_logger(), "[lidar_cluster] single-frame dedup: removed %d near-duplicate cones",
+                     removed);
     }
 }
 
@@ -300,18 +304,18 @@ ScoringParams LidarCluster::MakeScoringParams() const {
 }
 
 double LidarCluster::GetConfidence(PointType max, PointType min, Eigen::Vector4f centroid,
-                                   const pcl::PointCloud<PointType>::Ptr &cluster_cloud) {
+                                   const pcl::PointCloud<PointType>::Ptr& cluster_cloud) {
     ScoringParams p = MakeScoringParams();
     return ComputeConfidence(max, min, centroid, cluster_cloud, p);
 }
 
-void LidarCluster::SplitString(const std::string &in_string, std::vector<double> &out_array) {
+void LidarCluster::SplitString(const std::string& in_string, std::vector<double>& out_array) {
     lidar_cluster::parseCsvDoubles(in_string, out_array);
 }
 
 void LidarCluster::EuclideanClusterMethod(pcl::PointCloud<PointType>::Ptr inputcloud,
-                                          std::vector<pcl::PointIndices> &cluster_indices,
-                                          const double &max_cluster_dis) {
+                                          std::vector<pcl::PointIndices>& cluster_indices,
+                                          const double& max_cluster_dis) {
     if (inputcloud->points.size() == 0) {
         RCLCPP_DEBUG(node_->get_logger(), "[lidar_cluster] Euclidean clustering received empty point cloud, exiting");
         return;
@@ -329,11 +333,12 @@ void LidarCluster::EuclideanClusterMethod(pcl::PointCloud<PointType>::Ptr inputc
 }
 
 void LidarCluster::EuclideanAdaptiveClusterMethod(pcl::PointCloud<PointType>::Ptr inputcloud,
-                                                  std::vector<std::vector<pcl::PointIndices>> &cluster_indices) {
+                                                  std::vector<std::vector<pcl::PointIndices>>& cluster_indices) {
     size_t num_bins = seg_distances.size();
     if (num_bins == 0 || dis_range.size() + 1 != num_bins) {
-        RCLCPP_ERROR_THROTTLE(node_->get_logger(), *node_->get_clock(), 5000, "[lidar_cluster] Mismatched adaptive cluster config: dis_range=%zu, seg_distances=%zu",
-                           dis_range.size(), num_bins);
+        RCLCPP_ERROR_THROTTLE(node_->get_logger(), *node_->get_clock(), 5000,
+                              "[lidar_cluster] Mismatched adaptive cluster config: dis_range=%zu, seg_distances=%zu",
+                              dis_range.size(), num_bins);
         return;
     }
 
@@ -355,11 +360,11 @@ void LidarCluster::EuclideanAdaptiveClusterMethod(pcl::PointCloud<PointType>::Pt
     std::vector<double> dis_range_sq(dis_range.size());
     std::ranges::transform(dis_range, dis_range_sq.begin(), [](double d) { return d * d; });
 
-    for (const auto &p : inputcloud->points) {
+    for (const auto& p : inputcloud->points) {
         float origin_dis_sq = p.x * p.x + p.y * p.y;  // 到原点的平方距离
         auto it = std::ranges::find_if(dis_range_sq, [origin_dis_sq](double r_sq) { return origin_dis_sq < r_sq; });
-        size_t bin = (it != dis_range_sq.end()) ? static_cast<size_t>(std::distance(dis_range_sq.begin(), it))
-                                                : (num_bins - 1);
+        size_t bin =
+            (it != dis_range_sq.end()) ? static_cast<size_t>(std::distance(dis_range_sq.begin(), it)) : (num_bins - 1);
         cloud_segments_array_[bin]->points.push_back(p);
     }
 
@@ -371,9 +376,9 @@ void LidarCluster::EuclideanAdaptiveClusterMethod(pcl::PointCloud<PointType>::Pt
     }
 }
 
-bool LidarCluster::ProcessCluster(const pcl::PointCloud<PointType>::Ptr &cloud_cluster,
-                                  common_msgs::msg::HuatConeCluster &position,
-                                  pcl::PointCloud<PointType>::Ptr &final_cluster) {
+bool LidarCluster::ProcessCluster(const pcl::PointCloud<PointType>::Ptr& cloud_cluster,
+                                  common_msgs::msg::HuatConeCluster& position,
+                                  pcl::PointCloud<PointType>::Ptr& final_cluster) {
     Eigen::Vector4f centroid;
     PointType _min, _max;
     pcl::compute3DCentroid(*cloud_cluster, centroid);
@@ -433,7 +438,9 @@ void LidarCluster::PublishDebugTopics() {
     pub_debug_clustered_->publish(pub_pc);
     marker_pub_->publish(marker_array);
     marker_pub_all_->publish(marker_array_all);
-    pcl::PCLPointCloud2 pcl_pc2_skidpad; pcl::toPCLPointCloud2(*skidpad_detection_pc, pcl_pc2_skidpad); pcl_conversions::fromPCL(pcl_pc2_skidpad, pub_pc);
+    pcl::PCLPointCloud2 pcl_pc2_skidpad;
+    pcl::toPCLPointCloud2(*skidpad_detection_pc, pcl_pc2_skidpad);
+    pcl_conversions::fromPCL(pcl_pc2_skidpad, pub_pc);
     pub_pc.header = scan_header_;
     skidpad_detection->publish(pub_pc);
 }
@@ -451,7 +458,7 @@ void LidarCluster::ClusterMethod() {
     final_cluster_->clear();
     cloud_cluster_->clear();
     for (size_t i = 0; i < cluster_indices.size(); ++i) {
-        for (const auto &seg : cluster_indices[i]) {
+        for (const auto& seg : cluster_indices[i]) {
             cloud_cluster_->clear();
             cloud_cluster_->points.reserve(seg.indices.size());
             for (int idx : seg.indices)
@@ -467,7 +474,9 @@ void LidarCluster::ClusterMethod() {
         SingleFrameDedup(position);
 
     if (enable_debug_) {
-        pcl::PCLPointCloud2 pcl_pc2_final; pcl::toPCLPointCloud2(*final_cluster_, pcl_pc2_final); pcl_conversions::fromPCL(pcl_pc2_final, pub_pc);
+        pcl::PCLPointCloud2 pcl_pc2_final;
+        pcl::toPCLPointCloud2(*final_cluster_, pcl_pc2_final);
+        pcl_conversions::fromPCL(pcl_pc2_final, pub_pc);
         pub_pc.header = scan_header_;
         PublishDebugTopics();
     }

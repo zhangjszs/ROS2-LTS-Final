@@ -45,9 +45,9 @@ class UrinayVisualizer {
     UrinayVisualizer() = default;
 
     // 单例模式
-    static UrinayVisualizer &getInstance();
-    UrinayVisualizer(UrinayVisualizer const &) = delete;
-    void operator=(UrinayVisualizer const &) = delete;
+    static UrinayVisualizer& getInstance();
+    UrinayVisualizer(UrinayVisualizer const&) = delete;
+    void operator=(UrinayVisualizer const&) = delete;
 
     /**
      * @brief 初始化单例的方法。
@@ -55,33 +55,33 @@ class UrinayVisualizer {
      * @param[in] node
      * @param[in] params
      */
-    void init(rclcpp::Node::SharedPtr node, const UrinayParams::Visualization &params);
+    void init(rclcpp::Node::SharedPtr node, const UrinayParams::Visualization& params);
 
     /**
      * @brief 设置 stamp_ 属性，所有 Marker 将使用此时间戳发布。
      *
      * @param[in] stamp
      */
-    void setTimestamp(const rclcpp::Time &stamp);
+    void setTimestamp(const rclcpp::Time& stamp);
 
     /**
      * @brief 可视化 TriangleSet 的方法。
      *
      * @param[in] triSet
      */
-    void visualize(const TriangleSet &triSet) const;
+    void visualize(const TriangleSet& triSet) const;
 
     /**
      * @brief 可视化 EdgeSet 的方法。
      *
      * @param[in] edgeSet
      */
-    void visualize(const EdgeSet &edgeSet) const;
+    void visualize(const EdgeSet& edgeSet) const;
 
     /**
      * @brief 可视化 Way 的方法。
      *
      * @param[in] way
      */
-    void visualize(const Way &way) const;
+    void visualize(const Way& way) const;
 };

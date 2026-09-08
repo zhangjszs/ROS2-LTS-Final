@@ -14,7 +14,7 @@
 
 /* ----------------------------- 公有方法 ----------------------------- */
 
-double Vector::angleWith(const Vector &v) const {
+double Vector::angleWith(const Vector& v) const {
     double det = this->x * v.y - this->y * v.x;
     return std::atan2(det, this->dot(v));
 }

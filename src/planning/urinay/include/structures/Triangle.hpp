@@ -60,11 +60,10 @@ class Triangle {
      * @param[in] n1
      * @param[in] n2
      */
-    static uint64_t computeHash(const Node &n0, const Node &n1, const Node &n2);
+    static uint64_t computeHash(const Node& n0, const Node& n1, const Node& n2);
     friend class std::hash<Triangle>;
 
    public:
-
     /**
      * @brief 从 3 个节点构造一个新的 Triangle 对象。
      *
@@ -72,7 +71,7 @@ class Triangle {
      * @param[in] n1
      * @param[in] n2
      */
-    Triangle(const Node &n0, const Node &n1, const Node &n2);
+    Triangle(const Node& n0, const Node& n1, const Node& n2);
 
     /**
      * @brief 从一条边和一个节点构造一个新的 Triangle 对象。
@@ -80,14 +79,14 @@ class Triangle {
      * @param[in] e
      * @param[in] n
      */
-    Triangle(const Edge &e, const Node &n);
+    Triangle(const Edge& e, const Node& n);
 
     /**
      * @brief C++20 宇宙飞船操作符 <=>。
      * 根据三角形唯一哈希值 hash_ 进行全序三路比较，返回 std::strong_ordering。
      * 自动合成 <, <=, >, >=，使 Triangle 可直接用于排序与有序容器。
      */
-    [[nodiscard]] constexpr std::strong_ordering operator<=>(const Triangle &t) const noexcept {
+    [[nodiscard]] constexpr std::strong_ordering operator<=>(const Triangle& t) const noexcept {
         return this->hash_ <=> t.hash_;
     }
 
@@ -95,30 +94,28 @@ class Triangle {
      * @brief 比较运算符，如果两个三角形的哈希值相同，则它们相等。
      * C++20 自动合成 != 运算符。
      */
-    [[nodiscard]] constexpr bool operator==(const Triangle &t) const noexcept {
-        return this->hash_ == t.hash_;
-    }
+    [[nodiscard]] constexpr bool operator==(const Triangle& t) const noexcept { return this->hash_ == t.hash_; }
 
     /**
      * @brief 检查三角形是否包含节点 n。
      *
      * @param[in] n
      */
-    bool containsNode(const Node &n) const;
+    bool containsNode(const Node& n) const;
 
     /**
      * @brief 检查边 e 是否属于该三角形。
      *
      * @param[in] e
      */
-    bool containsEdge(const Edge &e) const;
+    bool containsEdge(const Edge& e) const;
 
     /**
      * @brief 检查一个节点是否在三角形的外接圆内部。
      *
      * @param[in] n
      */
-    bool circleContainsNode(const Node &n) const;
+    bool circleContainsNode(const Node& n) const;
 
     /**
      * @brief 检查三角形的任何节点是否属于超级三角形。
@@ -133,12 +130,12 @@ class Triangle {
     /**
      * @brief 返回局部坐标系下的外心。
      */
-    const Point &circumCenter() const;
+    const Point& circumCenter() const;
 
     /**
      * @brief 返回全局坐标系下的外心。
      */
-    const Point &circumCenterGlobal() const;
+    const Point& circumCenterGlobal() const;
 
     /**
      * @brief 输出流运算符。
@@ -146,16 +143,12 @@ class Triangle {
      * @param[in,out] os
      * @param[in] t
      */
-    friend std::ostream &operator<<(std::ostream &os, const Triangle &t);
+    friend std::ostream& operator<<(std::ostream& os, const Triangle& t);
 
-    int getHash() const {
-        return hash_;
-    }
+    int getHash() const { return hash_; }
 };
 
 template <>
 struct std::hash<Triangle> {
-    uint64_t operator()(const Triangle &t) const {
-        return t.hash_;
-    }
+    uint64_t operator()(const Triangle& t) const { return t.hash_; }
 };

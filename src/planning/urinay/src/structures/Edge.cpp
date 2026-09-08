@@ -12,19 +12,19 @@
 
 /* ----------------------------- 私有方法 ---------------------------- */
 
-uint64_t Edge::computeHash(const Node &n0, const Node &n1) {
+uint64_t Edge::computeHash(const Node& n0, const Node& n1) {
     return (uint64_t(std::max(n0.id, n1.id)) << HASH_SHIFT_NUM) + std::min(n0.id, n1.id);
 }
 
-double Edge::computeLen(const Node &n0, const Node &n1) {
+double Edge::computeLen(const Node& n0, const Node& n1) {
     return Point::dist(n0.pointGlobal(), n1.pointGlobal());
 }
 
 /* ----------------------------- 公有方法 ----------------------------- */
 
-Edge::Edge(const Node &n0, const Node &n1) : n0(n0), n1(n1), len(computeLen(n0, n1)), hash_(computeHash(n0, n1)) {}
+Edge::Edge(const Node& n0, const Node& n1) : n0(n0), n1(n1), len(computeLen(n0, n1)), hash_(computeHash(n0, n1)) {}
 
-void Edge::updateLocal(const Eigen::Affine3d &tf) const {
+void Edge::updateLocal(const Eigen::Affine3d& tf) const {
     this->n0.updateLocal(tf);
     this->n1.updateLocal(tf);
 }
@@ -41,7 +41,7 @@ Vector Edge::normal() const {
     return Vector(this->n0.point(), this->n1.point()).rotClock();
 }
 
-std::ostream &operator<<(std::ostream &os, const Edge &e) {
+std::ostream& operator<<(std::ostream& os, const Edge& e) {
     os << "E(" << e.n0 << ", " << e.n1 << ")";
     return os;
 }

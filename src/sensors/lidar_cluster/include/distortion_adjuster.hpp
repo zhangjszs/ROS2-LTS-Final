@@ -6,10 +6,10 @@
 
 #pragma once
 
-#include <common_msgs/msg/huat_ins_p2.hpp>
 #include <pcl/common/transforms.h>
 
 #include <Eigen/Dense>
+#include <common_msgs/msg/huat_ins_p2.hpp>
 #include <deque>
 #include <imu_data.hpp>
 #include <mutex>

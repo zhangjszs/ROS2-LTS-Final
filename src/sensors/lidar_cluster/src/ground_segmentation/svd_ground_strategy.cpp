@@ -1,8 +1,8 @@
 #include <ground_segmentation/svd_ground_strategy.h>
 #include <pcl/common/centroid.h>
-#include <rclcpp/rclcpp.hpp>
 
 #include <algorithm>
+#include <rclcpp/rclcpp.hpp>
 
 using namespace Eigen;
 

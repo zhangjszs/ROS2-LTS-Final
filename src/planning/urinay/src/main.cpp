@@ -6,18 +6,17 @@
  * @date 2022-10-31
  */
 
-#include <common_msgs/msg/huat_path_limits.hpp>
-#include <common_msgs/msg/huat_tracklimits.hpp>
+#include <chrono>
 #include <common_msgs/msg/huat_cone.hpp>
 #include <common_msgs/msg/huat_map.hpp>
-#include <rclcpp/rclcpp.hpp>
-#include <std_msgs/msg/float64_multi_array.hpp>
-
-#include <chrono>
+#include <common_msgs/msg/huat_path_limits.hpp>
+#include <common_msgs/msg/huat_tracklimits.hpp>
 #include <cstdlib>
 #include <iostream>
 #include <memory>
 #include <mutex>
+#include <rclcpp/rclcpp.hpp>
+#include <std_msgs/msg/float64_multi_array.hpp>
 #include <vector>
 
 #include "common_msgs/msg/huat_stop.hpp"
@@ -35,12 +34,11 @@ std::mutex g_planningMutex;
 /**
  * @brief 地图回调 — 处理锥桶地图、运行路径规划、发布结果。
  */
-void OnConeMapMessage(const rclcpp::Node::SharedPtr &node,
-                      const common_msgs::msg::HuatMap::ConstSharedPtr &data,
-                      rclcpp::Publisher<common_msgs::msg::HuatPathLimits>::SharedPtr &pubPartial,
-                      rclcpp::Publisher<common_msgs::msg::HuatStop>::SharedPtr &stopPub,
-                      const rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr &profPub,
-                      std::unique_ptr<RaceDirector> &raceDirector) {
+void OnConeMapMessage(const rclcpp::Node::SharedPtr& node, const common_msgs::msg::HuatMap::ConstSharedPtr& data,
+                      rclcpp::Publisher<common_msgs::msg::HuatPathLimits>::SharedPtr& pubPartial,
+                      rclcpp::Publisher<common_msgs::msg::HuatStop>::SharedPtr& stopPub,
+                      const rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr& profPub,
+                      std::unique_ptr<RaceDirector>& raceDirector) {
     auto t_start = std::chrono::steady_clock::now();
 
     std::unique_lock<std::mutex> planning_lock(g_planningMutex, std::try_to_lock);
@@ -68,7 +66,8 @@ void OnConeMapMessage(const rclcpp::Node::SharedPtr &node,
             stopPub->publish(msg);
             raceDirector->markStopPublished();
             if (raceDirector->lapCount() == g_params->main.number_of_stopped_turns + 1) {
-                RCLCPP_INFO(node->get_logger(), "[urinay] Race finished, stop requested; keeping planner alive to avoid path dropout");
+                RCLCPP_INFO(node->get_logger(),
+                            "[urinay] Race finished, stop requested; keeping planner alive to avoid path dropout");
             } else {
                 RCLCPP_INFO_THROTTLE(node->get_logger(), *node->get_clock(), 5000,
                                      "[urinay] Race finished, re-publishing stop request (heartbeat)");
@@ -79,13 +78,13 @@ void OnConeMapMessage(const rclcpp::Node::SharedPtr &node,
     // 锥筒坐标 → 节点
     std::vector<Node> nodes;
     nodes.reserve(data->cone.size());
-    for (const common_msgs::msg::HuatCone &c : data->cone) {
+    for (const common_msgs::msg::HuatCone& c : data->cone) {
         nodes.emplace_back(c);
     }
 
     // 计算局部坐标
     const Eigen::Affine3d local_tf = g_wayComputer->getLocalTf();
-    for (const Node &n : nodes) {
+    for (const Node& n : nodes) {
         n.updateLocal(local_tf);
     }
 
@@ -122,19 +121,20 @@ void OnConeMapMessage(const rclcpp::Node::SharedPtr &node,
         profPub->publish(arr);
     }
     RCLCPP_INFO_THROTTLE(node->get_logger(), *node->get_clock(), 5000,
-                         "[urinay] Profiling (ms) | Triangulation=%.2f WayCompute=%.2f PathGen=%.2f Total=%.2f",
-                         tri_ms, way_ms, pub_ms, total_ms);
+                         "[urinay] Profiling (ms) | Triangulation=%.2f WayCompute=%.2f PathGen=%.2f Total=%.2f", tri_ms,
+                         way_ms, pub_ms, total_ms);
 }
 
 // 主函数
-int main(int argc, char **argv) {
+int main(int argc, char** argv) {
     rclcpp::init(argc, argv);
     auto node = rclcpp::Node::make_shared("urinay");
     g_params = std::make_unique<UrinayParams>(node.get());
     g_wayComputer = std::make_unique<WayComputer>(g_params->wayComputer);
     auto raceDirector = std::make_unique<RaceDirector>(g_params->main.number_of_stopped_turns, g_params->main.start_x,
                                                        g_params->main.start_y);
-    RCLCPP_INFO(node->get_logger(), "[urinay] RaceDirector start point: (%.2f, %.2f)", g_params->main.start_x, g_params->main.start_y);
+    RCLCPP_INFO(node->get_logger(), "[urinay] RaceDirector start point: (%.2f, %.2f)", g_params->main.start_x,
+                g_params->main.start_y);
     UrinayVisualizer::getInstance().init(node, g_params->visualization);
 
     // 发布者（main 局部，通过引用传递给回调）
@@ -145,22 +145,20 @@ int main(int argc, char **argv) {
     rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr profPub;
     if (g_params->main.enable_profiling) {
         profPub = node->create_publisher<std_msgs::msg::Float64MultiArray>(g_params->main.profiling_topic, 10);
-        RCLCPP_INFO(node->get_logger(), "[urinay] Profiling enabled (topic=%s)", g_params->main.profiling_topic.c_str());
+        RCLCPP_INFO(node->get_logger(), "[urinay] Profiling enabled (topic=%s)",
+                    g_params->main.profiling_topic.c_str());
     }
 
     // 锥桶地图订阅
     auto subCones = node->create_subscription<common_msgs::msg::HuatMap>(
-        g_params->main.input_cones_topic, 1,
-        [&, node](const common_msgs::msg::HuatMap::ConstSharedPtr &data) {
+        g_params->main.input_cones_topic, 1, [&, node](const common_msgs::msg::HuatMap::ConstSharedPtr& data) {
             OnConeMapMessage(node, data, pubPartial, stopPub, profPub, raceDirector);
         });
 
     // 车辆位姿订阅
     auto subPose = node->create_subscription<common_msgs::msg::HuatCarstate>(
         g_params->main.input_pose_topic, 1,
-        [](const common_msgs::msg::HuatCarstate::ConstSharedPtr &data) {
-            g_wayComputer->stateCallback(data);
-        });
+        [](const common_msgs::msg::HuatCarstate::ConstSharedPtr& data) { g_wayComputer->stateCallback(data); });
 
     rclcpp::executors::MultiThreadedExecutor executor;
     executor.add_node(node);

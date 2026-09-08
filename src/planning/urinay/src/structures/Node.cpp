@@ -26,10 +26,11 @@ Node::Node(double x, double y)
 Node::Node(double x, double y, double xGlobal, double yGlobal, uint32_t id)
     : id(id), point_(x, y), pointGlobal_(xGlobal, yGlobal), belongsToSuperTriangle_(false) {
     if (this->id >= (1 << HASH_SHIFT_NUM) - 3)
-        RCLCPP_ERROR(rclcpp::get_logger("urinay"), "[urinay] Cone ID exceeds allowed threshold, check utils/constants.hpp/HASH_SHIFT_NUM");
+        RCLCPP_ERROR(rclcpp::get_logger("urinay"),
+                     "[urinay] Cone ID exceeds allowed threshold, check utils/constants.hpp/HASH_SHIFT_NUM");
 }
 
-Node::Node(const common_msgs::msg::HuatCone &c)
+Node::Node(const common_msgs::msg::HuatCone& c)
     : Node(c.position_base_link.x, c.position_base_link.y, c.position_global.x, c.position_global.y, c.id) {}
 
 double Node::x() const noexcept {
@@ -48,23 +49,23 @@ bool Node::belongsToSuperTriangle() const noexcept {
     return belongsToSuperTriangle_;
 }
 
-void Node::updateLocal(const Eigen::Affine3d &tf) const {
+void Node::updateLocal(const Eigen::Affine3d& tf) const {
     this->point_ = this->pointGlobal().transformed(tf);
 }
 
-const Point &Node::point() const noexcept {
+const Point& Node::point() const noexcept {
     return this->point_;
 }
 
-const Point &Node::pointGlobal() const noexcept {  //构造函数可直接赋值
+const Point& Node::pointGlobal() const noexcept {  // 构造函数可直接赋值
     return this->pointGlobal_;
 }
 
-double Node::distSq(const Point &p) const noexcept {
+double Node::distSq(const Point& p) const noexcept {
     return (this->x() - p.x) * (this->x() - p.x) + (this->y() - p.y) * (this->y() - p.y);
 }
 
-double Node::angleWith(const Node &n0, const Node &n1) const {
+double Node::angleWith(const Node& n0, const Node& n1) const {
     return std::abs(Vector(this->point(), n0.point()).angleWith(Vector(this->point(), n1.point())));
 }
 
@@ -80,7 +81,7 @@ common_msgs::msg::HuatCone Node::cone() const {
     return res;
 }
 
-std::ostream &operator<<(std::ostream &os, const Node &n) {
+std::ostream& operator<<(std::ostream& os, const Node& n) {
     os << "N(" << n.x() << ", " << n.y() << ")";
     return os;
 }

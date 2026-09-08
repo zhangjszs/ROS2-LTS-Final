@@ -4,7 +4,6 @@
  * @Date: 2021年11月29日14:52:37
  */
 #include <distortion_adjuster.hpp>
-
 #include <numbers>
 
 using namespace lidar_distortion;
@@ -17,8 +16,8 @@ void DistortionAdjuster::SetMotionInfo(float scan_period, ImuData velocity_data)
     angular_rate_ << velocity_data.rpy.heading, -velocity_data.rpy.pitch, 0;
 }
 
-void DistortionAdjuster::AdjustCloud(pcl::PointCloud<PointType>::Ptr &input_cloud_ptr,
-                                     pcl::PointCloud<PointType>::Ptr &output_cloud_ptr) {
+void DistortionAdjuster::AdjustCloud(pcl::PointCloud<PointType>::Ptr& input_cloud_ptr,
+                                     pcl::PointCloud<PointType>::Ptr& output_cloud_ptr) {
     output_cloud_ptr = std::make_shared<pcl::PointCloud<PointType>>();
     if (!input_cloud_ptr || input_cloud_ptr->points.empty()) {
         return;
@@ -39,7 +38,8 @@ void DistortionAdjuster::AdjustCloud(pcl::PointCloud<PointType>::Ptr &input_clou
     angular_rate_ = rotate_matrix * angular_rate_;
 
     for (size_t point_index = 1; point_index < origin_cloud_ptr->points.size(); ++point_index) {
-        float orientation = std::atan2(origin_cloud_ptr->points[point_index].y, origin_cloud_ptr->points[point_index].x);
+        float orientation =
+            std::atan2(origin_cloud_ptr->points[point_index].y, origin_cloud_ptr->points[point_index].x);
         if (orientation < 0.0f)
             orientation += kTwoPi;
 

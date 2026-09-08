@@ -14,7 +14,7 @@
 
 /* ----------------------------- 公有方法 ----------------------------- */
 
-Circle::Circle(const Node &p0, const Node &p1, const Node &p2) {
+Circle::Circle(const Node& p0, const Node& p1, const Node& p2) {
     // 查找 base_link 坐标系下的圆心
     const double ax = p1.x() - p0.x();
     const double ay = p1.y() - p0.y();
@@ -52,14 +52,14 @@ Circle::Circle(const Node &p0, const Node &p1, const Node &p2) {
     this->radSq_ = dx * dx + dy * dy;
 }
 
-bool Circle::containsNode(const Node &n) const {
+bool Circle::containsNode(const Node& n) const {
     return n.distSq(this->center_) < this->radSq_;
 }
 
-const Point &Circle::center() const noexcept {
+const Point& Circle::center() const noexcept {
     return this->center_;
 }
 
-const Point &Circle::centerGlobal() const noexcept {
+const Point& Circle::centerGlobal() const noexcept {
     return this->centerGlobal_;
 }

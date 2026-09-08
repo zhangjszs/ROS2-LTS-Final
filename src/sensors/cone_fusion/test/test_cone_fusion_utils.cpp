@@ -6,20 +6,20 @@
 #include <string>
 #include <vector>
 
-#include "cone_types.h"
 #include "cone_fusion_utils.h"
+#include "cone_types.h"
 
-using cone_fusion_utils::ConfidenceToPercent;
-using cone_fusion_utils::IsVehicleStateJumpAbnormal;
-using cone_fusion_utils::NormalizeAngle;
-using cone_fusion_utils::VehicleState;
-using cone_fusion_utils::RawPoint;
 using cone_fusion_utils::ConeCleaningParams;
+using cone_fusion_utils::ConfidenceToPercent;
 using cone_fusion_utils::FilterConesPipeline;
-using cone_fusion_utils::IsPointFinite;
+using cone_fusion_utils::IsConfidenceValid;
 using cone_fusion_utils::IsDistanceValid;
 using cone_fusion_utils::IsFieldOfViewValid;
-using cone_fusion_utils::IsConfidenceValid;
+using cone_fusion_utils::IsPointFinite;
+using cone_fusion_utils::IsVehicleStateJumpAbnormal;
+using cone_fusion_utils::NormalizeAngle;
+using cone_fusion_utils::RawPoint;
+using cone_fusion_utils::VehicleState;
 
 constexpr double kPi = std::numbers::pi_v<double>;
 
@@ -250,7 +250,7 @@ TEST(ConeCleaningPredicates, DistanceChecks) {
 TEST(ConeCleaningPredicates, FovChecks) {
     RawPoint front{.x = 5.0, .y = 0.0, .z = 0.0};    // 0 rad
     RawPoint left{.x = 0.0, .y = 5.0, .z = 0.0};     // +pi/2 rad
-    RawPoint behind{.x = -5.0, .y = 0.0, .z = 0.0};   // pi rad
+    RawPoint behind{.x = -5.0, .y = 0.0, .z = 0.0};  // pi rad
 
     EXPECT_TRUE(IsFieldOfViewValid(front, -kPi / 2, kPi / 2));
     EXPECT_TRUE(IsFieldOfViewValid(left, -kPi / 2, kPi / 2));
@@ -258,22 +258,20 @@ TEST(ConeCleaningPredicates, FovChecks) {
 }
 
 TEST(ConeCleaningPipeline, FiltersMultiStageInSinglePass) {
-    ConeCleaningParams params{
-        .min_distance = 1.0,
-        .max_distance = 20.0,
-        .min_fov_rad = -kPi / 3.0,  // -60 deg
-        .max_fov_rad = kPi / 3.0,   // +60 deg
-        .min_confidence = 30
-    };
+    ConeCleaningParams params{.min_distance = 1.0,
+                              .max_distance = 20.0,
+                              .min_fov_rad = -kPi / 3.0,  // -60 deg
+                              .max_fov_rad = kPi / 3.0,   // +60 deg
+                              .min_confidence = 30};
 
     std::vector<RawPoint> pts = {
-        RawPoint{.x = 5.0, .y = 0.0, .z = 0.0},    // 0: 有效点 (d=5m, angle=0, conf=80)
-        RawPoint{.x = 0.5, .y = 0.0, .z = 0.0},    // 1: 距离过近 (d=0.5m < 1.0m)
-        RawPoint{.x = 30.0, .y = 0.0, .z = 0.0},   // 2: 距离过远 (d=30m > 20.0m)
-        RawPoint{.x = 0.0, .y = 5.0, .z = 0.0},    // 3: 视场角过大 (angle=90 deg > 60 deg)
-        RawPoint{.x = 8.0, .y = 1.0, .z = 0.0},    // 4: 置信度过低 (conf=15 < 30)
-        RawPoint{.x = std::nan(""), .y = 0.0, .z = 0.0}, // 5: NaN 无效值
-        RawPoint{.x = 10.0, .y = -2.0, .z = 0.0}   // 6: 有效点 (d=10.2m, angle=-11 deg, conf=90)
+        RawPoint{.x = 5.0, .y = 0.0, .z = 0.0},           // 0: 有效点 (d=5m, angle=0, conf=80)
+        RawPoint{.x = 0.5, .y = 0.0, .z = 0.0},           // 1: 距离过近 (d=0.5m < 1.0m)
+        RawPoint{.x = 30.0, .y = 0.0, .z = 0.0},          // 2: 距离过远 (d=30m > 20.0m)
+        RawPoint{.x = 0.0, .y = 5.0, .z = 0.0},           // 3: 视场角过大 (angle=90 deg > 60 deg)
+        RawPoint{.x = 8.0, .y = 1.0, .z = 0.0},           // 4: 置信度过低 (conf=15 < 30)
+        RawPoint{.x = std::nan(""), .y = 0.0, .z = 0.0},  // 5: NaN 无效值
+        RawPoint{.x = 10.0, .y = -2.0, .z = 0.0}          // 6: 有效点 (d=10.2m, angle=-11 deg, conf=90)
     };
 
     std::vector<uint32_t> confidences = {80, 80, 80, 80, 15, 80, 90};

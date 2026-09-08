@@ -10,12 +10,11 @@
 
 #pragma once
 
-#include <common_msgs/msg/huat_path_limits.hpp>
-#include <rclcpp/rclcpp.hpp>
-
 #include <Eigen/Geometry>
+#include <common_msgs/msg/huat_path_limits.hpp>
 #include <compare>
 #include <list>
+#include <rclcpp/rclcpp.hpp>
 
 #include "structures/Edge.hpp"
 #include "structures/Node.hpp"
@@ -93,7 +92,7 @@ class Way {
      * @param[in] C
      * @param[in] D
      */
-    static bool segmentsIntersect(const Point &A, const Point &B, const Point &C, const Point &D);
+    static bool segmentsIntersect(const Point& A, const Point& B, const Point& C, const Point& D);
 
    public:
     /**
@@ -101,7 +100,7 @@ class Way {
      *
      * @param[in] params
      */
-    static void init(const UrinayParams::WayComputer::Way &params);
+    static void init(const UrinayParams::WayComputer::Way& params);
 
     /**
      * @brief 构造一个新的 Way 对象。
@@ -111,12 +110,12 @@ class Way {
     /**
      * @brief 拷贝构造函数（深拷贝边列表并安全重建最近迭代器索引）。
      */
-    Way(const Way &way);
+    Way(const Way& way);
 
     /**
      * @brief 移动构造函数。
      */
-    Way(Way &&way) noexcept;
+    Way(Way&& way) noexcept;
 
     /**
      * @brief 析构函数。
@@ -136,31 +135,31 @@ class Way {
     /**
      * @brief 返回最后一条边。
      */
-    const Edge &back() const;
+    const Edge& back() const;
 
     /**
      * @brief 返回倒数第二条边。
      */
-    const Edge &beforeBack() const;
+    const Edge& beforeBack() const;
 
     /**
      * @brief 返回第一条边。
      */
-    const Edge &front() const;
+    const Edge& front() const;
 
     /**
      * @brief 更新 Way 中所有边的局部位置。
      *
      * @param[in] tf
      */
-    void updateLocal(const Eigen::Affine3d &tf);
+    void updateLocal(const Eigen::Affine3d& tf);
 
     /**
      * @brief 在 Way 的末尾追加一条边。
      *
      * @param[in] edge
      */
-    void addEdge(const Edge &edge);
+    void addEdge(const Edge& edge);
 
     /**
      * @brief 修剪 Way，移除距离车辆最近的边之后的所有边。
@@ -177,7 +176,7 @@ class Way {
      * @param[in] e
      * @param[in] lastPosInTrace
      */
-    bool closesLoopWith(const Edge &e, const Point *lastPosInTrace = nullptr) const;
+    bool closesLoopWith(const Edge& e, const Point* lastPosInTrace = nullptr) const;
 
     /**
      * @brief 制作一个副本，确保：
@@ -199,44 +198,40 @@ class Way {
      *
      * @param[in] e
      */
-    bool intersectsWith(const Edge &e) const;
+    bool intersectsWith(const Edge& e) const;
 
     /**
      * @brief 检查 Way 是否包含特定的边 e。
      *
      * @param[in] e
      */
-    bool containsEdge(const Edge &e) const;
+    bool containsEdge(const Edge& e) const;
 
     /**
      * @brief 赋值运算符。
      *
      * @param[in] way
      */
-    Way &operator=(const Way &way);
+    Way& operator=(const Way& way);
 
     /**
      * @brief 移动赋值运算符。
      *
      * @param[in] way
      */
-    Way &operator=(Way &&way) noexcept;
+    Way& operator=(Way&& way) noexcept;
 
     /**
      * @brief C++20 宇宙飞船操作符 <=>。
      * 按底层边序列进行字典序全序比较，返回 std::strong_ordering。
      */
-    [[nodiscard]] auto operator<=>(const Way &way) const {
-        return this->path_ <=> way.path_;
-    }
+    [[nodiscard]] auto operator<=>(const Way& way) const { return this->path_ <=> way.path_; }
 
     /**
      * @brief 比较运算符。如果两个 Way 包含相同的边序列，则它们相等。
      * C++20 自动合成 != 运算符。
      */
-    [[nodiscard]] bool operator==(const Way &way) const {
-        return this->path_ == way.path_;
-    }
+    [[nodiscard]] bool operator==(const Way& way) const { return this->path_ == way.path_; }
 
     /**
      * @brief 检查 vital_num_midpoints（车辆位置后的 n 个中点）
@@ -244,12 +239,12 @@ class Way {
      *
      * @param[in] way
      */
-    bool quinEhLobjetiuDeLaSevaDiresio(const Way &way) const;
+    bool quinEhLobjetiuDeLaSevaDiresio(const Way& way) const;
 
     /**
      * @brief 返回平均边长。
      */
-    const double &getAvgEdgeLen() const;
+    const double& getAvgEdgeLen() const;
 
     /**
      * @brief 返回路径最后两条边构成的前进方向向量。
@@ -310,5 +305,5 @@ class Way {
      * @param[in,out] os
      * @param[in] way
      */
-    friend std::ostream &operator<<(std::ostream &os, const Way &way);
+    friend std::ostream& operator<<(std::ostream& os, const Way& way);
 };

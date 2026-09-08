@@ -1,10 +1,8 @@
 #include <imu_subscriber.hpp>
-
 #include <numbers>
 ImuSubscriber::ImuSubscriber(rclcpp::Node* node, std::string topic_name, size_t buff_size) : node_(node) {
     subscriber_ = node_->create_subscription<common_msgs::msg::HuatInsP2>(
-        topic_name, buff_size,
-        [this](const common_msgs::msg::HuatInsP2::ConstSharedPtr msg) { MsgCallback(msg); });
+        topic_name, buff_size, [this](const common_msgs::msg::HuatInsP2::ConstSharedPtr msg) { MsgCallback(msg); });
 }
 
 void ImuSubscriber::MsgCallback(const common_msgs::msg::HuatInsP2::ConstSharedPtr imu_msg_ptr) {
@@ -22,7 +20,7 @@ void ImuSubscriber::MsgCallback(const common_msgs::msg::HuatInsP2::ConstSharedPt
     new_imu_data_.push_back(imu_data);
 }
 
-void ImuSubscriber::ParseData(std::deque<ImuData> &imu_data_buff) {
+void ImuSubscriber::ParseData(std::deque<ImuData>& imu_data_buff) {
     std::scoped_lock lock(mtx);
     if (!new_imu_data_.empty()) {
         imu_data_buff.insert(imu_data_buff.end(), new_imu_data_.begin(), new_imu_data_.end());
@@ -30,7 +28,7 @@ void ImuSubscriber::ParseData(std::deque<ImuData> &imu_data_buff) {
     }
 }
 
-bool ImuSubscriber::SyncData(std::deque<ImuData> &UnsyncedData, ImuData &synced_data, double sync_time) {
+bool ImuSubscriber::SyncData(std::deque<ImuData>& UnsyncedData, ImuData& synced_data, double sync_time) {
     ImuData tmp_imu_data;
     while (UnsyncedData.size() >= 2) {
         if (UnsyncedData.front().time > sync_time)

@@ -1,24 +1,23 @@
 #pragma once
 
+#include <cmath>
 #include <diagnostic_msgs/msg/diagnostic_status.hpp>
 #include <diagnostic_updater/diagnostic_updater.hpp>
+#include <memory>
 #include <rclcpp/rclcpp.hpp>
+#include <span>
+#include <string>
 #include <tf2/LinearMath/Quaternion.hpp>
 #include <tf2_eigen/tf2_eigen.hpp>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
-
-#include <cmath>
-#include <memory>
-#include <span>
-#include <string>
 #include <vector>
 
 #include "common_msgs/msg/huat_asensing.hpp"
 #include "common_msgs/msg/huat_carstate.hpp"
 #include "common_msgs/msg/huat_control_command.hpp"
 #include "common_msgs/msg/huat_path_limits.hpp"
-#include "common_msgs/msg/huat_vehicle_cmd.hpp"
 #include "common_msgs/msg/huat_stop.hpp"
+#include "common_msgs/msg/huat_vehicle_cmd.hpp"
 #include "geometry_msgs/msg/point.hpp"
 #include "pure_pursuit/input_guard.h"
 #include "pure_pursuit/pure_pursuit_params.h"
@@ -31,9 +30,9 @@ class PurePursuitController {
     PurePursuitController(rclcpp::Node::SharedPtr node);
 
     void DiagnoseHealth(diagnostic_updater::DiagnosticStatusWrapper& stat);
-    void OnPathLimitsMessage(const common_msgs::msg::HuatPathLimits::ConstSharedPtr &msgs);
-    void OnCarStateMessage(const common_msgs::msg::HuatCarstate::ConstSharedPtr &msgs);
-    void OnStopMessage(const common_msgs::msg::HuatStop::ConstSharedPtr &msgs);
+    void OnPathLimitsMessage(const common_msgs::msg::HuatPathLimits::ConstSharedPtr& msgs);
+    void OnCarStateMessage(const common_msgs::msg::HuatCarstate::ConstSharedPtr& msgs);
+    void OnStopMessage(const common_msgs::msg::HuatStop::ConstSharedPtr& msgs);
     void ComputeControlCommand(common_msgs::msg::HuatControlCommand& cmd, common_msgs::msg::HuatVehicleCmd& finall_cmd);
     void PublishShutdownBrake();
 

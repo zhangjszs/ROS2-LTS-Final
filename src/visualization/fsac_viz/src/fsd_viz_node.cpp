@@ -1,29 +1,28 @@
-#include <geometry_msgs/msg/transform_stamped.hpp>
-#include <rclcpp/rclcpp.hpp>
-#include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
-#include <tf2_ros/buffer.hpp>
-#include <tf2_ros/transform_listener.hpp>
-#include <visualization_msgs/msg/marker_array.hpp>
-
 #include <array>
 #include <cmath>
 #include <deque>
 #include <format>
 #include <functional>
+#include <geometry_msgs/msg/transform_stamped.hpp>
 #include <limits>
 #include <map>
 #include <memory>
 #include <numbers>
+#include <rclcpp/rclcpp.hpp>
 #include <set>
 #include <string>
+#include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
+#include <tf2_ros/buffer.hpp>
+#include <tf2_ros/transform_listener.hpp>
+#include <visualization_msgs/msg/marker_array.hpp>
 
 #include "common_msgs/msg/huat_asensing.hpp"
 #include "common_msgs/msg/huat_carstate.hpp"
+#include "common_msgs/msg/huat_cone.hpp"
 #include "common_msgs/msg/huat_cone_cluster.hpp"
+#include "common_msgs/msg/huat_map.hpp"
 #include "common_msgs/msg/huat_path_limits.hpp"
 #include "common_msgs/msg/huat_tracklimits.hpp"
-#include "common_msgs/msg/huat_cone.hpp"
-#include "common_msgs/msg/huat_map.hpp"
 #include "cone_types.h"
 
 constexpr double kPi = std::numbers::pi_v<double>;
@@ -108,19 +107,20 @@ class ConeVisualizer {
         color_unknown_ = c.size() >= 3 ? Color(c[0], c[1], c[2], c.size() >= 4 ? c[3] : 1.0) : Color(0.8, 0.8, 0.8);
 
         cone_map_sub_ = node_->create_subscription<common_msgs::msg::HuatMap>(
-            cone_map_topic, 10,
-            [this](const common_msgs::msg::HuatMap::ConstSharedPtr msg) { OnConeMap(msg); });
+            cone_map_topic, 10, [this](const common_msgs::msg::HuatMap::ConstSharedPtr msg) { OnConeMap(msg); });
         cone_cluster_sub_ = node_->create_subscription<common_msgs::msg::HuatConeCluster>(
             cone_cluster_topic, 10,
             [this](const common_msgs::msg::HuatConeCluster::ConstSharedPtr msg) { OnConeCluster(msg); });
-        marker_pub_ = node_->create_publisher<visualization_msgs::msg::MarkerArray>(cone_marker_topic, 1);  // latch=true（锁存）
+        marker_pub_ =
+            node_->create_publisher<visualization_msgs::msg::MarkerArray>(cone_marker_topic, 1);  // latch=true（锁存）
 
         // TF 缓冲区，用于自适应坐标变换
         tf_buffer_ = std::make_shared<tf2_ros::Buffer>(node_->get_clock());
         tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
 
         RCLCPP_INFO(node_->get_logger(), "[ConeVisualizer] fixed_frame=%s use_mesh=%d map=%s raw=%s marker=%s",
-                    fixed_frame_.c_str(), use_mesh_, cone_map_topic.c_str(), cone_cluster_topic.c_str(), cone_marker_topic.c_str());
+                    fixed_frame_.c_str(), use_mesh_, cone_map_topic.c_str(), cone_cluster_topic.c_str(),
+                    cone_marker_topic.c_str());
     }
 
    private:
@@ -219,7 +219,8 @@ class ConeVisualizer {
     }
 
     // Returns the frame_id that `pose` is expressed in after this call.
-    std::string TransformPose(geometry_msgs::msg::Pose& pose, const std::string& from_frame, const rclcpp::Time& stamp) {
+    std::string TransformPose(geometry_msgs::msg::Pose& pose, const std::string& from_frame,
+                              const rclcpp::Time& stamp) {
         if (from_frame.empty() || from_frame == fixed_frame_)
             return fixed_frame_;
         try {
@@ -227,15 +228,17 @@ class ConeVisualizer {
             try {
                 tf = tf_buffer_->lookupTransform(fixed_frame_, from_frame, stamp, rclcpp::Duration::from_seconds(0.05));
             } catch (const tf2::ExtrapolationException&) {
-                tf = tf_buffer_->lookupTransform(fixed_frame_, from_frame, rclcpp::Time(0, 0), rclcpp::Duration::from_seconds(0.05));
+                tf = tf_buffer_->lookupTransform(fixed_frame_, from_frame, rclcpp::Time(0, 0),
+                                                 rclcpp::Duration::from_seconds(0.05));
             }
             geometry_msgs::msg::Pose pose_out;
             tf2::doTransform(pose, pose_out, tf);
             pose = pose_out;
             return fixed_frame_;
         } catch (const std::exception& e) {
-            RCLCPP_WARN_THROTTLE(node_->get_logger(), *node_->get_clock(), 5000, "[ConeVisualizer] TF fail %s->%s: %s (markers stay in %s)",
-                                 from_frame.c_str(), fixed_frame_.c_str(), e.what(), from_frame.c_str());
+            RCLCPP_WARN_THROTTLE(node_->get_logger(), *node_->get_clock(), 5000,
+                                 "[ConeVisualizer] TF fail %s->%s: %s (markers stay in %s)", from_frame.c_str(),
+                                 fixed_frame_.c_str(), e.what(), from_frame.c_str());
             return from_frame;
         }
     }
@@ -254,7 +257,8 @@ class ConeVisualizer {
             marker.ns = "cones";
             marker.id = marker_id;
             marker.action = visualization_msgs::msg::Marker::ADD;
-            marker.lifetime = persistent_cones_ ? rclcpp::Duration(0, 0) : rclcpp::Duration::from_seconds(marker_lifetime_);
+            marker.lifetime =
+                persistent_cones_ ? rclcpp::Duration(0, 0) : rclcpp::Duration::from_seconds(marker_lifetime_);
 
             if (use_mesh_) {
                 marker.type = visualization_msgs::msg::Marker::MESH_RESOURCE;
@@ -405,14 +409,11 @@ class VehicleVisualizer {
             vehicle_state_topic, 10,
             [this](const common_msgs::msg::HuatCarstate::ConstSharedPtr msg) { OnStateMessage(msg); });
         ins_sub_ = node_->create_subscription<common_msgs::msg::HuatASENSING>(
-            ins_topic, 10,
-            [this](const common_msgs::msg::HuatASENSING::ConstSharedPtr msg) { OnInsMessage(msg); });
+            ins_topic, 10, [this](const common_msgs::msg::HuatASENSING::ConstSharedPtr msg) { OnInsMessage(msg); });
         marker_pub_ = node_->create_publisher<visualization_msgs::msg::MarkerArray>(vehicle_marker_topic, 1);
 
         // 定时器驱动发布：即使状态消息速率低或抖动也能平滑显示
-        timer_ = node_->create_wall_timer(
-            std::chrono::duration<double>(1.0 / publish_rate_),
-            [this] { OnTimer(); });
+        timer_ = node_->create_wall_timer(std::chrono::duration<double>(1.0 / publish_rate_), [this] { OnTimer(); });
 
         // 预计算车轮偏移量（以后轴为中心）
         wheel_offsets_[0] = {0.0, 0.35, 0.0};
@@ -481,9 +482,7 @@ class VehicleVisualizer {
         }
     }
 
-    void OnTimer() {
-        PublishVehicleMarkers();
-    }
+    void OnTimer() { PublishVehicleMarkers(); }
 
     std::mutex mutex_;
 
@@ -705,12 +704,11 @@ class PathVisualizer {
         node_->get_parameter("path_marker_topic", path_marker_topic);
 
         path_sub_ = node_->create_subscription<common_msgs::msg::HuatPathLimits>(
-            path_topic, 10,
-            [this](const common_msgs::msg::HuatPathLimits::ConstSharedPtr msg) { OnPathLimits(msg); });
+            path_topic, 10, [this](const common_msgs::msg::HuatPathLimits::ConstSharedPtr msg) { OnPathLimits(msg); });
         path_pub_ = node_->create_publisher<visualization_msgs::msg::MarkerArray>(path_marker_topic, 1);
 
-        RCLCPP_INFO(node_->get_logger(), "[PathVisualizer] fixed_frame=%s path=%s marker=%s",
-                    fixed_frame_.c_str(), path_topic.c_str(), path_marker_topic.c_str());
+        RCLCPP_INFO(node_->get_logger(), "[PathVisualizer] fixed_frame=%s path=%s marker=%s", fixed_frame_.c_str(),
+                    path_topic.c_str(), path_marker_topic.c_str());
     }
 
    private:

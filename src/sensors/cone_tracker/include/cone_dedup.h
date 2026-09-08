@@ -3,12 +3,12 @@
 #include <pcl/kdtree/kdtree_flann.h>
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
-#include <rclcpp/rclcpp.hpp>
 
 #include <Eigen/Dense>
 #include <atomic>
 #include <limits>
 #include <mutex>
+#include <rclcpp/rclcpp.hpp>
 #include <span>
 #include <string>
 #include <vector>
@@ -50,12 +50,8 @@ struct MatchDiagStats {
             pos_jump_max = dist;
     }
 
-    double match_dist_avg() const {
-        return match_dist_n > 0 ? match_dist_sum / match_dist_n : -1.0;
-    }
-    double pos_jump_avg() const {
-        return pos_jump_n > 0 ? pos_jump_sum / pos_jump_n : 0.0;
-    }
+    double match_dist_avg() const { return match_dist_n > 0 ? match_dist_sum / match_dist_n : -1.0; }
+    double pos_jump_avg() const { return pos_jump_n > 0 ? pos_jump_sum / pos_jump_n : 0.0; }
 };
 
 struct TrackedCone {
@@ -86,33 +82,32 @@ class ConeDedup {
     double ComputeDynamicAlpha() const;
 
     // P3-2: 卡尔曼滤波器辅助函数
-    void KalmanInit(TrackedCone &tc, double x, double y);
-    void KalmanPredict(TrackedCone &tc, double dt);
-    void KalmanUpdate(TrackedCone &tc, double x, double y);
+    void KalmanInit(TrackedCone& tc, double x, double y);
+    void KalmanPredict(TrackedCone& tc, double dt);
+    void KalmanUpdate(TrackedCone& tc, double x, double y);
 
-    TrackedCone CreateTrackedCone(const common_msgs::msg::HuatCone &cone, const rclcpp::Time &stamp);
+    TrackedCone CreateTrackedCone(const common_msgs::msg::HuatCone& cone, const rclcpp::Time& stamp);
 
-    void ApplyPositionUpdate(TrackedCone &tc, double obs_x, double obs_y, double obs_z,
-                             const common_msgs::msg::HuatCone &src, const rclcpp::Time &stamp, double alpha);
+    void ApplyPositionUpdate(TrackedCone& tc, double obs_x, double obs_y, double obs_z,
+                             const common_msgs::msg::HuatCone& src, const rclcpp::Time& stamp, double alpha);
     std::vector<size_t> FilterInputByDistance(std::span<const common_msgs::msg::HuatCone> cones,
-                                              int &culled_count) const;
+                                              int& culled_count) const;
     cone_dedup_algo::FlatMatrix<double> BuildCostMatrix(std::span<const size_t> valid_idx,
                                                         std::span<const common_msgs::msg::HuatCone> cones, int n_tracks,
                                                         double inf_cost) const;
-    void UpdateUnmatchedExistingTracks(const std::vector<bool> &matched_existing, size_t original_size,
-                                       const rclcpp::Time &stamp);
+    void UpdateUnmatchedExistingTracks(const std::vector<bool>& matched_existing, size_t original_size,
+                                       const rclcpp::Time& stamp);
     int RemoveStaleTracks();
-    void CollectConfirmedCones(common_msgs::msg::HuatMap &out) const;
+    void CollectConfirmedCones(common_msgs::msg::HuatMap& out) const;
     void ProcessUnmatchedInputs(std::span<const size_t> valid_input_idx,
-                                std::span<const common_msgs::msg::HuatCone> cones, std::vector<bool> &matched_input,
-                                std::vector<bool> &matched_existing, const rclcpp::Time &stamp, double alpha,
-                                double radius_sq, MatchDiagStats &stats);
-    void ProcessMatchedPairs(std::span<const size_t> valid_input_idx,
-                             std::span<const common_msgs::msg::HuatCone> cones, std::span<const int> assignment,
-                             cone_dedup_algo::MatrixView<const double> cost_mat, std::vector<bool> &matched_existing,
-                             std::vector<bool> &matched_input, const rclcpp::Time &stamp, double alpha,
-                             MatchDiagStats &stats);
-    void PublishStatus(size_t input_size, const MatchDiagStats &stats, size_t published_count);
+                                std::span<const common_msgs::msg::HuatCone> cones, std::vector<bool>& matched_input,
+                                std::vector<bool>& matched_existing, const rclcpp::Time& stamp, double alpha,
+                                double radius_sq, MatchDiagStats& stats);
+    void ProcessMatchedPairs(std::span<const size_t> valid_input_idx, std::span<const common_msgs::msg::HuatCone> cones,
+                             std::span<const int> assignment, cone_dedup_algo::MatrixView<const double> cost_mat,
+                             std::vector<bool>& matched_existing, std::vector<bool>& matched_input,
+                             const rclcpp::Time& stamp, double alpha, MatchDiagStats& stats);
+    void PublishStatus(size_t input_size, const MatchDiagStats& stats, size_t published_count);
 
     rclcpp::Node::SharedPtr node_;
 

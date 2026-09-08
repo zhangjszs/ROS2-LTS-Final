@@ -44,8 +44,8 @@ bool IsVehicleStateJumpAbnormal(const VehicleState& last_state, const VehicleSta
         if (reason) {
             reason->clear();
             std::format_to(std::back_inserter(*reason),
-                           "dt={}s distance_jump={}m allowed_distance_jump={}m heading_jump={}rad",
-                           dt, distance_jump, allowed_distance_jump, heading_jump);
+                           "dt={}s distance_jump={}m allowed_distance_jump={}m heading_jump={}rad", dt, distance_jump,
+                           allowed_distance_jump, heading_jump);
         }
         return true;
     }
@@ -96,8 +96,7 @@ bool IsConfidenceValid(uint32_t confidence, uint32_t min_conf) {
     return confidence >= min_conf;
 }
 
-std::vector<size_t> FilterConesPipeline(std::span<const RawPoint> points,
-                                        std::span<const uint32_t> confidences,
+std::vector<size_t> FilterConesPipeline(std::span<const RawPoint> points, std::span<const uint32_t> confidences,
                                         const ConeCleaningParams& params) {
     if (points.empty()) {
         return {};
@@ -106,20 +105,17 @@ std::vector<size_t> FilterConesPipeline(std::span<const RawPoint> points,
     const size_t n = points.size();
 
     // C++20 惰性流式管道：多重清洗过滤组合为单一视图管道，无任何中间 vector 分配
-    auto indices = std::views::iota(size_t{0}, n)
-        | std::views::filter([&](size_t i) {
-            return IsPointFinite(points[i]);
-        })
-        | std::views::filter([&](size_t i) {
-            return IsDistanceValid(points[i], params.min_distance, params.max_distance);
-        })
-        | std::views::filter([&](size_t i) {
-            return IsFieldOfViewValid(points[i], params.min_fov_rad, params.max_fov_rad);
-        })
-        | std::views::filter([&](size_t i) {
-            const uint32_t conf = (i < confidences.size()) ? confidences[i] : 100u;
-            return IsConfidenceValid(conf, params.min_confidence);
-        });
+    auto indices = std::views::iota(size_t{0}, n) |
+                   std::views::filter([&](size_t i) { return IsPointFinite(points[i]); }) |
+                   std::views::filter(
+                       [&](size_t i) { return IsDistanceValid(points[i], params.min_distance, params.max_distance); }) |
+                   std::views::filter([&](size_t i) {
+                       return IsFieldOfViewValid(points[i], params.min_fov_rad, params.max_fov_rad);
+                   }) |
+                   std::views::filter([&](size_t i) {
+                       const uint32_t conf = (i < confidences.size()) ? confidences[i] : 100u;
+                       return IsConfidenceValid(conf, params.min_confidence);
+                   });
 
     std::vector<size_t> valid_indices;
     valid_indices.reserve(n);

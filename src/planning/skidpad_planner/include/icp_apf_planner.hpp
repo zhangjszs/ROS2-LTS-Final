@@ -1,9 +1,8 @@
 #pragma once
 
+#include <algorithm>
 #include <common_msgs/msg/huat_cone.hpp>
 #include <geometry_msgs/msg/point.hpp>
-
-#include <algorithm>
 #include <vector>
 
 namespace skidpad {
@@ -54,8 +53,8 @@ class IcpApfPlanner {
     std::vector<Point2D> GeneratePath(const std::vector<common_msgs::msg::HuatCone>& cones,
                                       const std::vector<Point2D>& prev_path, double icp_rmse_limit = 0.5);
 
-    void ClusterCones(const std::vector<common_msgs::msg::HuatCone>& cones, std::vector<common_msgs::msg::HuatCone>& left,
-                      std::vector<common_msgs::msg::HuatCone>& right);
+    void ClusterCones(const std::vector<common_msgs::msg::HuatCone>& cones,
+                      std::vector<common_msgs::msg::HuatCone>& left, std::vector<common_msgs::msg::HuatCone>& right);
 
     std::vector<Point2D> TransformPoints(const std::vector<Point2D>& points, double rotation, double tx, double ty);
 

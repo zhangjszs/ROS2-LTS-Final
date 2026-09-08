@@ -177,9 +177,15 @@ TEST(FlatMatrixTest, StorageAndViews) {
 
 TEST(HungarianAssignTest, MatrixViewOptimal) {
     cone_dedup_algo::FlatMatrix<double> cost(3, 3);
-    cost(0, 0) = 9.0; cost(0, 1) = 1.0; cost(0, 2) = 9.0;
-    cost(1, 0) = 9.0; cost(1, 1) = 9.0; cost(1, 2) = 1.0;
-    cost(2, 0) = 1.0; cost(2, 1) = 9.0; cost(2, 2) = 9.0;
+    cost(0, 0) = 9.0;
+    cost(0, 1) = 1.0;
+    cost(0, 2) = 9.0;
+    cost(1, 0) = 9.0;
+    cost(1, 1) = 9.0;
+    cost(1, 2) = 1.0;
+    cost(2, 0) = 1.0;
+    cost(2, 1) = 9.0;
+    cost(2, 2) = 9.0;
 
     auto result = HungarianAssign(cost.view(), kInfCost);
     ASSERT_EQ(result.size(), 3u);
@@ -189,9 +195,12 @@ TEST(HungarianAssignTest, MatrixViewOptimal) {
 
     // 矩形矩阵非方阵测试：3 行 2 列
     cone_dedup_algo::FlatMatrix<double> cost_rect(3, 2);
-    cost_rect(0, 0) = 1.0;  cost_rect(0, 1) = 10.0;
-    cost_rect(1, 0) = 10.0; cost_rect(1, 1) = 1.0;
-    cost_rect(2, 0) = 5.0;  cost_rect(2, 1) = 5.0;
+    cost_rect(0, 0) = 1.0;
+    cost_rect(0, 1) = 10.0;
+    cost_rect(1, 0) = 10.0;
+    cost_rect(1, 1) = 1.0;
+    cost_rect(2, 0) = 5.0;
+    cost_rect(2, 1) = 5.0;
 
     auto result_rect = HungarianAssign(cost_rect.view(), kInfCost);
     ASSERT_EQ(result_rect.size(), 3u);

@@ -39,12 +39,12 @@ class Circle {
      * 由于包含 Point 与 double 成员，返回类型为 std::partial_ordering。
      * 自动合成 <, <=, >, >=。
      */
-    [[nodiscard]] constexpr auto operator<=>(const Circle &) const noexcept = default;
+    [[nodiscard]] constexpr auto operator<=>(const Circle&) const noexcept = default;
 
     /**
      * @brief C++20 默认相等比较操作符，自动合成 == 与 !=。
      */
-    [[nodiscard]] constexpr bool operator==(const Circle &) const noexcept = default;
+    [[nodiscard]] constexpr bool operator==(const Circle&) const noexcept = default;
 
     /**
      * @brief 构造一个新的 Circle 对象。
@@ -54,29 +54,27 @@ class Circle {
      * @param[in] n1
      * @param[in] n2
      */
-    Circle(const Node &n0, const Node &n1, const Node &n2);
+    Circle(const Node& n0, const Node& n1, const Node& n2);
 
     /**
      * @brief 检查节点 n 是否在圆周内部。
      *
      * @param n
      */
-    [[nodiscard]] bool containsNode(const Node &n) const;
+    [[nodiscard]] bool containsNode(const Node& n) const;
 
     /**
      * @brief 返回局部坐标系下的圆心。
      */
-    [[nodiscard]] const Point &center() const noexcept;
+    [[nodiscard]] const Point& center() const noexcept;
 
     /**
      * @brief 返回全局坐标系下的圆心。
      */
-    [[nodiscard]] const Point &centerGlobal() const noexcept;
+    [[nodiscard]] const Point& centerGlobal() const noexcept;
 
     /**
      * @brief 返回圆半径的平方。
      */
-    [[nodiscard]] constexpr double radSq() const noexcept {
-        return radSq_;
-    }
+    [[nodiscard]] constexpr double radSq() const noexcept { return radSq_; }
 };

@@ -9,4 +9,3 @@
 // 显式实例化标准配置，导出至 liburinay
 template class BasicKDTree<Point, SquaredEuclideanMetric>;
 template class BasicKDTree<Point, ManhattanMetric>;
-

@@ -2,6 +2,7 @@
 #include <pcl/ModelCoefficients.h>
 #include <pcl/filters/extract_indices.h>
 #include <pcl/segmentation/sac_segmentation.h>
+
 #include <rclcpp/rclcpp.hpp>
 
 void RansacGroundStrategy::segment(const pcl::PointCloud<PointType>::Ptr& input,

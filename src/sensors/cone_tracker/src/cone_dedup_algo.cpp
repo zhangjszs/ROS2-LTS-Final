@@ -94,9 +94,7 @@ std::vector<int> HungarianAssignInternal(int rows, int cols, double inf_cost, Co
 }  // namespace
 
 std::vector<int> HungarianAssign(MatrixView<const double> cost_view, double inf_cost) {
-    return HungarianAssignInternal(static_cast<int>(cost_view.rows()),
-                                   static_cast<int>(cost_view.cols()),
-                                   inf_cost,
+    return HungarianAssignInternal(static_cast<int>(cost_view.rows()), static_cast<int>(cost_view.cols()), inf_cost,
                                    [&](int r, int c) { return cost_view(r, c); });
 }
 
@@ -128,8 +126,8 @@ double ComputeDynamicAlpha(double current_speed, double speed_ref, double alpha_
     return alpha;
 }
 
-std::vector<size_t> FilterIndicesByRadiusSq(std::span<const double> xs, std::span<const double> ys,
-                                            double origin_x, double origin_y, double radius_sq) {
+std::vector<size_t> FilterIndicesByRadiusSq(std::span<const double> xs, std::span<const double> ys, double origin_x,
+                                            double origin_y, double radius_sq) {
     std::vector<size_t> valid;
     const size_t n = std::min(xs.size(), ys.size());
     valid.reserve(n);
@@ -142,8 +140,8 @@ std::vector<size_t> FilterIndicesByRadiusSq(std::span<const double> xs, std::spa
     return valid;
 }
 
-std::vector<size_t> FilterIndicesByRadiusSq(std::span<const Point2D> points,
-                                            double origin_x, double origin_y, double radius_sq) {
+std::vector<size_t> FilterIndicesByRadiusSq(std::span<const Point2D> points, double origin_x, double origin_y,
+                                            double radius_sq) {
     std::vector<size_t> valid;
     valid.reserve(points.size());
     for (size_t i = 0; i < points.size(); ++i) {

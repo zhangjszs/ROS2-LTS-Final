@@ -31,8 +31,10 @@ struct IncompatibleType {
 // 1. Point2DLike 概念约束
 static_assert(urinay::concepts::Point2DLike<Point>, "Point must satisfy Point2DLike");
 static_assert(urinay::concepts::Point2DLike<Vector>, "Vector must satisfy Point2DLike");
-static_assert(urinay::concepts::Point2DLike<geometry_msgs::msg::Point>, "geometry_msgs::Point must satisfy Point2DLike");
-static_assert(urinay::concepts::Point2DLike<geometry_msgs::msg::Point32>, "geometry_msgs::Point32 must satisfy Point2DLike");
+static_assert(urinay::concepts::Point2DLike<geometry_msgs::msg::Point>,
+              "geometry_msgs::Point must satisfy Point2DLike");
+static_assert(urinay::concepts::Point2DLike<geometry_msgs::msg::Point32>,
+              "geometry_msgs::Point32 must satisfy Point2DLike");
 static_assert(urinay::concepts::Point2DLike<Custom2DPoint>, "Custom2DPoint must satisfy Point2DLike");
 static_assert(urinay::concepts::Point2DLike<Custom3DPoint>, "Custom3DPoint must satisfy Point2DLike");
 
@@ -43,15 +45,19 @@ static_assert(!urinay::concepts::Point2DLike<IncompatibleType>, "IncompatibleTyp
 
 // 2. Point3DLike 概念约束
 static_assert(!urinay::concepts::Point3DLike<Point>, "2D Point must NOT satisfy Point3DLike");
-static_assert(urinay::concepts::Point3DLike<geometry_msgs::msg::Point>, "geometry_msgs::Point must satisfy Point3DLike");
-static_assert(urinay::concepts::Point3DLike<geometry_msgs::msg::Point32>, "geometry_msgs::Point32 must satisfy Point3DLike");
+static_assert(urinay::concepts::Point3DLike<geometry_msgs::msg::Point>,
+              "geometry_msgs::Point must satisfy Point3DLike");
+static_assert(urinay::concepts::Point3DLike<geometry_msgs::msg::Point32>,
+              "geometry_msgs::Point32 must satisfy Point3DLike");
 static_assert(urinay::concepts::Point3DLike<Custom3DPoint>, "Custom3DPoint must satisfy Point3DLike");
 static_assert(!urinay::concepts::Point3DLike<Custom2DPoint>, "Custom2DPoint must NOT satisfy Point3DLike");
 
 // 3. CalculablePoint 概念约束
 static_assert(urinay::concepts::CalculablePoint<Point>, "Point must satisfy CalculablePoint");
-static_assert(urinay::concepts::CalculablePoint<geometry_msgs::msg::Point>, "geometry_msgs::Point must satisfy CalculablePoint");
-static_assert(urinay::concepts::CalculablePoint<geometry_msgs::msg::Point32>, "geometry_msgs::Point32 must satisfy CalculablePoint");
+static_assert(urinay::concepts::CalculablePoint<geometry_msgs::msg::Point>,
+              "geometry_msgs::Point must satisfy CalculablePoint");
+static_assert(urinay::concepts::CalculablePoint<geometry_msgs::msg::Point32>,
+              "geometry_msgs::Point32 must satisfy CalculablePoint");
 static_assert(urinay::concepts::CalculablePoint<Custom2DPoint>, "Custom2DPoint must satisfy CalculablePoint");
 
 // 4. ArithmeticScalar 概念约束

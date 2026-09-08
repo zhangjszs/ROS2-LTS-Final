@@ -65,8 +65,7 @@ bool IsFieldOfViewValid(const RawPoint& pt, double min_fov, double max_fov);
 bool IsConfidenceValid(uint32_t confidence, uint32_t min_conf);
 
 // C++20 std::views::filter 惰性流式清洗流水线：按需组合多重过滤阶段，零临时 vector 堆内存分配
-std::vector<size_t> FilterConesPipeline(std::span<const RawPoint> points,
-                                        std::span<const uint32_t> confidences,
+std::vector<size_t> FilterConesPipeline(std::span<const RawPoint> points, std::span<const uint32_t> confidences,
                                         const ConeCleaningParams& params);
 
 }  // namespace cone_fusion_utils

@@ -1,5 +1,4 @@
 #include <functional>
-
 #include <rclcpp/rclcpp.hpp>
 #include <visualization_msgs/msg/marker.hpp>
 
@@ -14,8 +13,8 @@ class ConeVisualizer {
     rclcpp::Subscription<common_msgs::msg::HuatMap>::SharedPtr cone_map_sub_;
     rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr cone_marker_pub_;
 
-    void OnConeMap(const common_msgs::msg::HuatMap::ConstSharedPtr &msg) {
-        for (const auto &cone : msg->cone) {
+    void OnConeMap(const common_msgs::msg::HuatMap::ConstSharedPtr& msg) {
+        for (const auto& cone : msg->cone) {
             visualization_msgs::msg::Marker marker;
             marker.header.frame_id = "velodyne";
             marker.lifetime = rclcpp::Duration(0, 0);
@@ -53,15 +52,14 @@ class ConeVisualizer {
         node_->get_parameter("cone_marker_topic", cone_marker_topic);
 
         cone_map_sub_ = node_->create_subscription<common_msgs::msg::HuatMap>(
-            cone_map_topic, 10,
-            [this](const common_msgs::msg::HuatMap::ConstSharedPtr msg) { OnConeMap(msg); });
+            cone_map_topic, 10, [this](const common_msgs::msg::HuatMap::ConstSharedPtr msg) { OnConeMap(msg); });
         cone_marker_pub_ = node_->create_publisher<visualization_msgs::msg::Marker>(cone_marker_topic, 10);
     }
 };
 
 }  // namespace
 
-int main(int argc, char *argv[]) {
+int main(int argc, char* argv[]) {
     rclcpp::init(argc, argv);
     auto node = rclcpp::Node::make_shared("cone_visualizer");
     ConeVisualizer viz(node);

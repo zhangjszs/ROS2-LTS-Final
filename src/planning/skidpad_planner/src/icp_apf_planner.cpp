@@ -2,7 +2,6 @@
 
 #include <pcl/kdtree/kdtree_flann.h>
 #include <pcl/point_cloud.h>
-#include <rclcpp/rclcpp.hpp>
 
 #include <Eigen/Dense>
 #include <Eigen/SVD>
@@ -10,6 +9,7 @@
 #include <cmath>
 #include <limits>
 #include <ranges>
+#include <rclcpp/rclcpp.hpp>
 
 namespace {
 
@@ -142,12 +142,12 @@ void IcpApfPlanner::ClusterCones(const std::vector<common_msgs::msg::HuatCone>& 
                                  std::vector<common_msgs::msg::HuatCone>& right) {
     left.clear();
     right.clear();
-    std::ranges::copy_if(cones, std::back_inserter(left),
-                         [this](float y) { return y < -center_margin_; },
-                         [](const common_msgs::msg::HuatCone& c) { return c.position_base_link.y; });
-    std::ranges::copy_if(cones, std::back_inserter(right),
-                         [this](float y) { return y > center_margin_; },
-                         [](const common_msgs::msg::HuatCone& c) { return c.position_base_link.y; });
+    std::ranges::copy_if(
+        cones, std::back_inserter(left), [this](float y) { return y < -center_margin_; },
+        [](const common_msgs::msg::HuatCone& c) { return c.position_base_link.y; });
+    std::ranges::copy_if(
+        cones, std::back_inserter(right), [this](float y) { return y > center_margin_; },
+        [](const common_msgs::msg::HuatCone& c) { return c.position_base_link.y; });
 }
 
 std::vector<Point2D> IcpApfPlanner::ComputeCenterline(const std::vector<common_msgs::msg::HuatCone>& left,
@@ -167,8 +167,8 @@ std::vector<Point2D> IcpApfPlanner::ComputeCenterline(const std::vector<common_m
     ordered.reserve(centerline.size());
     std::vector<bool> used(centerline.size(), false);
     auto take_nearest = [&](double x0, double y0) -> int {
-        auto unused_indices = std::views::iota(size_t{0}, centerline.size())
-                            | std::views::filter([&used](size_t i) { return !used[i]; });
+        auto unused_indices =
+            std::views::iota(size_t{0}, centerline.size()) | std::views::filter([&used](size_t i) { return !used[i]; });
         auto it = std::ranges::min_element(unused_indices, {}, [&](size_t i) {
             const double dx = centerline[i].x - x0;
             const double dy = centerline[i].y - y0;
@@ -202,8 +202,8 @@ std::vector<Point2D> IcpApfPlanner::ComputeCenterline(const std::vector<common_m
     std::vector<Point2D> result;
     result.reserve(deduped.size());
     const double lookahead_sq = path_lookahead_ * path_lookahead_;
-    std::ranges::copy_if(deduped, std::back_inserter(result),
-        [lookahead_sq](double d2) { return d2 <= lookahead_sq; },
+    std::ranges::copy_if(
+        deduped, std::back_inserter(result), [lookahead_sq](double d2) { return d2 <= lookahead_sq; },
         [](const Point2D& p) { return p.x * p.x + p.y * p.y; });
     return result;
 }
@@ -483,8 +483,7 @@ std::vector<Point2D> IcpApfPlanner::AlignPath(const std::vector<Point2D>& center
     }
     if (centerline.size() < 3) {
         RCLCPP_WARN_THROTTLE(rclcpp::get_logger("skidpad_planner"), throttle_clock, 1000,
-                             "[skidpad_planner] centerline_pts=%zu < 3, applying APF on prev_path",
-                             centerline.size());
+                             "[skidpad_planner] centerline_pts=%zu < 3, applying APF on prev_path", centerline.size());
         return prev_path;
     }
     IcpResult icp = IcpAlign(centerline, prev_path);

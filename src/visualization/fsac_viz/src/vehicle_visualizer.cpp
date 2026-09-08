@@ -1,6 +1,5 @@
 #include <array>
 #include <functional>
-
 #include <numbers>
 #include <rclcpp/rclcpp.hpp>
 #include <tf2/LinearMath/Quaternion.hpp>
@@ -30,7 +29,7 @@ class VehicleVisualizer {
     double ins_roll_ = 0.0;
     double ins_pitch_ = 0.0;
 
-    static void CalcVehicleDirection(double roll, double pitch, double yaw, double &x, double &y, double &z) {
+    static void CalcVehicleDirection(double roll, double pitch, double yaw, double& x, double& y, double& z) {
         double tf_roll = roll * kDegToRad;
         double tf_pitch = pitch * kDegToRad;
         x = cos(tf_pitch) * cos(-yaw + kPi / 2.0);
@@ -38,12 +37,12 @@ class VehicleVisualizer {
         z = -tf_roll * sin(-yaw + kPi / 2.0) + tf_pitch * sin(-yaw + kPi / 2.0);
     }
 
-    void OnInsMessage(const common_msgs::msg::HuatASENSING::ConstSharedPtr &msg) {
+    void OnInsMessage(const common_msgs::msg::HuatASENSING::ConstSharedPtr& msg) {
         ins_roll_ = msg->roll;
         ins_pitch_ = msg->pitch;
     }
 
-    void OnStateMessage(const common_msgs::msg::HuatCarstate::ConstSharedPtr &msg) {
+    void OnStateMessage(const common_msgs::msg::HuatCarstate::ConstSharedPtr& msg) {
         vehicle_state_ = *msg;
         has_state_ = true;
         PublishCarBody();
@@ -116,7 +115,7 @@ class VehicleVisualizer {
         transform.setRotation(qq);
 
         const std::array<tf2::Vector3, 4> offsets = {tf2::Vector3(-0.2, 0.35, 0), tf2::Vector3(-0.2, -0.35, 0),
-                                                    tf2::Vector3(-1.2, 0.35, 0), tf2::Vector3(-1.2, -0.35, 0)};
+                                                     tf2::Vector3(-1.2, 0.35, 0), tf2::Vector3(-1.2, -0.35, 0)};
         constexpr std::array<int, 4> ids = {1, 2, 3, 4};
 
         for (size_t i = 0; i < 4; i++) {
@@ -165,8 +164,7 @@ class VehicleVisualizer {
             vehicle_state_topic, 10,
             [this](const common_msgs::msg::HuatCarstate::ConstSharedPtr msg) { OnStateMessage(msg); });
         ins_sub_ = node_->create_subscription<common_msgs::msg::HuatASENSING>(
-            ins_topic, 10,
-            [this](const common_msgs::msg::HuatASENSING::ConstSharedPtr msg) { OnInsMessage(msg); });
+            ins_topic, 10, [this](const common_msgs::msg::HuatASENSING::ConstSharedPtr msg) { OnInsMessage(msg); });
         car_body_pub_ = node_->create_publisher<visualization_msgs::msg::Marker>(car_body_marker_topic, 1);
         wheel_pub_ = node_->create_publisher<visualization_msgs::msg::Marker>(wheel_marker_topic, 1);
     }
@@ -174,7 +172,7 @@ class VehicleVisualizer {
 
 }  // namespace
 
-int main(int argc, char *argv[]) {
+int main(int argc, char* argv[]) {
     rclcpp::init(argc, argv);
     auto node = rclcpp::Node::make_shared("vehicle_visualizer");
     VehicleVisualizer viz(node);

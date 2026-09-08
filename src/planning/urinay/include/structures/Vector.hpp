@@ -23,8 +23,8 @@ class Vector : public Point {
      */
     constexpr Vector() noexcept : Point() {}
 
-    [[nodiscard]] constexpr auto operator<=>(const Vector &) const noexcept = default;
-    [[nodiscard]] constexpr bool operator==(const Vector &) const noexcept = default;
+    [[nodiscard]] constexpr auto operator<=>(const Vector&) const noexcept = default;
+    [[nodiscard]] constexpr bool operator==(const Vector&) const noexcept = default;
 
     /**
      * @brief 从两个点构造一个新的 Vector 对象。
@@ -32,7 +32,7 @@ class Vector : public Point {
      * @param[in] a
      * @param[in] b
      */
-    constexpr Vector(const Point &a, const Point &b) noexcept : Point(b - a) {}
+    constexpr Vector(const Point& a, const Point& b) noexcept : Point(b - a) {}
 
     /**
      * @brief 从两个坐标构造一个新的 Vector 对象。
@@ -47,16 +47,14 @@ class Vector : public Point {
      *
      * @param[in] v
      */
-    [[nodiscard]] constexpr double dot(const Vector &v) const noexcept {
-        return this->x * v.x + this->y * v.y;
-    }
+    [[nodiscard]] constexpr double dot(const Vector& v) const noexcept { return this->x * v.x + this->y * v.y; }
 
     /**
      * @brief 返回隐式向量与 v 之间的夹角。
      *
      * @param[in] v
      */
-    [[nodiscard]] double angleWith(const Vector &v) const;
+    [[nodiscard]] double angleWith(const Vector& v) const;
 
     /**
      * @brief 检查点 actPos 是否沿着方向 dir 在 futPos 的后方。
@@ -65,21 +63,18 @@ class Vector : public Point {
      * @param[in] actPos
      * @param[in] dir
      */
-    [[nodiscard]] static constexpr bool pointBehind(const Point &futPos, const Point &actPos, const Vector &dir) noexcept {
+    [[nodiscard]] static constexpr bool pointBehind(const Point& futPos, const Point& actPos,
+                                                    const Vector& dir) noexcept {
         return Vector(actPos, futPos).dot(dir) < 0.0;
     }
 
     /**
      * @brief 返回顺时针旋转 90 度的向量。
      */
-    [[nodiscard]] constexpr Vector rotClock() const noexcept {
-        return Vector(this->y, -this->x);
-    }
+    [[nodiscard]] constexpr Vector rotClock() const noexcept { return Vector(this->y, -this->x); }
 
     /**
      * @brief 返回逆时针旋转 90 度的向量。
      */
-    [[nodiscard]] constexpr Vector rotCounterClock() const noexcept {
-        return Vector(-this->y, this->x);
-    }
+    [[nodiscard]] constexpr Vector rotCounterClock() const noexcept { return Vector(-this->y, this->x); }
 };

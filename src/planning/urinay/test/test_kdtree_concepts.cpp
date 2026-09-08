@@ -21,17 +21,24 @@ struct CustomConePoint {
 // -------------------------------------------------------------
 
 // 1. DistanceMetric 概念约束
-static_assert(urinay::concepts::DistanceMetric<SquaredEuclideanMetric, Point>, "SquaredEuclideanMetric must satisfy DistanceMetric for Point");
-static_assert(urinay::concepts::DistanceMetric<SquaredEuclideanMetric, geometry_msgs::msg::Point32>, "SquaredEuclideanMetric must satisfy DistanceMetric for Point32");
-static_assert(urinay::concepts::DistanceMetric<ManhattanMetric, Point>, "ManhattanMetric must satisfy DistanceMetric for Point");
-static_assert(urinay::concepts::DistanceMetric<ManhattanMetric, CustomConePoint>, "ManhattanMetric must satisfy DistanceMetric for CustomConePoint");
+static_assert(urinay::concepts::DistanceMetric<SquaredEuclideanMetric, Point>,
+              "SquaredEuclideanMetric must satisfy DistanceMetric for Point");
+static_assert(urinay::concepts::DistanceMetric<SquaredEuclideanMetric, geometry_msgs::msg::Point32>,
+              "SquaredEuclideanMetric must satisfy DistanceMetric for Point32");
+static_assert(urinay::concepts::DistanceMetric<ManhattanMetric, Point>,
+              "ManhattanMetric must satisfy DistanceMetric for Point");
+static_assert(urinay::concepts::DistanceMetric<ManhattanMetric, CustomConePoint>,
+              "ManhattanMetric must satisfy DistanceMetric for CustomConePoint");
 static_assert(!urinay::concepts::DistanceMetric<int, Point>, "int must NOT satisfy DistanceMetric");
 
 // 2. SpatialIndexablePoint 概念约束
 static_assert(urinay::concepts::SpatialIndexablePoint<Point>, "Point must satisfy SpatialIndexablePoint");
-static_assert(urinay::concepts::SpatialIndexablePoint<geometry_msgs::msg::Point>, "geometry_msgs::Point must satisfy SpatialIndexablePoint");
-static_assert(urinay::concepts::SpatialIndexablePoint<geometry_msgs::msg::Point32>, "geometry_msgs::Point32 must satisfy SpatialIndexablePoint");
-static_assert(urinay::concepts::SpatialIndexablePoint<CustomConePoint>, "CustomConePoint must satisfy SpatialIndexablePoint");
+static_assert(urinay::concepts::SpatialIndexablePoint<geometry_msgs::msg::Point>,
+              "geometry_msgs::Point must satisfy SpatialIndexablePoint");
+static_assert(urinay::concepts::SpatialIndexablePoint<geometry_msgs::msg::Point32>,
+              "geometry_msgs::Point32 must satisfy SpatialIndexablePoint");
+static_assert(urinay::concepts::SpatialIndexablePoint<CustomConePoint>,
+              "CustomConePoint must satisfy SpatialIndexablePoint");
 static_assert(!urinay::concepts::SpatialIndexablePoint<double>, "double must NOT satisfy SpatialIndexablePoint");
 
 }  // namespace
@@ -41,12 +48,7 @@ static_assert(!urinay::concepts::SpatialIndexablePoint<double>, "double must NOT
 // -------------------------------------------------------------
 
 TEST(KDTreeConcepts, DefaultKDTreeBackwardCompatibility) {
-    std::vector<Point> pts = {
-        Point(0.0, 0.0),
-        Point(2.0, 0.0),
-        Point(0.0, 2.0),
-        Point(2.0, 2.0)
-    };
+    std::vector<Point> pts = {Point(0.0, 0.0), Point(2.0, 0.0), Point(0.0, 2.0), Point(2.0, 2.0)};
 
     KDTree tree(pts);
     EXPECT_FALSE(tree.empty());
@@ -73,10 +75,14 @@ TEST(KDTreeConcepts, DefaultKDTreeBackwardCompatibility) {
 TEST(KDTreeConcepts, GenericRosPoint32Tree) {
     // 直接使用 ROS 消息类型 geometry_msgs::msg::Point32 建树，零类型转换
     std::vector<geometry_msgs::msg::Point32> pts(4);
-    pts[0].x = 10.0f; pts[0].y = 10.0f;
-    pts[1].x = 20.0f; pts[1].y = 10.0f;
-    pts[2].x = 10.0f; pts[2].y = 20.0f;
-    pts[3].x = 20.0f; pts[3].y = 20.0f;
+    pts[0].x = 10.0f;
+    pts[0].y = 10.0f;
+    pts[1].x = 20.0f;
+    pts[1].y = 10.0f;
+    pts[2].x = 10.0f;
+    pts[2].y = 20.0f;
+    pts[3].x = 20.0f;
+    pts[3].y = 20.0f;
 
     BasicKDTree<geometry_msgs::msg::Point32> tree(pts);
     EXPECT_EQ(tree.size(), 4u);
@@ -95,12 +101,7 @@ TEST(KDTreeConcepts, GenericRosPoint32Tree) {
 
 TEST(KDTreeConcepts, ManhattanMetricTree) {
     // 测试使用曼哈顿距离度量的 KDTree
-    std::vector<Point> pts = {
-        Point(0.0, 0.0),
-        Point(3.0, 0.0),
-        Point(0.0, 4.0),
-        Point(2.0, 2.0)
-    };
+    std::vector<Point> pts = {Point(0.0, 0.0), Point(3.0, 0.0), Point(0.0, 4.0), Point(2.0, 2.0)};
 
     BasicKDTree<Point, ManhattanMetric> tree(pts);
 
@@ -121,13 +122,8 @@ TEST(KDTreeConcepts, ManhattanMetricTree) {
 }
 
 TEST(KDTreeConcepts, RangeViewConstruction) {
-    std::vector<Point> all_pts = {
-        Point(-5.0, 0.0),
-        Point(1.0, 2.0),
-        Point(3.0, 4.0),
-        Point(-10.0, 5.0),
-        Point(5.0, 6.0)
-    };
+    std::vector<Point> all_pts = {Point(-5.0, 0.0), Point(1.0, 2.0), Point(3.0, 4.0), Point(-10.0, 5.0),
+                                  Point(5.0, 6.0)};
 
     // 使用 C++20 views::filter 惰性筛选 x > 0 的正半轴点建树，消灭中间临时容器
     auto positive_x = all_pts | std::views::filter([](const Point& p) { return p.x > 0.0; });
