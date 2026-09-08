@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <cmath>
+#include <numbers>
 #include <vector>
 
 #include "icp_apf_planner.hpp"
@@ -82,7 +83,7 @@ TEST(IcpApfPlanner, TransformPointsRanges) {
     };
 
     // Rotate 90 deg counter-clockwise, translate dx=2.0, dy=3.0
-    double rot = M_PI / 2.0;
+    double rot = std::numbers::pi_v<double> / 2.0;
     auto transformed = planner.TransformPoints(pts, rot, 2.0, 3.0);
 
     ASSERT_EQ(transformed.size(), 2u);

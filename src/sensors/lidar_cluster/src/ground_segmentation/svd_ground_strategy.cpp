@@ -6,10 +6,6 @@
 
 using namespace Eigen;
 
-static bool ComparePointHeight(const PointType& a, const PointType& b) {
-    return a.z < b.z;
-}
-
 static void ExtractInitialSeeds(const pcl::PointCloud<PointType>& p_sorted, pcl::PointCloud<PointType>::Ptr seeds_pc,
                                 int num_lpr, double th_seeds) {
     double sum = 0;
@@ -30,8 +26,8 @@ static void ExtractInitialSeeds(const pcl::PointCloud<PointType>& p_sorted, pcl:
 
 static void EstimateGroundPlane(const pcl::PointCloud<PointType>::Ptr& ground_pc, VectorXf& normal, float& d,
                                 float& th_dist_d, double th_dist) {
-    Eigen::Matrix3f cov;
-    Eigen::Vector4f pc_mean;
+    Eigen::Matrix3f cov = Eigen::Matrix3f::Zero();
+    Eigen::Vector4f pc_mean = Eigen::Vector4f::Zero();
     pcl::computeMeanAndCovarianceMatrix(*ground_pc, cov, pc_mean);
     JacobiSVD<MatrixXf> svd(cov, Eigen::DecompositionOptions::ComputeFullU);
     normal = (svd.matrixU().col(2));
@@ -49,17 +45,15 @@ void SvdGroundStrategy::segment(const pcl::PointCloud<PointType>::Ptr& input, pc
     // P2-A: 先用 remove_if 过滤地面以下极低点（O(N)），再用 nth_element 做部分排序（O(N)）
     // 替代原来的全量 std::sort（O(N logN)），只需保证前 num_lpr 个元素是最小的即可
     const float z_floor = -1.0f * static_cast<float>(params.sensor_height);
-    laserCloudIn.points.erase(std::remove_if(laserCloudIn.points.begin(), laserCloudIn.points.end(),
-                                             [z_floor](const PointType& p) { return p.z < z_floor; }),
-                              laserCloudIn.points.end());
+    std::erase_if(laserCloudIn.points, [z_floor](const PointType& p) { return p.z < z_floor; });
 
     if (!laserCloudIn.points.empty()) {
         const size_t nth = std::min(static_cast<size_t>(params.num_lpr), laserCloudIn.points.size() - 1);
-        std::nth_element(laserCloudIn.points.begin(), laserCloudIn.points.begin() + nth, laserCloudIn.points.end(),
-                         ComparePointHeight);
+        std::ranges::nth_element(laserCloudIn.points.begin(), laserCloudIn.points.begin() + nth,
+                                 laserCloudIn.points.end(), {}, &PointType::z);
     }
 
-    pcl::PointCloud<PointType>::Ptr seeds_pc(new pcl::PointCloud<PointType>());
+    auto seeds_pc = std::make_shared<pcl::PointCloud<PointType>>();
     ExtractInitialSeeds(laserCloudIn, seeds_pc, params.num_lpr, params.th_seeds);
 
     ground = seeds_pc;

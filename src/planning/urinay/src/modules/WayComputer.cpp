@@ -238,7 +238,7 @@ void WayComputer::computeWay(const std::vector<Edge> &edges, const UrinayParams:
     this->way_.trimByLocal();
 
     std::vector<Point> midpoints(edges.size());
-    std::transform(edges.begin(), edges.end(), midpoints.begin(), [](const Edge &e) -> Point { return e.midPoint(); });
+    std::ranges::transform(edges, midpoints.begin(), &Edge::midPoint);
     KDTree midpointsKDT(midpoints);
 
     std::vector<HeurInd> nextEdges;

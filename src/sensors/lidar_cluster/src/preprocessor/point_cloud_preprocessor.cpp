@@ -17,14 +17,12 @@ static void CompactPoints(pcl::PointCloud<PointType>::Ptr cloud) {
 // Keep 1m..15m in front. In-place compact instead of ExtractIndices (extra copy).
 static void ClipPointsByDistance(const pcl::PointCloud<PointType>::Ptr in) {
     auto& pts = in->points;
-    pts.erase(std::remove_if(pts.begin(), pts.end(),
-                             [](const PointType& p) {
-                                 if (!std::isfinite(p.x) || !std::isfinite(p.y) || p.x <= 0.0f)
-                                     return true;
-                                 const float d2 = p.x * p.x + p.y * p.y;
-                                 return d2 < 1.0f || d2 > 225.0f;
-                             }),
-              pts.end());
+    std::erase_if(pts, [](const PointType& p) {
+        if (!std::isfinite(p.x) || !std::isfinite(p.y) || p.x <= 0.0f)
+            return true;
+        const float d2 = p.x * p.x + p.y * p.y;
+        return d2 < 1.0f || d2 > 225.0f;
+    });
     CompactPoints(in);
 }
 
@@ -36,13 +34,11 @@ static void FilterCloudAabb(pcl::PointCloud<PointType>::Ptr cloud, const PointCl
     const float z_min = static_cast<float>(roi.z_min);
     const float z_max = static_cast<float>(roi.z_max);
     auto& pts = cloud->points;
-    pts.erase(std::remove_if(pts.begin(), pts.end(),
-                             [&](const PointType& p) {
-                                 return !std::isfinite(p.x) || !std::isfinite(p.y) || !std::isfinite(p.z) ||
-                                        p.x < x_min || p.x > x_max || p.y < y_min || p.y > y_max || p.z < z_min ||
-                                        p.z > z_max;
-                             }),
-              pts.end());
+    std::erase_if(pts, [&](const PointType& p) {
+        return !std::isfinite(p.x) || !std::isfinite(p.y) || !std::isfinite(p.z) ||
+               p.x < x_min || p.x > x_max || p.y < y_min || p.y > y_max || p.z < z_min ||
+               p.z > z_max;
+    });
     CompactPoints(cloud);
 }
 
@@ -76,7 +72,7 @@ size_t PointCloudPreprocessor::countValidPointsInRoi(PointSpan points, const Roi
     const float z_min = static_cast<float>(roi.z_min);
     const float z_max = static_cast<float>(roi.z_max);
 
-    return static_cast<size_t>(std::count_if(points.begin(), points.end(), [&](const PointType& p) {
+    return static_cast<size_t>(std::ranges::count_if(points, [&](const PointType& p) {
         return std::isfinite(p.x) && std::isfinite(p.y) && std::isfinite(p.z) &&
                p.x >= x_min && p.x <= x_max && p.y >= y_min && p.y <= y_max && p.z >= z_min && p.z <= z_max;
     }));
@@ -295,10 +291,9 @@ void PointCloudPreprocessor::process(pcl::PointCloud<PointType>::Ptr& cloud_filt
         const float z_min = static_cast<float>(roi.z_min);
         const float z_max = static_cast<float>(roi.z_max);
         auto& pts = cloud_filtered->points;
-        pts.erase(std::remove_if(
-                      pts.begin(), pts.end(),
-                      [z_min, z_max](const PointType& p) { return !std::isfinite(p.z) || p.z < z_min || p.z > z_max; }),
-                  pts.end());
+        std::erase_if(pts, [z_min, z_max](const PointType& p) {
+            return !std::isfinite(p.z) || p.z < z_min || p.z > z_max;
+        });
         CompactPoints(cloud_filtered);
     } else if (road_type_ == 2 || road_type_ == 3) {
         FilterCloudAabb(cloud_filtered, roi);

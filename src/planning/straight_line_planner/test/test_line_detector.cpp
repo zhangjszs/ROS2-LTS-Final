@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <cmath>
+#include <numbers>
 #include <vector>
 
 #include "line_detector.hpp"
@@ -22,7 +23,7 @@ TEST(GlobalDeltaToBaseLink, IdentityAtZeroHeading) {
 
 TEST(GlobalDeltaToBaseLink, RotatesWithVehicleHeading) {
     double bx = 0, by = 0;
-    GlobalDeltaToBaseLink(1.0, 0.0, M_PI / 2.0, &bx, &by);
+    GlobalDeltaToBaseLink(1.0, 0.0, std::numbers::pi_v<double> / 2.0, &bx, &by);
     EXPECT_NEAR(bx, 0.0, 1e-12);
     EXPECT_NEAR(by, -1.0, 1e-12);
 }

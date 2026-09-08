@@ -94,12 +94,15 @@ ConeFusion::ConeFusion(rclcpp::Node::SharedPtr node)
     car_state_sub_mf_.subscribe(node.get(), vehicle_state_topic, 10);
     sync_ = std::make_unique<message_filters::Synchronizer<ApproxSyncPolicy>>(
         ApproxSyncPolicy(static_cast<uint32_t>(approx_queue)), cone_sub_mf_, car_state_sub_mf_);
-    sync_->registerCallback(std::bind(&ConeFusion::OnSyncedMessages, this, std::placeholders::_1, std::placeholders::_2));
+    sync_->registerCallback([this](const common_msgs::msg::HuatConeCluster::ConstSharedPtr& lidar_msg,
+                                  const common_msgs::msg::HuatCarstate::ConstSharedPtr& state_msg) {
+        OnSyncedMessages(lidar_msg, state_msg);
+    });
 
     if (enable_vision_color_injection_) {
         vision_sub_ = node_->create_subscription<autodrive_msgs::msg::HuatVisionDetections>(
             vision_detections_topic, 1,
-            std::bind(&ConeFusion::OnVisionMessage, this, std::placeholders::_1));
+            [this](const autodrive_msgs::msg::HuatVisionDetections::ConstSharedPtr msg) { OnVisionMessage(msg); });
         RCLCPP_INFO(node_->get_logger(), "[cone_fusion] Vision color injection ENABLED (topic=%s, fx=%.1f fy=%.1f)",
                  vision_detections_topic.c_str(), cam_fx_, cam_fy_);
     } else {

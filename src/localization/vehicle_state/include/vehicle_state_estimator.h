@@ -9,13 +9,14 @@
 #include <tf2_ros/transform_broadcaster.hpp>
 
 #include <iostream>
+#include <numbers>
 #include <string>
 #include <vector>
 
 #include "common_msgs/msg/huat_asensing.hpp"
 #include "common_msgs/msg/huat_carstate.hpp"
 
-constexpr double kPi = 3.14159265358979;
+constexpr double kPi = std::numbers::pi_v<double>;
 constexpr double kDegToRad = kPi / 180.0;
 
 class VehicleStateEstimator {

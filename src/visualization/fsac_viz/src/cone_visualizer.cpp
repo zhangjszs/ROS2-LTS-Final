@@ -52,7 +52,7 @@ class ConeVisualizer {
 
         cone_map_sub_ = node_->create_subscription<common_msgs::msg::HuatMap>(
             cone_map_topic, 10,
-            std::bind(&ConeVisualizer::OnConeMap, this, std::placeholders::_1));
+            [this](const common_msgs::msg::HuatMap::ConstSharedPtr msg) { OnConeMap(msg); });
         cone_marker_pub_ = node_->create_publisher<visualization_msgs::msg::Marker>(cone_marker_topic, 10);
     }
 };

@@ -1,5 +1,6 @@
 #include <functional>
 
+#include <numbers>
 #include <rclcpp/rclcpp.hpp>
 #include <tf2/LinearMath/Quaternion.hpp>
 #include <tf2/LinearMath/Transform.hpp>
@@ -9,7 +10,7 @@
 #include "common_msgs/msg/huat_asensing.hpp"
 #include "common_msgs/msg/huat_carstate.hpp"
 
-constexpr double kPi = 3.14159265358979;
+constexpr double kPi = std::numbers::pi_v<double>;
 constexpr double kLidarToImuDistance = 1.87;
 constexpr double kDegToRad = kPi / 180.0;
 
@@ -159,10 +160,10 @@ class VehicleVisualizer {
 
         state_sub_ = node_->create_subscription<common_msgs::msg::HuatCarstate>(
             vehicle_state_topic, 10,
-            std::bind(&VehicleVisualizer::OnStateMessage, this, std::placeholders::_1));
+            [this](const common_msgs::msg::HuatCarstate::ConstSharedPtr msg) { OnStateMessage(msg); });
         ins_sub_ = node_->create_subscription<common_msgs::msg::HuatASENSING>(
             ins_topic, 10,
-            std::bind(&VehicleVisualizer::OnInsMessage, this, std::placeholders::_1));
+            [this](const common_msgs::msg::HuatASENSING::ConstSharedPtr msg) { OnInsMessage(msg); });
         car_body_pub_ = node_->create_publisher<visualization_msgs::msg::Marker>(car_body_marker_topic, 1);
         wheel_pub_ = node_->create_publisher<visualization_msgs::msg::Marker>(wheel_marker_topic, 1);
     }

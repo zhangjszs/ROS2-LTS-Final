@@ -133,8 +133,8 @@ class BasicKDTree {
             return -1;
 
         int mid = lo + (hi - lo) / 2;
-        std::nth_element(tmp.begin() + lo, tmp.begin() + mid, tmp.begin() + hi,
-                         [lv](const Entry& a, const Entry& b) { return a.first[lv] < b.first[lv]; });
+        std::ranges::nth_element(tmp.begin() + lo, tmp.begin() + mid, tmp.begin() + hi,
+                                 {}, [lv](const Entry& e) { return e.first[lv]; });
 
         int ni = static_cast<int>(nodes_.size());
         nodes_.push_back(Node{});

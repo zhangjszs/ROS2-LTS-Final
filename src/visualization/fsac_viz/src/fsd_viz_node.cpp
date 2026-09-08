@@ -1,13 +1,14 @@
 #include <geometry_msgs/msg/transform_stamped.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
-#include <tf2_ros/buffer.h>
-#include <tf2_ros/transform_listener.h>
+#include <tf2_ros/buffer.hpp>
+#include <tf2_ros/transform_listener.hpp>
 #include <visualization_msgs/msg/marker_array.hpp>
 
 #include <array>
 #include <cmath>
 #include <deque>
+#include <format>
 #include <functional>
 #include <limits>
 #include <map>
@@ -35,7 +36,7 @@ struct Color {
     Color(double rr = 1.0, double gg = 1.0, double bb = 1.0, double aa = 1.0) : r(rr), g(gg), b(bb), a(aa) {}
 };
 
-static Color ColorFromHex(uint32_t hex, double alpha = 1.0) {
+[[maybe_unused]] static Color ColorFromHex(uint32_t hex, double alpha = 1.0) {
     return Color(((hex >> 16) & 0xFF) / 255.0, ((hex >> 8) & 0xFF) / 255.0, (hex & 0xFF) / 255.0, alpha);
 }
 
@@ -106,10 +107,10 @@ class ConeVisualizer {
 
         cone_map_sub_ = node_->create_subscription<common_msgs::msg::HuatMap>(
             cone_map_topic, 10,
-            std::bind(&ConeVisualizer::OnConeMap, this, std::placeholders::_1));
+            [this](const common_msgs::msg::HuatMap::ConstSharedPtr msg) { OnConeMap(msg); });
         cone_cluster_sub_ = node_->create_subscription<common_msgs::msg::HuatConeCluster>(
             cone_cluster_topic, 10,
-            std::bind(&ConeVisualizer::OnConeCluster, this, std::placeholders::_1));
+            [this](const common_msgs::msg::HuatConeCluster::ConstSharedPtr msg) { OnConeCluster(msg); });
         marker_pub_ = node_->create_publisher<visualization_msgs::msg::MarkerArray>(cone_marker_topic, 1);  // latch=true（锁存）
 
         // TF 缓冲区，用于自适应坐标变换
@@ -160,10 +161,7 @@ class ConeVisualizer {
     }
 
     static std::string PosKey(float x, float y) {
-        // 0.1米网格键
-        char buf[64];
-        snprintf(buf, sizeof(buf), "%d,%d", static_cast<int>(std::round(x * 10)), static_cast<int>(std::round(y * 10)));
-        return std::string(buf);
+        return std::format("{},{}", static_cast<int>(std::round(x * 10)), static_cast<int>(std::round(y * 10)));
     }
 
     char LookupClusterColor(float x, float y) const {
@@ -177,10 +175,9 @@ class ConeVisualizer {
             for (int dy = -1; dy <= 1; ++dy) {
                 if (dx == 0 && dy == 0)
                     continue;
-                char buf[64];
-                snprintf(buf, sizeof(buf), "%d,%d", static_cast<int>(std::round(x * 10)) + dx,
-                         static_cast<int>(std::round(y * 10)) + dy);
-                auto it2 = latest_cluster_colors_.find(buf);
+                std::string key = std::format("{},{}", static_cast<int>(std::round(x * 10)) + dx,
+                                              static_cast<int>(std::round(y * 10)) + dy);
+                auto it2 = latest_cluster_colors_.find(key);
                 if (it2 != latest_cluster_colors_.end())
                     return it2->second;
             }
@@ -297,11 +294,9 @@ class ConeVisualizer {
                 text.pose.position = pose.position;
                 text.pose.position.z += 0.5;
                 text.scale.z = 0.25;
-                char buf[64];
                 float dist = std::sqrt(cone.position_base_link.x * cone.position_base_link.x +
                                        cone.position_base_link.y * cone.position_base_link.y);
-                snprintf(buf, sizeof(buf), "%.1fm", dist);
-                text.text = buf;
+                text.text = std::format("{:.1f}m", dist);
                 text.color = ToRosColor(Color(1.0, 1.0, 1.0, 0.8));
                 array.markers.push_back(text);
             }
@@ -406,16 +401,16 @@ class VehicleVisualizer {
 
         state_sub_ = node_->create_subscription<common_msgs::msg::HuatCarstate>(
             vehicle_state_topic, 10,
-            std::bind(&VehicleVisualizer::OnStateMessage, this, std::placeholders::_1));
+            [this](const common_msgs::msg::HuatCarstate::ConstSharedPtr msg) { OnStateMessage(msg); });
         ins_sub_ = node_->create_subscription<common_msgs::msg::HuatASENSING>(
             ins_topic, 10,
-            std::bind(&VehicleVisualizer::OnInsMessage, this, std::placeholders::_1));
+            [this](const common_msgs::msg::HuatASENSING::ConstSharedPtr msg) { OnInsMessage(msg); });
         marker_pub_ = node_->create_publisher<visualization_msgs::msg::MarkerArray>(vehicle_marker_topic, 1);
 
         // 定时器驱动发布：即使状态消息速率低或抖动也能平滑显示
         timer_ = node_->create_wall_timer(
             std::chrono::duration<double>(1.0 / publish_rate_),
-            std::bind(&VehicleVisualizer::OnTimer, this));
+            [this] { OnTimer(); });
 
         // 预计算车轮偏移量（以后轴为中心）
         wheel_offsets_[0] = {0.0, 0.35, 0.0};
@@ -674,9 +669,7 @@ class VehicleVisualizer {
             m.pose.position.y = cy;
             m.pose.position.z = cz + 1.2;
             m.scale.z = 0.3;
-            char buf[64];
-            snprintf(buf, sizeof(buf), "V:%.1fkm/h Yaw:%.1fdeg", v * 3.6, yaw * 180.0 / kPi);
-            m.text = buf;
+            m.text = std::format("V:{:.1f}km/h Yaw:{:.1f}deg", v * 3.6, yaw * 180.0 / kPi);
             m.color = ToRosColor(Color(1.0, 1.0, 1.0, 0.9));
             array.markers.push_back(m);
         }
@@ -711,7 +704,7 @@ class PathVisualizer {
 
         path_sub_ = node_->create_subscription<common_msgs::msg::HuatPathLimits>(
             path_topic, 10,
-            std::bind(&PathVisualizer::OnPathLimits, this, std::placeholders::_1));
+            [this](const common_msgs::msg::HuatPathLimits::ConstSharedPtr msg) { OnPathLimits(msg); });
         path_pub_ = node_->create_publisher<visualization_msgs::msg::MarkerArray>(path_marker_topic, 1);
 
         RCLCPP_INFO(node_->get_logger(), "[PathVisualizer] fixed_frame=%s path=%s marker=%s",

@@ -14,7 +14,7 @@ VehicleStateEstimator::VehicleStateEstimator(rclcpp::Node::SharedPtr node)
 
     node_->get_parameter_or<int>("azimuth_init_frames", azimuth_init_frames_, 5);
     ins_sub_ = node_->create_subscription<common_msgs::msg::HuatASENSING>(
-        ins_topic, 1, std::bind(&VehicleStateEstimator::OnInsMessage, this, std::placeholders::_1));
+        ins_topic, 1, [this](const common_msgs::msg::HuatASENSING::ConstSharedPtr msg) { OnInsMessage(msg); });
     state_pub_ = node_->create_publisher<common_msgs::msg::HuatCarstate>(vehicle_state_topic, 1);
 
     diag_updater_.setHardwareID("vehicle_state");

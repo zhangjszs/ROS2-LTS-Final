@@ -38,19 +38,19 @@ class SafetyMonitor {
 
         sub_pathlimits_ = node_->create_subscription<common_msgs::msg::HuatPathLimits>(
             pathlimits_topic, 10,
-            std::bind(&SafetyMonitor::OnPathLimits, this, std::placeholders::_1));
+            [this](const common_msgs::msg::HuatPathLimits::ConstSharedPtr msg) { OnPathLimits(msg); });
         sub_vehicle_state_ = node_->create_subscription<common_msgs::msg::HuatCarstate>(
             vehicle_state_topic, 10,
-            std::bind(&SafetyMonitor::OnVehicleState, this, std::placeholders::_1));
+            [this](const common_msgs::msg::HuatCarstate::ConstSharedPtr msg) { OnVehicleState(msg); });
         if (!stop_request_topic.empty()) {
             sub_stop_request_ = node_->create_subscription<common_msgs::msg::HuatStop>(
                 stop_request_topic, 10,
-                std::bind(&SafetyMonitor::OnStopRequest, this, std::placeholders::_1));
+                [this](const common_msgs::msg::HuatStop::ConstSharedPtr msg) { OnStopRequest(msg); });
         }
         if (!reset_stop_topic.empty()) {
             sub_reset_ = node_->create_subscription<common_msgs::msg::HuatStop>(
                 reset_stop_topic, 1,
-                std::bind(&SafetyMonitor::OnResetStop, this, std::placeholders::_1));
+                [this](const common_msgs::msg::HuatStop::ConstSharedPtr msg) { OnResetStop(msg); });
             RCLCPP_INFO(node_->get_logger(), "%s",
                         std::format("[safety_monitor] Manual reset enabled on: {}", reset_stop_topic).c_str());
         }

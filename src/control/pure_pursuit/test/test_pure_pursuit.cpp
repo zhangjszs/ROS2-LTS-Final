@@ -2,6 +2,7 @@
 
 #include <cmath>
 #include <geometry_msgs/msg/point.hpp>
+#include <numbers>
 #include <vector>
 
 #include "pure_pursuit/input_guard.h"
@@ -21,7 +22,7 @@ TEST(PpMath, UnitCircleCurvature) {
     double r = 5.0;
     std::vector<double> rx, ry;
     for (int i = -1; i <= 1; ++i) {
-        double theta = i * (M_PI / 6.0);  // -30°, 0°, +30°
+        double theta = i * (std::numbers::pi_v<double> / 6.0);  // -30°, 0°, +30°
         rx.push_back(r * std::cos(theta));
         ry.push_back(r * std::sin(theta));
     }
@@ -55,7 +56,7 @@ TEST(PpMath, KnownRadiusCurvature) {
     double r = 10.0;
     std::vector<double> rx, ry;
     for (int i = -2; i <= 2; ++i) {
-        double theta = i * (M_PI / 8.0);
+        double theta = i * (std::numbers::pi_v<double> / 8.0);
         rx.push_back(r * std::cos(theta));
         ry.push_back(r * std::sin(theta));
     }
@@ -68,7 +69,7 @@ TEST(PpMath, SharpTurnHigherCurvature) {
     double r_small = 3.0, r_large = 15.0;
     std::vector<double> rx_small, ry_small, rx_large, ry_large;
     for (int i = -1; i <= 1; ++i) {
-        double theta = i * (M_PI / 6.0);
+        double theta = i * (std::numbers::pi_v<double> / 6.0);
         rx_small.push_back(r_small * std::cos(theta));
         ry_small.push_back(r_small * std::sin(theta));
         rx_large.push_back(r_large * std::cos(theta));
@@ -432,7 +433,7 @@ TEST(Point2DLikeTest, GeometryMsgsPointCurvature) {
     double r = 10.0;
     std::vector<geometry_msgs::msg::Point> circle_pts(5);
     for (int i = -2; i <= 2; ++i) {
-        double theta = i * (M_PI / 8.0);
+        double theta = i * (std::numbers::pi_v<double> / 8.0);
         circle_pts[i + 2].x = r * std::cos(theta);
         circle_pts[i + 2].y = r * std::sin(theta);
     }

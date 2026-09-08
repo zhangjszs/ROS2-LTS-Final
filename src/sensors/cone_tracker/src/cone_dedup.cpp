@@ -360,30 +360,25 @@ void ConeDedup::UpdateUnmatchedExistingTracks(const std::vector<bool> &matched_e
 
 int ConeDedup::RemoveStaleTracks() {
     int removed = 0;
-    auto it = tracked_cones_.begin();
-    while (it != tracked_cones_.end()) {
-        bool should_remove = false;
+    size_t before_size = tracked_cones_.size();
+    std::erase_if(tracked_cones_, [&](const TrackedCone &tc) {
         if (has_car_state_) {
-            double dx = it->cone.position_global.x - car_x_;
-            double dy = it->cone.position_global.y - car_y_;
+            double dx = tc.cone.position_global.x - car_x_;
+            double dy = tc.cone.position_global.y - car_y_;
             if (dx * dx + dy * dy > max_tracking_distance_ * max_tracking_distance_) {
-                should_remove = true;
                 diag_culled_track_count_++;
+                return true;
             }
         }
-        if (!should_remove) {
-            int miss_limit = (it->state == TrackState::CONFIRMED) ? max_miss_frames_confirmed_ : max_miss_frames_;
-            if (it->missed_frames > miss_limit) {
-                should_remove = true;
-                removed++;
-            }
+        int miss_limit = (tc.state == TrackState::CONFIRMED) ? max_miss_frames_confirmed_ : max_miss_frames_;
+        if (tc.missed_frames > miss_limit) {
+            removed++;
+            return true;
         }
-        if (should_remove) {
-            it = tracked_cones_.erase(it);
-            kdtree_needs_full_rebuild_ = true;
-        } else {
-            ++it;
-        }
+        return false;
+    });
+    if (tracked_cones_.size() != before_size) {
+        kdtree_needs_full_rebuild_ = true;
     }
     return removed;
 }
@@ -422,7 +417,7 @@ void ConeDedup::ProcessMatchedPairs(std::span<const size_t> valid_input_idx,
         ApplyPositionUpdate(tracked_cones_[static_cast<size_t>(tidx)], cones[i].position_global.x, cones[i].position_global.y,
                             cones[i].position_global.z, cones[i], stamp, alpha);
     }
-    stats.matched = static_cast<int>(std::count(matched_input.begin(), matched_input.end(), true));
+    stats.matched = static_cast<int>(std::ranges::count(matched_input, true));
     RCLCPP_DEBUG(node_->get_logger(), "[cone_dedup] match stats: input=%zu, matched=%d, unmatched=%zu, tracked=%zu", cones.size(),
               stats.matched, cones.size() - stats.matched, tracked_cones_.size());
 }

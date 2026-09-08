@@ -71,9 +71,9 @@ SkidpadPlannerNode::SkidpadPlannerNode(rclcpp::Node::SharedPtr node)
     planner_ = std::make_unique<IcpApfPlanner>(planner_cfg);
 
     cone_map_sub_ = node_->create_subscription<common_msgs::msg::HuatMap>(
-        input_topic_, 1, std::bind(&SkidpadPlannerNode::OnConeMapMessage, this, std::placeholders::_1));
+        input_topic_, 1, [this](const common_msgs::msg::HuatMap::ConstSharedPtr msg) { OnConeMapMessage(msg); });
     car_state_sub_ = node_->create_subscription<common_msgs::msg::HuatCarstate>(
-        vehicle_state_topic_, 1, std::bind(&SkidpadPlannerNode::OnCarStateMessage, this, std::placeholders::_1));
+        vehicle_state_topic_, 1, [this](const common_msgs::msg::HuatCarstate::ConstSharedPtr msg) { OnCarStateMessage(msg); });
     path_limits_pub_ = node_->create_publisher<common_msgs::msg::HuatPathLimits>(output_topic_, 1);
 
     RCLCPP_INFO(node_->get_logger(), "[skidpad_planner] Node initialized. road_type=%d", road_type_);
