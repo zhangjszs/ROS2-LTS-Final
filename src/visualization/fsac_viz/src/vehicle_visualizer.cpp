@@ -1,3 +1,4 @@
+#include <array>
 #include <functional>
 
 #include <numbers>
@@ -14,6 +15,8 @@ constexpr double kPi = std::numbers::pi_v<double>;
 constexpr double kLidarToImuDistance = 1.87;
 constexpr double kDegToRad = kPi / 180.0;
 
+namespace {
+
 class VehicleVisualizer {
    private:
     rclcpp::Node::SharedPtr node_;
@@ -27,7 +30,7 @@ class VehicleVisualizer {
     double ins_roll_ = 0.0;
     double ins_pitch_ = 0.0;
 
-    void CalcVehicleDirection(double roll, double pitch, double yaw, double &x, double &y, double &z) {
+    static void CalcVehicleDirection(double roll, double pitch, double yaw, double &x, double &y, double &z) {
         double tf_roll = roll * kDegToRad;
         double tf_pitch = pitch * kDegToRad;
         x = cos(tf_pitch) * cos(-yaw + kPi / 2.0);
@@ -112,11 +115,11 @@ class VehicleVisualizer {
         qq.setRPY(0, 0, vehicle_state_.car_state.theta);
         transform.setRotation(qq);
 
-        tf2::Vector3 offsets[4] = {tf2::Vector3(-0.2, 0.35, 0), tf2::Vector3(-0.2, -0.35, 0),
-                                   tf2::Vector3(-1.2, 0.35, 0), tf2::Vector3(-1.2, -0.35, 0)};
-        int ids[4] = {1, 2, 3, 4};
+        const std::array<tf2::Vector3, 4> offsets = {tf2::Vector3(-0.2, 0.35, 0), tf2::Vector3(-0.2, -0.35, 0),
+                                                    tf2::Vector3(-1.2, 0.35, 0), tf2::Vector3(-1.2, -0.35, 0)};
+        constexpr std::array<int, 4> ids = {1, 2, 3, 4};
 
-        for (int i = 0; i < 4; i++) {
+        for (size_t i = 0; i < 4; i++) {
             tf2::Vector3 v = transform * offsets[i];
             visualization_msgs::msg::Marker wheel;
             wheel.header.frame_id = "velodyne";
@@ -143,7 +146,7 @@ class VehicleVisualizer {
     }
 
    public:
-    VehicleVisualizer(rclcpp::Node::SharedPtr node) : node_(node) {
+    explicit VehicleVisualizer(rclcpp::Node::SharedPtr node) : node_(node) {
         node_->declare_parameter("vehicle_state_topic", "/localization/vehicle_state");
         node_->declare_parameter("ins_topic", "/INS/ASENSING_INS");
         node_->declare_parameter("car_body_marker_topic", "/visualization/car_body");
@@ -168,6 +171,8 @@ class VehicleVisualizer {
         wheel_pub_ = node_->create_publisher<visualization_msgs::msg::Marker>(wheel_marker_topic, 1);
     }
 };
+
+}  // namespace
 
 int main(int argc, char *argv[]) {
     rclcpp::init(argc, argv);

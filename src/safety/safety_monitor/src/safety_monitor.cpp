@@ -12,9 +12,10 @@
 
 class SafetyMonitor {
    public:
-    SafetyMonitor() {
-        node_ = rclcpp::Node::make_shared("safety_monitor");
-
+    SafetyMonitor()
+        : node_(rclcpp::Node::make_shared("safety_monitor")),
+          has_vehicle_state_(false),
+          has_nonempty_pathlimits_(false) {
         double planner_timeout = 0.5;
         std::string pathlimits_topic, vehicle_state_topic, stop_topic, stop_request_topic, reset_stop_topic;
 
@@ -33,8 +34,6 @@ class SafetyMonitor {
         node_->get_parameter("reset_stop_topic", reset_stop_topic);
 
         planner_timeout_ = rclcpp::Duration::from_seconds(planner_timeout);
-        has_vehicle_state_ = false;
-        has_nonempty_pathlimits_ = false;
 
         sub_pathlimits_ = node_->create_subscription<common_msgs::msg::HuatPathLimits>(
             pathlimits_topic, 10,

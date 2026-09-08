@@ -353,20 +353,13 @@ void LidarCluster::EuclideanAdaptiveClusterMethod(pcl::PointCloud<PointType>::Pt
 
     // 预计算距离的平方阈值（避免每个点都计算 sqrt）
     std::vector<double> dis_range_sq(dis_range.size());
-    for (size_t k = 0; k < dis_range.size(); k++) {
-        dis_range_sq[k] = dis_range[k] * dis_range[k];
-    }
+    std::ranges::transform(dis_range, dis_range_sq.begin(), [](double d) { return d * d; });
 
-    for (size_t i = 0; i < inputcloud->points.size(); i++) {
-        const auto &p = inputcloud->points[i];
+    for (const auto &p : inputcloud->points) {
         float origin_dis_sq = p.x * p.x + p.y * p.y;  // 到原点的平方距离
-        size_t bin = num_bins - 1;
-        for (size_t r = 0; r < dis_range.size(); r++) {
-            if (origin_dis_sq < dis_range_sq[r]) {
-                bin = r;
-                break;
-            }
-        }
+        auto it = std::ranges::find_if(dis_range_sq, [origin_dis_sq](double r_sq) { return origin_dis_sq < r_sq; });
+        size_t bin = (it != dis_range_sq.end()) ? static_cast<size_t>(std::distance(dis_range_sq.begin(), it))
+                                                : (num_bins - 1);
         cloud_segments_array_[bin]->points.push_back(p);
     }
 

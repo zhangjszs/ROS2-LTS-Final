@@ -30,6 +30,8 @@ constexpr double kPi = std::numbers::pi_v<double>;
 constexpr double kLidarToImuDistance = 1.87;
 constexpr double kDegToRad = kPi / 180.0;
 
+namespace {
+
 // 颜色工具
 struct Color {
     double r, g, b, a;
@@ -831,7 +833,7 @@ class PathVisualizer {
             m.header.frame_id = path_frame;
             m.header.stamp = now;
             m.ns = "path_replan";
-            m.id = id++;
+            m.id = id;
             m.type = visualization_msgs::msg::Marker::TEXT_VIEW_FACING;
             m.action = visualization_msgs::msg::Marker::ADD;
             m.lifetime = rclcpp::Duration::from_seconds(marker_lifetime_);
@@ -849,6 +851,8 @@ class PathVisualizer {
         path_pub_->publish(array);
     }
 };
+
+}  // namespace
 
 // ------------------------------------------------------------------
 // 主函数

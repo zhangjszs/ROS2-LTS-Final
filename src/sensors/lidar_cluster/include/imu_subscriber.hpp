@@ -12,7 +12,7 @@ class ImuSubscriber {
     explicit ImuSubscriber(const rclcpp::Node::SharedPtr& node, std::string topic_name, size_t buff_size)
         : ImuSubscriber(node.get(), std::move(topic_name), buff_size) {}
     ImuSubscriber() = default;
-    bool buff_mutex_;
+    bool buff_mutex_{false};
 
     void ParseData(std::deque<ImuData>& imu_data_buff);
     void SetInsInfo(common_msgs::msg::HuatInsP2::ConstSharedPtr imu_msg_ptr);

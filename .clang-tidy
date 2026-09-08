@@ -1,0 +1,36 @@
+---
+# C++20 Modernization & Static Analysis Configuration
+# Applied across all ROS 2 packages in this workspace.
+
+Checks: >
+  -*,
+  modernize-*,
+  -modernize-use-trailing-return-type,
+  -modernize-avoid-c-arrays,
+  -modernize-use-nodiscard,
+  cppcoreguidelines-*,
+  -cppcoreguidelines-pro-bounds-array-to-pointer-decay,
+  -cppcoreguidelines-pro-bounds-pointer-arithmetic,
+  -cppcoreguidelines-pro-type-reinterpret-cast,
+  -cppcoreguidelines-owning-memory,
+  -cppcoreguidelines-avoid-magic-numbers,
+  -cppcoreguidelines-pro-type-vararg,
+  readability-*,
+  -readability-magic-numbers,
+  -readability-function-cognitive-complexity,
+  -readability-identifier-length,
+  performance-*,
+  bugprone-*,
+  -bugprone-easily-swappable-parameters
+
+WarningsAsErrors: ''
+
+HeaderFilterRegex: '(src/.*\.h|src/.*\.hpp)'
+
+CheckOptions:
+  modernize-use-std-numbers.CheckMathConstants: true
+  modernize-use-ranges.CheckAlgorithms: true
+  modernize-use-starts-ends-with.CheckStringViews: true
+  modernize-use-nullptr.NullMacros: 'NULL'
+  readability-braces-around-statements.ShortStatementLines: 1
+...

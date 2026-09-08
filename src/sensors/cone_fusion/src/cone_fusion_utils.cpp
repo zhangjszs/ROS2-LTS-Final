@@ -103,8 +103,6 @@ std::vector<size_t> FilterConesPipeline(std::span<const RawPoint> points,
         return {};
     }
 
-    const double min_dist_sq = params.min_distance * params.min_distance;
-    const double max_dist_sq = params.max_distance * params.max_distance;
     const size_t n = points.size();
 
     // C++20 惰性流式管道：多重清洗过滤组合为单一视图管道，无任何中间 vector 分配
@@ -113,16 +111,14 @@ std::vector<size_t> FilterConesPipeline(std::span<const RawPoint> points,
             return IsPointFinite(points[i]);
         })
         | std::views::filter([&](size_t i) {
-            const double d2 = points[i].x * points[i].x + points[i].y * points[i].y;
-            return d2 >= min_dist_sq && d2 <= max_dist_sq;
+            return IsDistanceValid(points[i], params.min_distance, params.max_distance);
         })
         | std::views::filter([&](size_t i) {
-            const double angle = std::atan2(points[i].y, points[i].x);
-            return angle >= params.min_fov_rad && angle <= params.max_fov_rad;
+            return IsFieldOfViewValid(points[i], params.min_fov_rad, params.max_fov_rad);
         })
         | std::views::filter([&](size_t i) {
             const uint32_t conf = (i < confidences.size()) ? confidences[i] : 100u;
-            return conf >= params.min_confidence;
+            return IsConfidenceValid(conf, params.min_confidence);
         });
 
     std::vector<size_t> valid_indices;

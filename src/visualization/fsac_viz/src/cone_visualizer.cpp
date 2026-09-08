@@ -6,6 +6,8 @@
 #include "common_msgs/msg/huat_cone.hpp"
 #include "common_msgs/msg/huat_map.hpp"
 
+namespace {
+
 class ConeVisualizer {
    private:
     rclcpp::Node::SharedPtr node_;
@@ -41,7 +43,7 @@ class ConeVisualizer {
     }
 
    public:
-    ConeVisualizer(rclcpp::Node::SharedPtr node) : node_(node) {
+    explicit ConeVisualizer(rclcpp::Node::SharedPtr node) : node_(node) {
         node_->declare_parameter("cone_map_topic", "/sensors/cones/fused");
         node_->declare_parameter("cone_marker_topic", "/visualization/cone_markers");
 
@@ -56,6 +58,8 @@ class ConeVisualizer {
         cone_marker_pub_ = node_->create_publisher<visualization_msgs::msg::Marker>(cone_marker_topic, 10);
     }
 };
+
+}  // namespace
 
 int main(int argc, char *argv[]) {
     rclcpp::init(argc, argv);
