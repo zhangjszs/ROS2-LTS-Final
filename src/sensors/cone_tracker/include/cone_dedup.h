@@ -16,6 +16,7 @@
 #include "common_msgs/msg/huat_carstate.hpp"
 #include "common_msgs/msg/huat_cone.hpp"
 #include "common_msgs/msg/huat_map.hpp"
+#include "cone_dedup_algo.h"
 #include "std_msgs/msg/string.hpp"
 
 enum class TrackState { TENTATIVE, CONFIRMED };
@@ -95,9 +96,9 @@ class ConeDedup {
                              const common_msgs::msg::HuatCone &src, const rclcpp::Time &stamp, double alpha);
     std::vector<size_t> FilterInputByDistance(std::span<const common_msgs::msg::HuatCone> cones,
                                               int &culled_count) const;
-    std::vector<std::vector<double>> BuildCostMatrix(std::span<const size_t> valid_idx,
-                                                     std::span<const common_msgs::msg::HuatCone> cones, int n_tracks,
-                                                     double inf_cost) const;
+    cone_dedup_algo::FlatMatrix<double> BuildCostMatrix(std::span<const size_t> valid_idx,
+                                                        std::span<const common_msgs::msg::HuatCone> cones, int n_tracks,
+                                                        double inf_cost) const;
     void UpdateUnmatchedExistingTracks(const std::vector<bool> &matched_existing, size_t original_size,
                                        const rclcpp::Time &stamp);
     int RemoveStaleTracks();
@@ -108,7 +109,7 @@ class ConeDedup {
                                 double radius_sq, MatchDiagStats &stats);
     void ProcessMatchedPairs(std::span<const size_t> valid_input_idx,
                              std::span<const common_msgs::msg::HuatCone> cones, std::span<const int> assignment,
-                             std::span<const std::vector<double>> cost_mat, std::vector<bool> &matched_existing,
+                             cone_dedup_algo::MatrixView<const double> cost_mat, std::vector<bool> &matched_existing,
                              std::vector<bool> &matched_input, const rclcpp::Time &stamp, double alpha,
                              MatchDiagStats &stats);
     void PublishStatus(size_t input_size, const MatchDiagStats &stats, size_t published_count);

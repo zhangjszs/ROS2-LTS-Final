@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <limits>
 #include <span>
 #include <vector>
@@ -13,71 +14,91 @@ namespace {
 // 内部通用的 Kuhn-Munkres 匈牙利算法实现，通过 Lambda 访问代价矩阵，消除多重重载的代码重复
 template <typename CostAccessor>
 std::vector<int> HungarianAssignInternal(int rows, int cols, double inf_cost, CostAccessor&& get_cost) {
-    if (rows == 0)
+    if (rows <= 0)
         return {};
-    if (cols == 0)
+    if (cols <= 0)
         return std::vector<int>(rows, -1);
-    int sz = std::max(rows, cols);
+    const int sz = std::max(rows, cols);
+    const size_t sz_st = static_cast<size_t>(sz);
 
-    // 扩展为方阵，无效格填 inf_cost
-    std::vector<std::vector<double>> c(sz, std::vector<double>(sz, inf_cost));
-    for (int i = 0; i < rows; ++i)
-        for (int j = 0; j < cols; ++j)
-            c[i][j] = get_cost(i, j);
+    // 扩展为方阵，采用单块连续一维内存存储（Row-Major），彻底消除 vector<vector> 的 N+1 次堆分配
+    std::vector<double> c(sz_st * sz_st, inf_cost);
+    for (int i = 0; i < rows; ++i) {
+        const size_t row_offset = static_cast<size_t>(i) * sz_st;
+        for (int j = 0; j < cols; ++j) {
+            c[row_offset + static_cast<size_t>(j)] = get_cost(i, j);
+        }
+    }
 
-    std::vector<double> u(sz + 1, 0.0), v(sz + 1, 0.0);
-    std::vector<int> p(sz + 1, 0), way(sz + 1, 0);
+    std::vector<double> u(sz_st + 1, 0.0), v(sz_st + 1, 0.0);
+    std::vector<int> p(sz_st + 1, 0), way(sz_st + 1, 0);
+
+    // 将循环内部的临时变量提至外层，避免每轮迭代重复进行动态堆分配与释放
+    std::vector<double> minv(sz_st + 1);
+    std::vector<uint8_t> used(sz_st + 1);
 
     for (int i = 1; i <= sz; ++i) {
         p[0] = i;
         int j0 = 0;
-        std::vector<double> minv(sz + 1, std::numeric_limits<double>::max());
-        std::vector<bool> used(sz + 1, false);
+        std::fill(minv.begin(), minv.end(), std::numeric_limits<double>::max());
+        std::fill(used.begin(), used.end(), static_cast<uint8_t>(0));
+
         do {
-            used[j0] = true;
-            int i0 = p[j0], j1 = -1;
+            used[static_cast<size_t>(j0)] = 1;
+            int i0 = p[static_cast<size_t>(j0)];
+            int j1 = -1;
             double delta = std::numeric_limits<double>::max();
+            const size_t c_row_offset = static_cast<size_t>(i0 - 1) * sz_st;
             for (int j = 1; j <= sz; ++j) {
-                if (!used[j]) {
-                    double val = c[i0 - 1][j - 1] - u[i0] - v[j];
-                    if (val < minv[j]) {
-                        minv[j] = val;
-                        way[j] = j0;
+                const size_t j_st = static_cast<size_t>(j);
+                if (!used[j_st]) {
+                    double val = c[c_row_offset + (j_st - 1)] - u[static_cast<size_t>(i0)] - v[j_st];
+                    if (val < minv[j_st]) {
+                        minv[j_st] = val;
+                        way[j_st] = j0;
                     }
-                    if (minv[j] < delta) {
-                        delta = minv[j];
+                    if (minv[j_st] < delta) {
+                        delta = minv[j_st];
                         j1 = j;
                     }
                 }
             }
             for (int j = 0; j <= sz; ++j) {
-                if (used[j]) {
-                    u[p[j]] += delta;
-                    v[j] -= delta;
+                const size_t j_st = static_cast<size_t>(j);
+                if (used[j_st]) {
+                    u[static_cast<size_t>(p[j_st])] += delta;
+                    v[j_st] -= delta;
                 } else {
-                    minv[j] -= delta;
+                    minv[j_st] -= delta;
                 }
             }
             j0 = j1;
-        } while (p[j0] != 0);
+        } while (p[static_cast<size_t>(j0)] != 0);
         do {
-            int j1 = way[j0];
-            p[j0] = p[j1];
+            int j1 = way[static_cast<size_t>(j0)];
+            p[static_cast<size_t>(j0)] = p[static_cast<size_t>(j1)];
             j0 = j1;
         } while (j0);
     }
 
     // p[j] = 行（1-indexed）被分配到列 j
-    std::vector<int> result(rows, -1);
+    std::vector<int> result(static_cast<size_t>(rows), -1);
     for (int j = 1; j <= cols; ++j) {
-        int row = p[j] - 1;
+        int row = p[static_cast<size_t>(j)] - 1;
         if (row >= 0 && row < rows && get_cost(row, j - 1) < inf_cost)
-            result[row] = j - 1;
+            result[static_cast<size_t>(row)] = j - 1;
     }
     return result;
 }
 
 }  // namespace
+
+std::vector<int> HungarianAssign(MatrixView<const double> cost_view, double inf_cost) {
+    return HungarianAssignInternal(static_cast<int>(cost_view.rows()),
+                                   static_cast<int>(cost_view.cols()),
+                                   inf_cost,
+                                   [&](int r, int c) { return cost_view(r, c); });
+}
 
 std::vector<int> HungarianAssign(std::span<const std::vector<double>> cost, double inf_cost) {
     int rows = static_cast<int>(cost.size());

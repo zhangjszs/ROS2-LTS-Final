@@ -68,10 +68,10 @@ ConeDedup::ConeDedup(rclcpp::Node::SharedPtr node) : node_(node) {
 
     transformed_sub_ = node_->create_subscription<common_msgs::msg::HuatMap>(
         transformed_cones_topic, 1,
-        std::bind(&ConeDedup::OnTransformedCone, this, std::placeholders::_1));
+        [this](common_msgs::msg::HuatMap::ConstSharedPtr msg) { OnTransformedCone(msg); });
     car_state_sub_ = node_->create_subscription<common_msgs::msg::HuatCarstate>(
         vehicle_state_topic, 1,
-        std::bind(&ConeDedup::OnCarState, this, std::placeholders::_1));
+        [this](common_msgs::msg::HuatCarstate::ConstSharedPtr msg) { OnCarState(msg); });
     fused_pub_ = node_->create_publisher<common_msgs::msg::HuatMap>(fused_cones_topic, 10);
     status_pub_ = node_->create_publisher<std_msgs::msg::String>(status_topic, 10);
 
@@ -233,45 +233,48 @@ std::vector<size_t> ConeDedup::FilterInputByDistance(std::span<const common_msgs
         std::vector<size_t> valid(cones.size());
         for (size_t i = 0; i < cones.size(); ++i)
             valid[i] = i;
+        culled_count = 0;
         return valid;
     }
-    std::vector<double> xs, ys;
-    xs.reserve(cones.size());
-    ys.reserve(cones.size());
-    for (const auto &c : cones) {
-        xs.push_back(c.position_global.x);
-        ys.push_back(c.position_global.y);
+    std::vector<size_t> valid;
+    valid.reserve(cones.size());
+    const double max_dist_sq = max_tracking_distance_ * max_tracking_distance_;
+    for (size_t i = 0; i < cones.size(); ++i) {
+        const double dx = cones[i].position_global.x - car_x_;
+        const double dy = cones[i].position_global.y - car_y_;
+        if (dx * dx + dy * dy <= max_dist_sq) {
+            valid.push_back(i);
+        }
     }
-    std::vector<size_t> valid = cone_dedup_algo::FilterIndicesByRadiusSq(
-        xs, ys, car_x_, car_y_, max_tracking_distance_ * max_tracking_distance_);
     culled_count = static_cast<int>(cones.size() - valid.size());
     return valid;
 }
 
-std::vector<std::vector<double>> ConeDedup::BuildCostMatrix(std::span<const size_t> valid_idx,
+cone_dedup_algo::FlatMatrix<double> ConeDedup::BuildCostMatrix(std::span<const size_t> valid_idx,
                                                             std::span<const common_msgs::msg::HuatCone> cones,
                                                             int n_tracks, double inf_cost) const {
-    int n_in = static_cast<int>(valid_idx.size());
-    // PCL FLANN nearestKSearch 返回的 point_dist 是平方距离，门限也需用平方半径比较（F2-P2-03）
+    const int n_in = static_cast<int>(valid_idx.size());
     const double radius_sq = cone_match_radius_ * cone_match_radius_;
-    std::vector<std::vector<double>> cost_mat(n_in, std::vector<double>(n_tracks, inf_cost));
+    cone_dedup_algo::FlatMatrix<double> cost_mat(static_cast<size_t>(n_in), static_cast<size_t>(n_tracks), inf_cost);
+    if (cloud_->empty() || n_in == 0 || n_tracks == 0)
+        return cost_mat;
+
+    std::vector<int> point_idx(kMaxMatchNeighbors);
+    std::vector<float> point_dist(kMaxMatchNeighbors);
     for (int r = 0; r < n_in; ++r) {
-        size_t i = valid_idx[r];
+        size_t i = valid_idx[static_cast<size_t>(r)];
         pcl::PointXYZ pt;
-        pt.x = cones[i].position_global.x;
-        pt.y = cones[i].position_global.y;
-        pt.z = 0.0;
-        if (cloud_->empty())
-            continue;
-        std::vector<int> point_idx(kMaxMatchNeighbors);
-        std::vector<float> point_dist(kMaxMatchNeighbors);
+        pt.x = static_cast<float>(cones[i].position_global.x);
+        pt.y = static_cast<float>(cones[i].position_global.y);
+        pt.z = 0.0f;
         int found = kdtree_.nearestKSearch(pt, kMaxMatchNeighbors, point_idx, point_dist);
         for (int k = 0; k < found; ++k) {
-            if (point_dist[k] > radius_sq)
+            if (static_cast<double>(point_dist[static_cast<size_t>(k)]) > radius_sq)
                 break;
-            int tidx = point_idx[k];
+            int tidx = point_idx[static_cast<size_t>(k)];
             if (tidx < n_tracks)
-                cost_mat[r][tidx] = static_cast<double>(point_dist[k]);
+                cost_mat(static_cast<size_t>(r), static_cast<size_t>(tidx)) =
+                    static_cast<double>(point_dist[static_cast<size_t>(k)]);
         }
     }
     return cost_mat;
@@ -282,17 +285,17 @@ void ConeDedup::ProcessUnmatchedInputs(std::span<const size_t> valid_input_idx,
                                        std::vector<bool> &matched_input, std::vector<bool> &matched_existing,
                                        const rclcpp::Time &stamp, double alpha, double radius_sq, MatchDiagStats &stats) {
     int anomaly_log_count = 0;
+    std::vector<int> idx(kMaxMatchNeighbors);
+    std::vector<float> dist(kMaxMatchNeighbors);
     for (size_t i : valid_input_idx) {
         if (matched_input[i])
             continue;
         bool suppressed = false;
         if (!cloud_->empty()) {
             pcl::PointXYZ pt;
-            pt.x = cones[i].position_global.x;
-            pt.y = cones[i].position_global.y;
-            pt.z = 0.0;
-            std::vector<int> idx(kMaxMatchNeighbors);
-            std::vector<float> dist(kMaxMatchNeighbors);
+            pt.x = static_cast<float>(cones[i].position_global.x);
+            pt.y = static_cast<float>(cones[i].position_global.y);
+            pt.z = 0.0f;
             int found = kdtree_.nearestKSearch(pt, kMaxMatchNeighbors, idx, dist);
             if (found > 0) {
                 double d0 = std::sqrt(static_cast<double>(dist[0]));
@@ -404,19 +407,19 @@ void ConeDedup::CollectConfirmedCones(common_msgs::msg::HuatMap &out) const {
 void ConeDedup::ProcessMatchedPairs(std::span<const size_t> valid_input_idx,
                                     std::span<const common_msgs::msg::HuatCone> cones,
                                     std::span<const int> assignment,
-                                    std::span<const std::vector<double>> cost_mat,
+                                    cone_dedup_algo::MatrixView<const double> cost_mat,
                                     std::vector<bool> &matched_existing, std::vector<bool> &matched_input,
                                     const rclcpp::Time &stamp, double alpha, MatchDiagStats &stats) {
     int n_in = static_cast<int>(valid_input_idx.size());
     for (int r = 0; r < n_in; ++r) {
-        int tidx = assignment[r];
+        int tidx = assignment[static_cast<size_t>(r)];
         if (tidx < 0)
             continue;
-        size_t i = valid_input_idx[r];
-        matched_existing[tidx] = true;
+        size_t i = valid_input_idx[static_cast<size_t>(r)];
+        matched_existing[static_cast<size_t>(tidx)] = true;
         matched_input[i] = true;
-        stats.record_match(std::sqrt(cost_mat[r][tidx]));
-        ApplyPositionUpdate(tracked_cones_[tidx], cones[i].position_global.x, cones[i].position_global.y,
+        stats.record_match(std::sqrt(cost_mat(static_cast<size_t>(r), static_cast<size_t>(tidx))));
+        ApplyPositionUpdate(tracked_cones_[static_cast<size_t>(tidx)], cones[i].position_global.x, cones[i].position_global.y,
                             cones[i].position_global.z, cones[i], stamp, alpha);
     }
     stats.matched = static_cast<int>(std::count(matched_input.begin(), matched_input.end(), true));
@@ -467,7 +470,7 @@ void ConeDedup::OnTransformedCone(const common_msgs::msg::HuatMap::ConstSharedPt
     MatchDiagStats stats;
 
     {
-        std::lock_guard<std::mutex> lock(mtx_);
+        std::scoped_lock lock(mtx_);
 
         if (msgs->cone.empty()) {
             for (auto &tc : tracked_cones_) {
@@ -509,9 +512,9 @@ void ConeDedup::OnTransformedCone(const common_msgs::msg::HuatMap::ConstSharedPt
             std::vector<size_t> valid_input_idx = FilterInputByDistance(msgs->cone, stats.culled_input);
             auto cost_mat =
                 BuildCostMatrix(valid_input_idx, msgs->cone, static_cast<int>(original_tracked_size), inf_cost);
-            std::vector<int> assignment = cone_dedup_algo::HungarianAssign(cost_mat, inf_cost);
+            std::vector<int> assignment = cone_dedup_algo::HungarianAssign(cost_mat.view(), inf_cost);
 
-            ProcessMatchedPairs(valid_input_idx, msgs->cone, assignment, cost_mat, matched_existing, matched_input,
+            ProcessMatchedPairs(valid_input_idx, msgs->cone, assignment, cost_mat.view(), matched_existing, matched_input,
                                 msgs->header.stamp, dynamic_alpha, stats);
             ProcessUnmatchedInputs(valid_input_idx, msgs->cone, matched_input, matched_existing, msgs->header.stamp,
                                    dynamic_alpha, radius_sq, stats);

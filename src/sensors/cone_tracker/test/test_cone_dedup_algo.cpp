@@ -111,6 +111,95 @@ TEST(HungarianAssignTest, FlatMatrixEquivalentTo2D) {
     }
 }
 
+TEST(MatrixViewTest, BasicOperations) {
+    cone_dedup_algo::MatrixView<double> empty_view;
+    EXPECT_TRUE(empty_view.empty());
+    EXPECT_EQ(empty_view.rows(), 0u);
+    EXPECT_EQ(empty_view.cols(), 0u);
+    EXPECT_EQ(empty_view.size(), 0u);
+
+    std::array<double, 6> raw_buf = {1.0, 2.0, 3.0, 4.0, 5.0, 6.0};
+    cone_dedup_algo::MatrixView<double> mat(raw_buf, 2, 3);
+    EXPECT_FALSE(mat.empty());
+    EXPECT_EQ(mat.rows(), 2u);
+    EXPECT_EQ(mat.cols(), 3u);
+    EXPECT_EQ(mat.size(), 6u);
+
+    EXPECT_DOUBLE_EQ(mat(0, 0), 1.0);
+    EXPECT_DOUBLE_EQ(mat(0, 2), 3.0);
+    EXPECT_DOUBLE_EQ(mat(1, 0), 4.0);
+    EXPECT_DOUBLE_EQ(mat(1, 2), 6.0);
+
+    // 修改验证
+    mat(1, 1) = 99.0;
+    EXPECT_DOUBLE_EQ(raw_buf[4], 99.0);
+
+    // Row span 验证
+    auto row0 = mat.row(0);
+    ASSERT_EQ(row0.size(), 3u);
+    EXPECT_DOUBLE_EQ(row0[0], 1.0);
+    EXPECT_DOUBLE_EQ(row0[1], 2.0);
+    EXPECT_DOUBLE_EQ(row0[2], 3.0);
+}
+
+TEST(FlatMatrixTest, StorageAndViews) {
+    cone_dedup_algo::FlatMatrix<double> mat(2, 3, 10.0);
+    EXPECT_EQ(mat.rows(), 2u);
+    EXPECT_EQ(mat.cols(), 3u);
+    EXPECT_EQ(mat.size(), 6u);
+    EXPECT_DOUBLE_EQ(mat(0, 1), 10.0);
+
+    mat(0, 1) = 42.0;
+    EXPECT_DOUBLE_EQ(mat(0, 1), 42.0);
+
+    // 视图获取与传递
+    cone_dedup_algo::MatrixView<const double> view = mat.view();
+    EXPECT_EQ(view.rows(), 2u);
+    EXPECT_EQ(view.cols(), 3u);
+    EXPECT_DOUBLE_EQ(view(0, 1), 42.0);
+
+    // 隐式转换支持
+    cone_dedup_algo::MatrixView<double> mut_view = mat;
+    mut_view(1, 2) = 100.0;
+    EXPECT_DOUBLE_EQ(mat(1, 2), 100.0);
+
+    // Resize 与 Clear
+    mat.resize(3, 3, -1.0);
+    EXPECT_EQ(mat.rows(), 3u);
+    EXPECT_EQ(mat.cols(), 3u);
+    EXPECT_EQ(mat.size(), 9u);
+    EXPECT_DOUBLE_EQ(mat(2, 2), -1.0);
+
+    mat.clear();
+    EXPECT_TRUE(mat.empty());
+    EXPECT_EQ(mat.size(), 0u);
+}
+
+TEST(HungarianAssignTest, MatrixViewOptimal) {
+    cone_dedup_algo::FlatMatrix<double> cost(3, 3);
+    cost(0, 0) = 9.0; cost(0, 1) = 1.0; cost(0, 2) = 9.0;
+    cost(1, 0) = 9.0; cost(1, 1) = 9.0; cost(1, 2) = 1.0;
+    cost(2, 0) = 1.0; cost(2, 1) = 9.0; cost(2, 2) = 9.0;
+
+    auto result = HungarianAssign(cost.view(), kInfCost);
+    ASSERT_EQ(result.size(), 3u);
+    EXPECT_EQ(result[0], 1);
+    EXPECT_EQ(result[1], 2);
+    EXPECT_EQ(result[2], 0);
+
+    // 矩形矩阵非方阵测试：3 行 2 列
+    cone_dedup_algo::FlatMatrix<double> cost_rect(3, 2);
+    cost_rect(0, 0) = 1.0;  cost_rect(0, 1) = 10.0;
+    cost_rect(1, 0) = 10.0; cost_rect(1, 1) = 1.0;
+    cost_rect(2, 0) = 5.0;  cost_rect(2, 1) = 5.0;
+
+    auto result_rect = HungarianAssign(cost_rect.view(), kInfCost);
+    ASSERT_EQ(result_rect.size(), 3u);
+    EXPECT_EQ(result_rect[0], 0);
+    EXPECT_EQ(result_rect[1], 1);
+    EXPECT_EQ(result_rect[2], -1);
+}
+
 // ── ComputeDynamicAlpha ────────────────────────────────────────────────────
 
 TEST(ComputeDynamicAlphaTest, DisabledReturnsFallback) {
