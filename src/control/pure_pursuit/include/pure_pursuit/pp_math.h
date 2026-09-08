@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <compare>
+#include <concepts>
 #include <limits>
 #include <ranges>
 #include <span>
@@ -11,6 +12,13 @@
 #include <vector>
 
 namespace pp_math {
+
+// C++20 空间点概念约束：支持任意具有 x, y 坐标的二维/三维点类型（如 geometry_msgs::msg::Point, HuatCone 等）
+template <typename T>
+concept Point2DLike = requires(const T& p) {
+    { p.x } -> std::convertible_to<double>;
+    { p.y } -> std::convertible_to<double>;
+};
 
 // 将 idx 钳位到三点法有效范围 [1, n-2]
 inline int clampKappaIdx(int idx, int n) {
@@ -120,6 +128,117 @@ inline int findLookaheadIndexEuclidean(std::span<const double> refx, std::span<c
         | std::views::transform([&](int i) {
             double dx = refx[i] - ox;
             double dy = refy[i] - oy;
+            return std::make_pair(i, dx * dx + dy * dy);
+        })
+        | std::views::filter([lookahead_sq](const auto& pt) {
+            return pt.second >= lookahead_sq;
+        });
+
+    auto it = ahead_points.begin();
+    if (it != ahead_points.end()) {
+        return (*it).first;
+    }
+    return n - 1;
+}
+
+// ── Point2DLike 连续点集视图重载 ──────────────────────────────────────────
+
+// 三点法曲率估算（Point2DLike 点集视图）
+template <Point2DLike PointType>
+inline double estimateCurvature(std::span<PointType> points, int idx) {
+    const int n = static_cast<int>(points.size());
+    if (n < 3 || idx < 1 || idx >= n - 1)
+        return 0.0;
+
+    double ax = points[idx - 1].x, ay = points[idx - 1].y;
+    double bx = points[idx].x, by = points[idx].y;
+    double cx = points[idx + 1].x, cy = points[idx + 1].y;
+
+    double ab = std::hypot(bx - ax, by - ay);
+    double bc = std::hypot(cx - bx, cy - by);
+    double ca = std::hypot(ax - cx, ay - cy);
+
+    double area2 = std::abs((bx - ax) * (cy - ay) - (cx - ax) * (by - ay));
+    if (area2 < 1e-9)
+        return 0.0;
+
+    double denom = ab * bc * ca;
+    if (denom < 1e-9)
+        return 0.0;
+
+    return 2.0 * area2 / denom;
+}
+
+// 在 [search_start, search_end) 内找距 (cx, cy) 最近的路径点（Point2DLike 点集视图）
+template <Point2DLike PointType>
+inline NearestIndexResult findNearestIndex(std::span<PointType> points, double cx,
+                                           double cy, int search_start, int search_end) {
+    NearestIndexResult result;
+    const int n = static_cast<int>(points.size());
+    if (n == 0 || search_start >= search_end || search_start < 0)
+        return result;
+    search_end = std::min(search_end, n);
+
+    auto indices = std::views::iota(search_start, search_end);
+    auto compute_dist_sq = [&](int i) -> double {
+        double dx = cx - points[i].x;
+        double dy = cy - points[i].y;
+        return dx * dx + dy * dy;
+    };
+
+    auto best_it = std::ranges::min_element(indices, {}, compute_dist_sq);
+    if (best_it != indices.end()) {
+        result.idx = *best_it;
+        result.dist_sq = compute_dist_sq(result.idx);
+    }
+    return result;
+}
+
+// 基于折线累积距离的前瞻点搜索（Point2DLike 点集视图）
+template <Point2DLike PointType>
+inline int findLookaheadIndex(std::span<PointType> points,
+                              int current_idx, double lookahead) {
+    const int n = static_cast<int>(points.size());
+    if (current_idx < 0 || n == 0)
+        return 0;
+
+    double distance_sum = 0.0;
+    int target_idx = current_idx;
+
+    auto segments = std::views::iota(current_idx, std::max(current_idx, n - 1))
+        | std::views::transform([&](int i) {
+            double dx = points[i + 1].x - points[i].x;
+            double dy = points[i + 1].y - points[i].y;
+            return std::make_pair(i + 1, std::hypot(dx, dy));
+        });
+
+    for (const auto& [next_idx, seg_dist] : segments) {
+        if (distance_sum + seg_dist <= lookahead) {
+            distance_sum += seg_dist;
+            target_idx = next_idx;
+        } else {
+            break;
+        }
+    }
+    return target_idx;
+}
+
+// 基于欧氏距离的前瞻点搜索（Point2DLike 点集视图）
+template <Point2DLike PointType>
+inline int findLookaheadIndexEuclidean(std::span<PointType> points,
+                                       int current_idx, double lookahead) {
+    const int n = static_cast<int>(points.size());
+    if (current_idx < 0 || n == 0)
+        return 0;
+
+    const double lookahead_sq = lookahead * lookahead;
+    const double ox = points[current_idx].x;
+    const double oy = points[current_idx].y;
+
+    auto ahead_points = std::views::iota(current_idx, n)
+        | std::views::transform([&](int i) {
+            double dx = points[i].x - ox;
+            double dy = points[i].y - oy;
             return std::make_pair(i, dx * dx + dy * dy);
         })
         | std::views::filter([lookahead_sq](const auto& pt) {

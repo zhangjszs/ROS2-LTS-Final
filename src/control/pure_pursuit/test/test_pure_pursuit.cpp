@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <cmath>
+#include <geometry_msgs/msg/point.hpp>
 #include <vector>
 
 #include "pure_pursuit/input_guard.h"
@@ -414,6 +415,49 @@ TEST(SpanAdoption, VehicleCommandEncoderPayloadChecksum) {
     EXPECT_EQ(checksum, static_cast<uint16_t>(0xAA + 0x55 + 0x01 + 0x02 + 0x03));
     EXPECT_TRUE(VehicleCommandEncoder::verifyChecksum(payload, checksum));
     EXPECT_FALSE(VehicleCommandEncoder::verifyChecksum(payload, static_cast<uint16_t>(checksum + 1)));
+}
+
+TEST(Point2DLikeTest, GeometryMsgsPointCurvature) {
+    // 验证 Point2DLike 概念直接支持 geometry_msgs::msg::Point
+    std::vector<geometry_msgs::msg::Point> pts(5);
+    for (int i = 0; i < 5; ++i) {
+        pts[i].x = i * 1.0;
+        pts[i].y = 0.0;
+        pts[i].z = 0.0;
+    }
+    double kappa = pp_math::estimateCurvature(std::span{pts}, 2);
+    EXPECT_NEAR(kappa, 0.0, 1e-9);
+
+    // 圆弧测试
+    double r = 10.0;
+    std::vector<geometry_msgs::msg::Point> circle_pts(5);
+    for (int i = -2; i <= 2; ++i) {
+        double theta = i * (M_PI / 8.0);
+        circle_pts[i + 2].x = r * std::cos(theta);
+        circle_pts[i + 2].y = r * std::sin(theta);
+    }
+    double circle_kappa = pp_math::estimateCurvature(std::span{circle_pts}, 2);
+    EXPECT_NEAR(circle_kappa, 1.0 / r, 1e-3);
+}
+
+TEST(Point2DLikeTest, FindNearestIndexAndLookahead) {
+    std::vector<geometry_msgs::msg::Point> pts(4);
+    for (size_t i = 0; i < 4; ++i) {
+        pts[i].x = static_cast<double>(i) * 10.0;
+        pts[i].y = 0.0;
+    }
+    // 最近点测试
+    auto nearest = pp_math::findNearestIndex(std::span{pts}, 19.5, 0.0, 0, 4);
+    EXPECT_EQ(nearest.idx, 2);
+    EXPECT_NEAR(nearest.dist_sq, 0.25, 1e-9);
+
+    // 累积折线前瞻点测试
+    int la_idx = pp_math::findLookaheadIndex(std::span{pts}, 0, 15.0);
+    EXPECT_EQ(la_idx, 1);  // 距离为 10m <= 15m，下一段 20m > 15m
+
+    // 欧氏距离前瞻点测试
+    int la_euc = pp_math::findLookaheadIndexEuclidean(std::span{pts}, 0, 15.0);
+    EXPECT_EQ(la_euc, 2);  // pts[2].x - pts[0].x = 20.0 >= 15.0
 }
 
 int main(int argc, char** argv) {

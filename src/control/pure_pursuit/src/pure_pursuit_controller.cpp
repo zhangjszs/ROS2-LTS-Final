@@ -25,13 +25,13 @@ PurePursuitController::PurePursuitController(rclcpp::Node::SharedPtr node)
     dropped_commands_pub_ = node_->create_publisher<std_msgs::msg::UInt64>(params_.topics.dropped_commands, 10);
     sub_ = node_->create_subscription<common_msgs::msg::HuatCarstate>(
         params_.topics.vehicle_state, 1,
-        std::bind(&PurePursuitController::OnCarStateMessage, this, std::placeholders::_1));
+        [this](const common_msgs::msg::HuatCarstate::ConstSharedPtr &msg) { OnCarStateMessage(msg); });
     sub_path_ = node_->create_subscription<common_msgs::msg::HuatPathLimits>(
         params_.topics.path, 1,
-        std::bind(&PurePursuitController::OnPathLimitsMessage, this, std::placeholders::_1));
+        [this](const common_msgs::msg::HuatPathLimits::ConstSharedPtr &msg) { OnPathLimitsMessage(msg); });
     sub_stop_ = node_->create_subscription<common_msgs::msg::HuatStop>(
         params_.topics.stop, 1,
-        std::bind(&PurePursuitController::OnStopMessage, this, std::placeholders::_1));
+        [this](const common_msgs::msg::HuatStop::ConstSharedPtr &msg) { OnStopMessage(msg); });
 
     RCLCPP_INFO(node_->get_logger(),
                 "[pure_pursuit] Topics: state=%s path=%s stop=%s cmd=%s latency=%s rate=%.1fHz startup_delay=%.2fs",
@@ -78,6 +78,8 @@ void PurePursuitController::OnPathLimitsMessage(const common_msgs::msg::HuatPath
     has_received_path_ = true;
     refx_.clear();
     refy_.clear();
+    refx_.reserve(msgs->path.size());
+    refy_.reserve(msgs->path.size());
     last_goal_idx_ = -1;
     for (const auto &pt : msgs->path) {
         refx_.push_back(pt.x);
@@ -177,31 +179,8 @@ int PurePursuitController::GetGoalIndex() {
 
 int PurePursuitController::GetLookaheadIndices(int current_idx, double lookahead, std::span<const double> refx,
                                                std::span<const double> refy) {
-    if (current_idx < 0 || refx.empty() || refx.size() != refy.size()) {
-        return 0;
-    }
-    const int n = static_cast<int>(refx.size());
-    double distance_sum = 0.0;
-    int idx = current_idx;
-
-    // C++20 std::ranges 管道流水线：iota 惰性生成线段下标，transform 惰性计算步进欧氏距离
-    auto segment_dists = std::views::iota(current_idx, std::max(current_idx, n - 1))
-        | std::views::transform([&](int i) {
-            double dx = refx[i + 1] - refx[i];
-            double dy = refy[i + 1] - refy[i];
-            return std::make_pair(i + 1, std::hypot(dx, dy));
-        });
-
-    for (const auto &[next_idx, seg_dist] : segment_dists) {
-        if (distance_sum + seg_dist <= lookahead) {
-            distance_sum += seg_dist;
-            idx = next_idx;
-        } else {
-            break;
-        }
-    }
-
-    if (idx >= 0 && idx < n)
+    int idx = pp_math::findLookaheadIndex(refx, refy, current_idx, lookahead);
+    if (idx >= 0 && idx < static_cast<int>(refx.size()))
         RCLCPP_DEBUG(node_->get_logger(), "[pure_pursuit] Lookahead point: x=%f y=%f", refx[idx], refy[idx]);
     return idx;
 }
