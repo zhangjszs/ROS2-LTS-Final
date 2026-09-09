@@ -1,0 +1,20 @@
+/**:
+  ros__parameters:
+    sim_rate: 100.0          # 物理模型更新频率 (Hz)
+    sensor_rate: 20.0        # 感知视场传感器更新频率 (Hz)
+    fov_deg: 120.0           # 激光雷达/相机探测视场角 (度)
+    max_range: 15.0          # 最大探测视距 (米)
+    noise_stddev: 0.02       # 锥桶位置测量高斯噪声标准差 (米)
+
+    # 赛车初始位姿
+    init_x: -12.0
+    init_y: 0.0
+    init_theta: 0.0
+    init_v: 0.0
+
+    # 车辆几何与动力学参数 (FSAC 赛车标准)
+    wheelbase: 1.55          # 轴距 (米)
+    max_steer_angle: 0.40    # 最大前轮转角 (rad, 约 23 度)
+    max_accel: 6.0           # 最大驱动加速度 (m/s^2)
+    max_decel: 9.0           # 最大制动减速度 (m/s^2)
+    max_speed: 25.0          # 最大车速 (m/s)
