@@ -131,7 +131,7 @@ void MpcControllerNode::OnPath(const common_msgs::msg::HuatPathLimits::ConstShar
         ReferencePoint pt;
         pt.x = msg->path[i].x;
         pt.y = msg->path[i].y;
-        pt.speed = config_.horizon.target_speed;
+        pt.speed = (msg->path[i].z > 0.1) ? msg->path[i].z : config_.horizon.target_speed;
 
         // 计算航向角与曲率估计
         if (i + 1 < msg->path.size()) {

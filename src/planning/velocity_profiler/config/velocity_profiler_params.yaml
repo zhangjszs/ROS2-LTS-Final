@@ -1,0 +1,16 @@
+/**:
+  ros__parameters:
+    limits:
+      max_velocity: 20.0
+      min_velocity: 2.0
+      max_lat_accel: 9.8
+      max_lon_accel: 3.5
+      max_lon_decel: 5.0
+      curvature_smoothing_window: 5
+      enable_friction_circle: true
+
+    topics:
+      input_path: "/planning/raw_pathlimits"
+      output_path: "/planning/pathlimits"
+      vehicle_state: "/localization/vehicle_state"
+      speed_markers: "/planning/viz/speed_markers"
