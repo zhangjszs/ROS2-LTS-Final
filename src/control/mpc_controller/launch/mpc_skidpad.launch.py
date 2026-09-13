@@ -1,5 +1,8 @@
 import os
 from launch import LaunchDescription
+from launch.actions import DeclareLaunchArgument
+from launch.conditions import IfCondition
+from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 from ament_index_python.packages import get_package_share_directory
 
@@ -11,12 +14,26 @@ def generate_launch_description():
     huat_launch_dir = get_package_share_directory('huat_launch')
     benchmark_pkg_dir = get_package_share_directory('track_benchmark')
 
-    default_track = os.path.join(sim_pkg_dir, 'tracks', 'skidpad_track.csv')
-    default_sim_params = os.path.join(sim_pkg_dir, 'config', 'simulator_params.yaml')
-    default_skidpad_params = os.path.join(skidpad_pkg_dir, 'config', 'skidpad_planner.yaml')
-    default_mpc_params = os.path.join(mpc_pkg_dir, 'config', 'mpc_params.yaml')
-    default_viz_params = os.path.join(viz_pkg_dir, 'config', 'fsd_viz.yaml')
+    def find_file(pkg_dir, sub_dir, filename):
+        p1 = os.path.join(pkg_dir, sub_dir, filename)
+        if os.path.exists(p1):
+            return p1
+        p2 = os.path.join(pkg_dir, filename)
+        if os.path.exists(p2):
+            return p2
+        return p1
+
+    default_track = find_file(sim_pkg_dir, 'tracks', 'skidpad_track.csv')
+    default_sim_params = find_file(sim_pkg_dir, 'config', 'simulator_params.yaml')
+    default_skidpad_params = find_file(skidpad_pkg_dir, 'config', 'skidpad_planner.yaml')
+    default_mpc_params = find_file(mpc_pkg_dir, 'config', 'mpc_params.yaml')
     default_rviz_config = os.path.join(huat_launch_dir, 'config', 'tuxiang.rviz')
+
+    use_rviz_arg = DeclareLaunchArgument(
+        'use_rviz',
+        default_value='true' if os.environ.get('DISPLAY') else 'false',
+        description='Whether to launch RViz2'
+    )
 
     # 1. 车辆与传感器运动学闭环仿真器
     sim_node = Node(
@@ -90,7 +107,6 @@ def generate_launch_description():
         name='fsd_viz_node',
         output='screen',
         parameters=[
-            default_viz_params,
             {
                 'vehicle_state_topic': '/localization/vehicle_state',
                 'cone_map_topic': '/sensors/cones/fused',
@@ -107,10 +123,12 @@ def generate_launch_description():
         executable='rviz2',
         name='rviz2',
         output='screen',
-        arguments=['-d', default_rviz_config] if os.path.exists(default_rviz_config) else []
+        arguments=['-d', default_rviz_config] if os.path.exists(default_rviz_config) else [],
+        condition=IfCondition(LaunchConfiguration('use_rviz'))
     )
 
     return LaunchDescription([
+        use_rviz_arg,
         sim_node,
         skidpad_node,
         mpc_node,

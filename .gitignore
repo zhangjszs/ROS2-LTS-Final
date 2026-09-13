@@ -13,6 +13,7 @@ COLCON_IGNORE
 *.bag.active
 *.db3
 *.mcap
+benchmark_*.md
 
 # ============================================================
 # C++ / CMake Artifacts

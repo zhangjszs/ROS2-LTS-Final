@@ -50,25 +50,37 @@ static std_msgs::msg::ColorRGBA ToRosColor(const Color& c) {
     return rgba;
 }
 
+template <typename T>
+void SafeDeclare(const rclcpp::Node::SharedPtr& node, const std::string& name, const T& default_val) {
+    if (!node->has_parameter(name)) {
+        node->declare_parameter<T>(name, default_val);
+    }
+}
+
 // ------------------------------------------------------------------
 // 锥桶可视化器
 // ------------------------------------------------------------------
 class ConeVisualizer {
    public:
     explicit ConeVisualizer(rclcpp::Node::SharedPtr node) : node_(node) {
-        node_->declare_parameter("fixed_frame", "map");
-        node_->declare_parameter("use_mesh", false);
-        node_->declare_parameter("cone_mesh", "package://fsac_viz/meshes/construction_cone.dae");
-        node_->declare_parameter("cone_scale", 0.3);
-        node_->declare_parameter("min_alpha", 0.3);
-        node_->declare_parameter("show_confidence_alpha", true);
-        node_->declare_parameter("show_distance_label", true);
-        node_->declare_parameter("show_cluster_bbox", false);
-        node_->declare_parameter("marker_lifetime", 0.5);
-        node_->declare_parameter("persistent_cones", true);
-        node_->declare_parameter("cone_map_topic", "/sensors/cones/fused");
-        node_->declare_parameter("cone_cluster_topic", "/sensors/cones/raw");
-        node_->declare_parameter("cone_marker_topic", "/fsd/viz/cones");
+        SafeDeclare(node_, "fixed_frame", std::string("map"));
+        SafeDeclare(node_, "use_mesh", false);
+        SafeDeclare(node_, "cone_mesh", std::string("package://fsac_viz/meshes/construction_cone.dae"));
+        SafeDeclare(node_, "cone_scale", 0.3);
+        SafeDeclare(node_, "min_alpha", 0.3);
+        SafeDeclare(node_, "show_confidence_alpha", true);
+        SafeDeclare(node_, "show_distance_label", true);
+        SafeDeclare(node_, "show_cluster_bbox", false);
+        SafeDeclare(node_, "marker_lifetime", 0.5);
+        SafeDeclare(node_, "persistent_cones", true);
+        SafeDeclare(node_, "cone_map_topic", std::string("/sensors/cones/fused"));
+        SafeDeclare(node_, "cone_cluster_topic", std::string("/sensors/cones/raw"));
+        SafeDeclare(node_, "cone_marker_topic", std::string("/fsd/viz/cones"));
+
+        SafeDeclare(node_, "color_blue", std::vector<double>{0.0, 0.0, 1.0, 1.0});
+        SafeDeclare(node_, "color_yellow", std::vector<double>{1.0, 0.85, 0.0, 1.0});
+        SafeDeclare(node_, "color_orange", std::vector<double>{1.0, 0.5, 0.0, 1.0});
+        SafeDeclare(node_, "color_unknown", std::vector<double>{0.8, 0.8, 0.8, 1.0});
 
         node_->get_parameter("fixed_frame", fixed_frame_);
         node_->get_parameter("use_mesh", use_mesh_);
@@ -89,10 +101,6 @@ class ConeVisualizer {
 
         // 从参数映射颜色（默认：FSSIM 约定）
         std::vector<double> c;
-        node_->declare_parameter("color_blue", std::vector<double>{0.0, 0.0, 1.0, 1.0});
-        node_->declare_parameter("color_yellow", std::vector<double>{1.0, 0.85, 0.0, 1.0});
-        node_->declare_parameter("color_orange", std::vector<double>{1.0, 0.5, 0.0, 1.0});
-        node_->declare_parameter("color_unknown", std::vector<double>{0.8, 0.8, 0.8, 1.0});
 
         node_->get_parameter("color_blue", c);
         color_blue_ = c.size() >= 3 ? Color(c[0], c[1], c[2], c.size() >= 4 ? c[3] : 1.0) : Color(0.0, 0.0, 1.0);
@@ -370,21 +378,21 @@ class ConeVisualizer {
 class VehicleVisualizer {
    public:
     explicit VehicleVisualizer(rclcpp::Node::SharedPtr node) : node_(node) {
-        node_->declare_parameter("fixed_frame", "map");
-        node_->declare_parameter("use_mesh", false);
-        node_->declare_parameter("car_mesh", "package://fsac_viz/meshes/whole_car.stl");
-        node_->declare_parameter("car_scale", 0.001);
-        node_->declare_parameter("show_trail", true);
-        node_->declare_parameter("trail_max_points", 200);
-        node_->declare_parameter("trail_min_dist", 0.1);
-        node_->declare_parameter("show_velocity_arrow", true);
-        node_->declare_parameter("show_status_text", true);
-        node_->declare_parameter("show_heading_arrow", true);
-        node_->declare_parameter("marker_lifetime", 0.3);
-        node_->declare_parameter("publish_rate", 30.0);
-        node_->declare_parameter("vehicle_state_topic", "/localization/vehicle_state");
-        node_->declare_parameter("ins_topic", "/INS/ASENSING_INS");
-        node_->declare_parameter("vehicle_marker_topic", "/fsd/viz/vehicle");
+        SafeDeclare(node_, "fixed_frame", std::string("map"));
+        SafeDeclare(node_, "use_mesh", false);
+        SafeDeclare(node_, "car_mesh", std::string("package://fsac_viz/meshes/whole_car.stl"));
+        SafeDeclare(node_, "car_scale", 0.001);
+        SafeDeclare(node_, "show_trail", true);
+        SafeDeclare(node_, "trail_max_points", 200);
+        SafeDeclare(node_, "trail_min_dist", 0.1);
+        SafeDeclare(node_, "show_velocity_arrow", true);
+        SafeDeclare(node_, "show_status_text", true);
+        SafeDeclare(node_, "show_heading_arrow", true);
+        SafeDeclare(node_, "marker_lifetime", 0.3);
+        SafeDeclare(node_, "publish_rate", 30.0);
+        SafeDeclare(node_, "vehicle_state_topic", std::string("/localization/vehicle_state"));
+        SafeDeclare(node_, "ins_topic", std::string("/INS/ASENSING_INS"));
+        SafeDeclare(node_, "vehicle_marker_topic", std::string("/fsd/viz/vehicle"));
 
         node_->get_parameter("fixed_frame", fixed_frame_);
         node_->get_parameter("use_mesh", use_mesh_);
@@ -685,13 +693,13 @@ class VehicleVisualizer {
 class PathVisualizer {
    public:
     explicit PathVisualizer(rclcpp::Node::SharedPtr node) : node_(node) {
-        node_->declare_parameter("fixed_frame", "map");
-        node_->declare_parameter("show_center_path", true);
-        node_->declare_parameter("show_boundaries", true);
-        node_->declare_parameter("show_path_points", true);
-        node_->declare_parameter("marker_lifetime", 0.5);
-        node_->declare_parameter("path_topic", "/planning/pathlimits");
-        node_->declare_parameter("path_marker_topic", "/fsd/viz/path");
+        SafeDeclare(node_, "fixed_frame", std::string("map"));
+        SafeDeclare(node_, "show_center_path", true);
+        SafeDeclare(node_, "show_boundaries", true);
+        SafeDeclare(node_, "show_path_points", true);
+        SafeDeclare(node_, "marker_lifetime", 0.5);
+        SafeDeclare(node_, "path_topic", std::string("/planning/pathlimits"));
+        SafeDeclare(node_, "path_marker_topic", std::string("/fsd/viz/path"));
 
         node_->get_parameter("fixed_frame", fixed_frame_);
         node_->get_parameter("show_center_path", show_center_path_);

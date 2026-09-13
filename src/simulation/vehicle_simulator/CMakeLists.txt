@@ -67,7 +67,7 @@ install(
 )
 
 install(
-  DIRECTORY config/ tracks/ launch/
+  DIRECTORY config tracks launch
   DESTINATION share/${PROJECT_NAME}
 )
 
