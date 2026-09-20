@@ -64,7 +64,7 @@ std::vector<ProfilePoint> VelocityProfiler::ComputeProfile(const std::vector<std
 
     // 5. 整合最优车速
     for (auto& pt : pts) {
-        pt.target_speed = std::clamp(pt.v_fwd, limits_.min_velocity, limits_.max_velocity);
+        pt.target_speed = std::clamp(pt.v_fwd, 0.0, limits_.max_velocity);
     }
 
     return pts;
@@ -132,7 +132,7 @@ void VelocityProfiler::ComputeCorneringLimits(std::vector<ProfilePoint>& pts) co
         } else {
             // a_y = v^2 * kappa <= a_y_max ==> v <= sqrt(a_y_max / kappa)
             double v_lim = std::sqrt(a_y_max / abs_k);
-            pt.v_corner = std::clamp(v_lim, limits_.min_velocity, limits_.max_velocity);
+            pt.v_corner = std::min(v_lim, limits_.max_velocity);
         }
     }
 }

@@ -86,6 +86,33 @@ TEST(VelocityProfilerTest, CornerDecelerationAndSpeedLimit) {
     EXPECT_LT(profile[corner_start_idx].target_speed, 12.0);
 }
 
+TEST(VelocityProfilerTest, CornerLimitOverridesMinimumCruisingSpeed) {
+    ProfilerLimits limits;
+    limits.min_velocity = 3.0;
+    limits.max_velocity = 20.0;
+    limits.max_lat_accel = 1.0;
+    limits.curvature_smoothing_window = 1;
+
+    VelocityProfiler profiler(limits);
+    std::vector<std::pair<double, double>> path;
+    constexpr double radius = 5.0;
+    for (int i = 0; i < 100; ++i) {
+        const double angle = static_cast<double>(i) * 0.03;
+        path.emplace_back(radius * std::sin(angle), radius * (1.0 - std::cos(angle)));
+    }
+
+    const auto profile = profiler.ComputeProfile(path, 3.0);
+    const double expected_max_speed = std::sqrt(limits.max_lat_accel * radius);
+    bool produced_below_minimum = false;
+    for (const auto& point : profile) {
+        EXPECT_LE(point.target_speed, expected_max_speed + 0.05);
+        EXPECT_LE(point.target_speed * point.target_speed * std::abs(point.curvature),
+                  limits.max_lat_accel + 0.05);
+        produced_below_minimum = produced_below_minimum || point.target_speed < limits.min_velocity;
+    }
+    EXPECT_TRUE(produced_below_minimum);
+}
+
 TEST(VelocityProfilerTest, EmptyAndDegeneratePath) {
     VelocityProfiler profiler;
 
