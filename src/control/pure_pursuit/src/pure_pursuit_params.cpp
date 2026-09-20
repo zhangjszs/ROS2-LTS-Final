@@ -4,8 +4,9 @@
 
 PurePursuitParams::PurePursuitParams(rclcpp::Node::SharedPtr node) {
     auto get = [&]<typename T>(const std::string& name, const T& default_val) -> T {
-        T val;
-        node->get_parameter_or<T>(name, val, default_val);
+        node->declare_parameter<T>(name, default_val);
+        T val = default_val;
+        node->get_parameter<T>(name, val);
         return val;
     };
 

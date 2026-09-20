@@ -73,10 +73,10 @@ def generate_launch_description():
         parameters=[
             pure_pursuit_config,
             {
-                'topics/path': LaunchConfiguration('path_topic'),
-                'topics/vehicle_state': LaunchConfiguration('vehicle_state_topic'),
-                'topics/stop': LaunchConfiguration('stop_topic'),
-                'topics/vehicle_command': LaunchConfiguration('vehicle_command_topic'),
+                'topics.path': LaunchConfiguration('path_topic'),
+                'topics.vehicle_state': LaunchConfiguration('vehicle_state_topic'),
+                'topics.stop': LaunchConfiguration('stop_topic'),
+                'topics.vehicle_command': LaunchConfiguration('vehicle_command_topic'),
             },
         ],
     )

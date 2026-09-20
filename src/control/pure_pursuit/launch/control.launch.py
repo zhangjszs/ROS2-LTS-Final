@@ -82,12 +82,12 @@ def generate_launch_description():
             pure_pursuit_config,
             {
                 'road_type': LaunchConfiguration('road_type'),
-                'topics/path': LaunchConfiguration('path_topic'),
-                'topics/vehicle_state': LaunchConfiguration('vehicle_state_topic'),
-                'topics/stop': LaunchConfiguration('stop_topic'),
-                'topics/vehicle_command': LaunchConfiguration('vehicle_command_topic'),
-                'safety/path_timeout': LaunchConfiguration('path_timeout'),
-                'safety/state_timeout': LaunchConfiguration('state_timeout'),
+                'topics.path': LaunchConfiguration('path_topic'),
+                'topics.vehicle_state': LaunchConfiguration('vehicle_state_topic'),
+                'topics.stop': LaunchConfiguration('stop_topic'),
+                'topics.vehicle_command': LaunchConfiguration('vehicle_command_topic'),
+                'safety.path_timeout': LaunchConfiguration('path_timeout'),
+                'safety.state_timeout': LaunchConfiguration('state_timeout'),
             },
         ],
     )

@@ -8,10 +8,13 @@ VehicleStateEstimator::VehicleStateEstimator(rclcpp::Node::SharedPtr node)
     : node_(node), tf_broadcaster_(*node), diag_updater_(node) {
     std::string ins_topic;
     std::string vehicle_state_topic;
-    node_->get_parameter_or<std::string>("ins_topic", ins_topic, "/INS/ASENSING_INS");
-    node_->get_parameter_or<std::string>("vehicle_state_topic", vehicle_state_topic, "/localization/vehicle_state");
+    node_->declare_parameter<std::string>("ins_topic", "/INS/ASENSING_INS");
+    node_->declare_parameter<std::string>("vehicle_state_topic", "/localization/vehicle_state");
+    node_->get_parameter<std::string>("ins_topic", ins_topic);
+    node_->get_parameter<std::string>("vehicle_state_topic", vehicle_state_topic);
 
-    node_->get_parameter_or<int>("azimuth_init_frames", azimuth_init_frames_, 5);
+    node_->declare_parameter<int>("azimuth_init_frames", 5);
+    node_->get_parameter<int>("azimuth_init_frames", azimuth_init_frames_);
     ins_sub_ = node_->create_subscription<common_msgs::msg::HuatASENSING>(
         ins_topic, 1, [this](const common_msgs::msg::HuatASENSING::ConstSharedPtr msg) { OnInsMessage(msg); });
     state_pub_ = node_->create_publisher<common_msgs::msg::HuatCarstate>(vehicle_state_topic, 1);
