@@ -88,9 +88,11 @@ ConeFusion::ConeFusion(rclcpp::Node::SharedPtr node) : node_(node), diag_updater
     node_->declare_parameter("vision_detections_topic", std::string("/perception/vision/detections"));
     node_->get_parameter("vision_detections_topic", vision_detections_topic);
 
-    // P1-H: ApproximateTime 同步订阅——两话题在同一回调中共享时间戳，消除 50ms 延迟
-    cone_sub_mf_.subscribe(node.get(), input_cones_topic, 5);
-    car_state_sub_mf_.subscribe(node.get(), vehicle_state_topic, 10);
+    // P1-H: ApproximateTime 同步订阅——DDS 深度与同步器队列分别配置
+    const auto cone_qos = rclcpp::QoS(rclcpp::KeepLast(5)).reliable().durability_volatile();
+    const auto vehicle_state_qos = rclcpp::QoS(rclcpp::KeepLast(10)).reliable().durability_volatile();
+    cone_sub_mf_.subscribe(node.get(), input_cones_topic, cone_qos);
+    car_state_sub_mf_.subscribe(node.get(), vehicle_state_topic, vehicle_state_qos);
     sync_ = std::make_unique<message_filters::Synchronizer<ApproxSyncPolicy>>(
         ApproxSyncPolicy(static_cast<uint32_t>(approx_queue)), cone_sub_mf_, car_state_sub_mf_);
     sync_->registerCallback([this](const common_msgs::msg::HuatConeCluster::ConstSharedPtr& lidar_msg,
