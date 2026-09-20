@@ -39,6 +39,39 @@ TEST(BicycleModelTest, StraightLineAcceleration) {
     EXPECT_NEAR(s.steering_angle, 0.0, 1e-4);  // 前轮无转角
 }
 
+TEST(BicycleModelTest, LongitudinalDerivativesHaveDistinctUnits) {
+    BicycleModel model;
+    VehicleState state{.v = 5.0, .accel = 2.0};
+    ControlCommand cmd{.target_accel = 4.0};
+
+    const auto derivative = model.ComputeDerivative(state, cmd);
+
+    EXPECT_DOUBLE_EQ(derivative.v, state.accel);
+    EXPECT_DOUBLE_EQ(derivative.accel, 20.0);
+}
+
+TEST(BicycleModelTest, AccelerationResponseMatchesFirstOrderModel) {
+    VehicleParams params;
+    params.max_speed = 100.0;
+    BicycleModel model(params);
+    model.Reset();
+
+    constexpr double target_accel = 4.0;
+    constexpr double dt = 0.001;
+    constexpr int steps = 1000;
+    for (int i = 0; i < steps; ++i) {
+        model.Step(ControlCommand{.target_accel = target_accel}, dt);
+    }
+
+    const double time = steps * dt;
+    const double tau = params.throttle_time_const;
+    const double expected_velocity = target_accel * (time - tau * (1.0 - std::exp(-time / tau)));
+    const double expected_accel = target_accel * (1.0 - std::exp(-time / tau));
+
+    EXPECT_NEAR(model.state().v, expected_velocity, 1e-4);
+    EXPECT_NEAR(model.state().accel, expected_accel, 1e-4);
+}
+
 TEST(BicycleModelTest, SteadyStateCurvatureRadius) {
     VehicleParams params;
     params.wheelbase = 1.55;

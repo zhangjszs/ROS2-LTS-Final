@@ -48,8 +48,8 @@ VehicleState BicycleModel::ComputeDerivative(const VehicleState& state, const Co
 
     // 2. 纵向动力系统一阶滞后与加减速限幅
     const double target_accel_clamped = std::clamp(cmd.target_accel, -params_.max_decel, params_.max_accel);
-    deriv.v = (target_accel_clamped - state.accel) / params_.throttle_time_const;
-    deriv.accel = deriv.v;
+    deriv.v = state.accel;
+    deriv.accel = (target_accel_clamped - state.accel) / params_.throttle_time_const;
 
     // 3. 质心侧偏角 beta (Slip angle at center of gravity)
     const double beta = std::atan(params_.lr_ratio * std::tan(state.steering_angle));
