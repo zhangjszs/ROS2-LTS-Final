@@ -45,15 +45,15 @@ th_dist:
 z_up: 0.7 # clip z up threshold (clip 截断)
 z_down: -2.0 # clip z down threshold (default: -1.0)
 # accelerate
-accel_x_max: 50
+accel_x_max: 50.0
 accel_x_min: 0.5
-accel_y_max: 2
-accel_y_min: -2
+accel_y_max: 2.0
+accel_y_min: -2.0
 # track
-track_x_max: 50 # forward
+track_x_max: 50.0 # forward
 track_x_min: 0.1 # backward
-track_y_max: 10 # left
-track_y_min: -10 # right
+track_y_max: 10.0 # left
+track_y_min: -10.0 # right
 # skidpad (not in use)  （这里建议加上去）  这是个弧形 要加上去。
 skid_max: 30
 skid_min: 0.1

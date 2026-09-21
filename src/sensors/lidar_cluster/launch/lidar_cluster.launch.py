@@ -22,11 +22,13 @@
 # limitations under the License.
 
 import os
+import yaml
 
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, ExecuteProcess
+from launch.actions import DeclareLaunchArgument, OpaqueFunction
 from launch.substitutions import LaunchConfiguration
-from launch_ros.actions import Node
+from launch_ros.actions import ComposableNodeContainer, LoadComposableNodes, Node
+from launch_ros.descriptions import ComposableNode
 from ament_index_python.packages import get_package_share_directory
 
 
@@ -78,25 +80,47 @@ def generate_launch_description():
     )
 
     # Component container (replaces nodelet manager)
-    component_container = Node(
+    component_container = ComposableNodeContainer(
         package='rclcpp_components',
         executable='component_container',
         name='lidar_cluster_nodelet_manager',
+        namespace='',
         output='screen',
     )
 
-    # Load LidarClusterComponent as component
-    # In ROS2, components are loaded via CLI after container starts
-    load_lidar_cluster_component = ExecuteProcess(
-        cmd=[
-            'ros2', 'component', 'load',
-            '/lidar_cluster_nodelet_manager',
-            'lidar_cluster',
-            'lidar_cluster::LidarClusterComponent',
-            'lidar_cluster_node',
-        ],
-        output='screen',
-    )
+    def load_lidar_cluster_component(context):
+        config_path = LaunchConfiguration('cluster_config').perform(context)
+        with open(config_path, encoding='utf-8') as config_file:
+            config = yaml.safe_load(config_file) or {}
+
+        def as_bool(value):
+            return str(value).lower() in ('1', 'true', 'yes', 'on')
+
+        parameters = [
+            config,
+            {
+                'input_topic': LaunchConfiguration('input_topic').perform(context),
+                'output_cones_topic': LaunchConfiguration('output_cones_topic').perform(context),
+                'vehicle_state_topic': LaunchConfiguration('vehicle_state_topic').perform(context),
+                'ins_p2_topic': LaunchConfiguration('ins_p2_topic').perform(context),
+                'ins_asensing_topic': LaunchConfiguration('ins_asensing_topic').perform(context),
+                'enable_debug_topics': as_bool(LaunchConfiguration('enable_debug_topics').perform(context)),
+                'road_type': int(LaunchConfiguration('road_type').perform(context)),
+            },
+        ]
+        return [
+            LoadComposableNodes(
+                target_container='/lidar_cluster_nodelet_manager',
+                composable_node_descriptions=[
+                    ComposableNode(
+                        package='lidar_cluster',
+                        plugin='lidar_cluster::LidarClusterComponent',
+                        name='lidar_cluster_node',
+                        parameters=parameters,
+                    )
+                ],
+            )
+        ]
 
     return LaunchDescription([
         # Arguments
@@ -111,5 +135,5 @@ def generate_launch_description():
 
         # Container and component
         component_container,
-        load_lidar_cluster_component,
+        OpaqueFunction(function=load_lidar_cluster_component),
     ])
