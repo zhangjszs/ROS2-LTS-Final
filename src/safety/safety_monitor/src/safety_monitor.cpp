@@ -54,7 +54,9 @@ class SafetyMonitor {
             RCLCPP_INFO(node_->get_logger(), "%s",
                         std::format("[safety_monitor] Manual reset enabled on: {}", reset_stop_topic).c_str());
         }
-        pub_stop_ = node_->create_publisher<common_msgs::msg::HuatStop>(stop_topic, 1);  // 锁存发布
+        const auto stop_qos = rclcpp::QoS(rclcpp::KeepLast(1)).reliable().transient_local();
+        pub_stop_ = node_->create_publisher<common_msgs::msg::HuatStop>(stop_topic, stop_qos);
+        publishStop(false);
 
         // last_pathlimits_time_ starts on first vehicle_state so a silent planner still times out.
 

@@ -102,8 +102,9 @@ void MpcControllerNode::SetupSubscribersAndPublishers() {
     path_sub_ = create_subscription<common_msgs::msg::HuatPathLimits>(
         config_.topics.path, 10, [this](const common_msgs::msg::HuatPathLimits::ConstSharedPtr msg) { OnPath(msg); });
 
+    const auto stop_qos = rclcpp::QoS(rclcpp::KeepLast(1)).reliable().transient_local();
     stop_sub_ = create_subscription<common_msgs::msg::HuatStop>(
-        config_.topics.stop, 10, [this](const common_msgs::msg::HuatStop::ConstSharedPtr msg) { OnStop(msg); });
+        config_.topics.stop, stop_qos, [this](const common_msgs::msg::HuatStop::ConstSharedPtr msg) { OnStop(msg); });
 
     cmd_pub_ = create_publisher<common_msgs::msg::HuatVehicleCmd>(config_.topics.vehicle_command, 1);
     pred_path_pub_ = create_publisher<nav_msgs::msg::Path>(config_.topics.predicted_path, 1);
