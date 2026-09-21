@@ -2,6 +2,7 @@
 #include <diagnostic_updater/diagnostic_updater.hpp>
 #include <format>
 #include <rclcpp/rclcpp.hpp>
+#include <mutex>
 #include <stop_token>
 #include <thread>
 
@@ -115,6 +116,7 @@ class SafetyMonitor {
         }
     }
     void DiagnoseHealth(diagnostic_updater::DiagnosticStatusWrapper& stat) {
+        std::scoped_lock lock(state_mutex_);
         if (!has_vehicle_state_) {
             stat.summary(diagnostic_msgs::msg::DiagnosticStatus::STALE, "No vehicle state received yet");
         } else if (!has_nonempty_pathlimits_) {
@@ -147,6 +149,7 @@ class SafetyMonitor {
     }
 
     void OnPathLimits(const common_msgs::msg::HuatPathLimits::ConstSharedPtr& msg) {
+        std::scoped_lock lock(state_mutex_);
         if (msg->path.empty()) {
             RCLCPP_WARN_THROTTLE(node_->get_logger(), *node_->get_clock(), 1000,
                                  "[safety_monitor] Empty pathlimits ignored (not a liveness heartbeat)");
@@ -165,6 +168,7 @@ class SafetyMonitor {
     }
 
     void OnVehicleState(const common_msgs::msg::HuatCarstate::ConstSharedPtr& msg) {
+        std::scoped_lock lock(state_mutex_);
         if (!has_vehicle_state_) {
             last_pathlimits_time_ = node_->now();
         }
@@ -173,6 +177,7 @@ class SafetyMonitor {
     }
 
     void OnStopRequest(const common_msgs::msg::HuatStop::ConstSharedPtr& msg) {
+        std::scoped_lock lock(state_mutex_);
         if (msg->stop) {
             auto result = state_machine_.onStopRequested();
             if (result.action == StopAction::PUBLISH_STOP) {
@@ -187,6 +192,7 @@ class SafetyMonitor {
     }
 
     void OnResetStop(const common_msgs::msg::HuatStop::ConstSharedPtr& msg) {
+        std::scoped_lock lock(state_mutex_);
         if (!msg->stop) {
             auto result = state_machine_.onManualReset();
             if (result.action == StopAction::CLEAR_STOP) {
@@ -202,6 +208,7 @@ class SafetyMonitor {
     }
 
     void checkPlannerLiveness() {
+        std::scoped_lock lock(state_mutex_);
         if (!has_vehicle_state_)
             return;  // 先等待车辆状态
 
@@ -241,6 +248,7 @@ class SafetyMonitor {
     bool has_vehicle_state_;
     bool has_nonempty_pathlimits_;
     StopStateMachine state_machine_;
+    mutable std::mutex state_mutex_;
     double current_speed_ = 0.0;
     bool stop_active_ = false;
     StopReason stop_reason_ = StopReason::NONE;
