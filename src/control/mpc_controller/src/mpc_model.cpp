@@ -194,16 +194,18 @@ MpcSolution MpcModel::Step(double current_x, double current_y, double current_th
     // 8. 调用 ADMM QP 求解器
     QpResult qp_res = qp_solver_.Solve(H, g, lb, ub);
 
-    if (!qp_res.converged && qp_res.iterations >= qp_solver_.GetSettings().max_iter) {
-        // 如果未严格收敛但得到了可行解，进行平滑保护
-        solution.steering_rad = std::clamp(qp_res.x(0), lb(0), ub(0));
-        solution.accel_mps2 = std::clamp(qp_res.x(1), lb(1), ub(1));
-        solution.success = true;
-    } else {
-        solution.steering_rad = qp_res.x(0);
-        solution.accel_mps2 = qp_res.x(1);
-        solution.success = qp_res.converged;
+    const bool acceptable_approximation =
+        !qp_res.converged && qp_res.iterations >= qp_solver_.GetSettings().max_iter &&
+        qp_res.primal_residual <= qp_solver_.GetSettings().acceptable_primal_residual &&
+        qp_res.dual_residual <= qp_solver_.GetSettings().acceptable_dual_residual;
+    if ((!qp_res.converged && !acceptable_approximation) || qp_res.x.size() < 2 || !qp_res.x.allFinite()) {
+        solution.success = false;
+        return solution;
     }
+
+    solution.steering_rad = qp_res.x(0);
+    solution.accel_mps2 = qp_res.x(1);
+    solution.success = true;
 
     // 9. 基于解出的最优前瞻控制序列进行运动学时域轨迹前向积分推演
     std::vector<PredictedPoint> pred_path;

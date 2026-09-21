@@ -17,6 +17,8 @@ struct QpSettings {
     double eps_rel{1e-4};   // 相对收敛容差
     size_t max_iter{50};    // 最大迭代步数
     bool warm_start{true};  // 是否启用热启动
+    double acceptable_primal_residual{0.25};
+    double acceptable_dual_residual{0.01};
 };
 
 /**
@@ -27,6 +29,10 @@ struct QpResult {
     size_t iterations{0};   // 实际迭代次数
     bool converged{false};  // 是否满足收敛准则
     double cost{0.0};       // 最终代价值
+    double primal_residual{0.0};
+    double dual_residual{0.0};
+    double primal_tolerance{0.0};
+    double dual_tolerance{0.0};
 };
 
 /**

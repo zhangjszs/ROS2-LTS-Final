@@ -1,5 +1,7 @@
 #include "mpc_controller/qp_solver.hpp"
 
+#include <limits>
+
 namespace mpc {
 
 QpResult BoxQpSolver::Solve(const Eigen::MatrixXd& H, const Eigen::VectorXd& g, const Eigen::VectorXd& lb,
@@ -45,6 +47,10 @@ QpResult BoxQpSolver::Solve(const Eigen::MatrixXd& H, const Eigen::VectorXd& g, 
     // 4. ADMM 迭代循环
     bool converged = false;
     size_t iter = 0;
+    double final_primal_residual = std::numeric_limits<double>::infinity();
+    double final_dual_residual = std::numeric_limits<double>::infinity();
+    double final_eps_pri = std::numeric_limits<double>::infinity();
+    double final_eps_dual = std::numeric_limits<double>::infinity();
     for (; iter < settings_.max_iter; ++iter) {
         // Step 1: u 子问题求解 (通过已分解的 Cholesky 因子做极速三角前向/后向代入)
         Eigen::VectorXd rhs = rho * z - y - g;
@@ -65,6 +71,10 @@ QpResult BoxQpSolver::Solve(const Eigen::MatrixXd& H, const Eigen::VectorXd& g, 
         double eps_pri = settings_.eps_abs + settings_.eps_rel * std::max(u.template lpNorm<Eigen::Infinity>(),
                                                                           z.template lpNorm<Eigen::Infinity>());
         double eps_dual = settings_.eps_abs + settings_.eps_rel * y.template lpNorm<Eigen::Infinity>();
+        final_primal_residual = r_pri;
+        final_dual_residual = r_dual;
+        final_eps_pri = eps_pri;
+        final_eps_dual = eps_dual;
 
         if (r_pri <= eps_pri && r_dual <= eps_dual) {
             converged = true;
@@ -81,6 +91,10 @@ QpResult BoxQpSolver::Solve(const Eigen::MatrixXd& H, const Eigen::VectorXd& g, 
     result.iterations = iter;
     result.converged = converged;
     result.cost = 0.5 * z.dot(H * z) + g.dot(z);
+    result.primal_residual = final_primal_residual;
+    result.dual_residual = final_dual_residual;
+    result.primal_tolerance = final_eps_pri;
+    result.dual_tolerance = final_eps_dual;
 
     return result;
 }

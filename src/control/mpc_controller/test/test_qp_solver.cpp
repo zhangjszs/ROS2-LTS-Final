@@ -71,3 +71,23 @@ TEST(BoxQpSolverTest, HighDimensionalQpPerformance) {
         EXPECT_LE(res.x(i), ub(i) + 1e-4);
     }
 }
+
+TEST(BoxQpSolverTest, ReportsNonConvergenceEvidenceAtIterationLimit) {
+    QpSettings settings;
+    settings.max_iter = 1;
+    BoxQpSolver solver(settings);
+
+    Eigen::MatrixXd H = 2.0 * Eigen::MatrixXd::Identity(4, 4);
+    Eigen::VectorXd g = Eigen::VectorXd::Constant(4, -4.0);
+    Eigen::VectorXd lb = Eigen::VectorXd::Constant(4, -10.0);
+    Eigen::VectorXd ub = Eigen::VectorXd::Constant(4, 10.0);
+
+    const auto result = solver.Solve(H, g, lb, ub);
+
+    EXPECT_FALSE(result.converged);
+    EXPECT_EQ(result.iterations, 1u);
+    EXPECT_TRUE(std::isfinite(result.primal_residual));
+    EXPECT_TRUE(std::isfinite(result.dual_residual));
+    EXPECT_GT(result.primal_tolerance, 0.0);
+    EXPECT_GT(result.dual_tolerance, 0.0);
+}
