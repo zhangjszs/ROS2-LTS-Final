@@ -68,3 +68,18 @@ TEST(MpcModelTest, SpeedTrackingAccelerationAndBraking) {
     EXPECT_TRUE(sol_brake.success);
     EXPECT_LT(sol_brake.accel_mps2, -0.2);
 }
+
+TEST(MpcModelTest, ExplicitZeroSpeedRemainsAStopTarget) {
+    MpcConfig config;
+    MpcModel model(config);
+
+    std::vector<ReferencePoint> path;
+    for (double x = 0.0; x <= 30.0; x += 0.5) {
+        path.push_back({.x = x, .y = 0.0, .theta = 0.0, .curvature = 0.0, .speed = 0.0, .speed_valid = true});
+    }
+
+    const auto solution = model.Step(5.0, 0.0, 0.0, 5.0, 0.0, 0.0, path);
+
+    ASSERT_TRUE(solution.success);
+    EXPECT_LT(solution.accel_mps2, -0.2);
+}

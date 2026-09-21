@@ -108,8 +108,9 @@ void VelocityProfilerNode::OnPathLimits(const common_msgs::msg::HuatPathLimits::
     auto profile = profiler_.ComputeProfile(raw_pts, current_speed_);
 
     common_msgs::msg::HuatPathLimits out_msg = *msg;
+    out_msg.target_speeds.resize(profile.size());
     for (size_t i = 0; i < out_msg.path.size() && i < profile.size(); ++i) {
-        out_msg.path[i].z = profile[i].target_speed;  // 关键协议：在 z 中编码各点最优车速 (m/s)
+        out_msg.target_speeds[i] = profile[i].target_speed;
     }
 
     pub_path_->publish(out_msg);

@@ -19,6 +19,7 @@ struct ReferencePoint {
     double theta{0.0};
     double curvature{0.0};
     double speed{0.0};
+    bool speed_valid{true};
 };
 
 /**

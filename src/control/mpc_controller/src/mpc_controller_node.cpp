@@ -127,12 +127,19 @@ void MpcControllerNode::OnPath(const common_msgs::msg::HuatPathLimits::ConstShar
 
     std::vector<ReferencePoint> pts;
     pts.reserve(msg->path.size());
+    const bool has_explicit_speeds = msg->target_speeds.size() == msg->path.size();
 
     for (size_t i = 0; i < msg->path.size(); ++i) {
         ReferencePoint pt;
         pt.x = msg->path[i].x;
         pt.y = msg->path[i].y;
-        pt.speed = (msg->path[i].z > 0.1) ? msg->path[i].z : config_.horizon.target_speed;
+        if (has_explicit_speeds) {
+            pt.speed = msg->target_speeds[i];
+            pt.speed_valid = std::isfinite(pt.speed) && pt.speed >= 0.0;
+        } else {
+            pt.speed = msg->path[i].z;
+            pt.speed_valid = std::isfinite(pt.speed) && pt.speed > 0.1;
+        }
 
         // 计算航向角与曲率估计
         if (i + 1 < msg->path.size()) {

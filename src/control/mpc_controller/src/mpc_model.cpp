@@ -41,7 +41,7 @@ MpcSolution MpcModel::Step(double current_x, double current_y, double current_th
         size_t idx = best_idx + k;
         if (idx < reference_path.size()) {
             ReferencePoint pt = reference_path[idx];
-            if (pt.speed <= 0.1) {
+            if (!pt.speed_valid) {
                 pt.speed = target_v;
             }
             ref_horizon.push_back(pt);
