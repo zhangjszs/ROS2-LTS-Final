@@ -15,7 +15,15 @@ constexpr double kPi = std::numbers::pi_v<double>;
 
 PurePursuitController::PurePursuitController(rclcpp::Node::SharedPtr node)
     : node_(node), params_(node), input_guard_(params_.safety.state_timeout, params_.safety.path_timeout) {
-    steering_ = 90;
+    // 转向编码统一走 common_msgs::vehicle::SteeringCalibration（issue #2），不再硬编码零位/比例
+    steering_calib_ = common_msgs::vehicle::SteeringCalibration{
+        .neutral = static_cast<double>(params_.algorithm.steering.mapping.neutral),
+        .units_per_degree = params_.algorithm.steering.mapping.units_per_degree,
+        .min_raw = static_cast<double>(params_.algorithm.steering.mapping.min_raw),
+        .max_raw = static_cast<double>(params_.algorithm.steering.mapping.max_raw),
+    };
+    steering_ = steering_calib_.neutralRaw();
+    encoder_ = VehicleCommandEncoder(steering_);
     pedal_ratio_ = 0;
     racing_num_ = params_.system.racing_num;
     racing_status_ = 1;
@@ -259,8 +267,7 @@ void PurePursuitController::ComputeControlCommand(common_msgs::msg::HuatControlC
         cmd.steering_angle.data = delta;
         RCLCPP_DEBUG(node_->get_logger(), "[pure_pursuit] Steering angle: %f, steering: %d, speed: %f", delta,
                      steering_, current_speed_);
-        steering_ = static_cast<int>(cmd.steering_angle.data * 180 / kPi * steer.mapping.deg_per_rad) +
-                    steer.mapping.center_offset;
+        steering_ = steering_calib_.encodeRad(cmd.steering_angle.data);
         long_error_ = throt.target_speed - current_speed_;
         {
             const double zone = throt.speed_blend_zone > 0.0 ? throt.speed_blend_zone : 0.0;
@@ -306,12 +313,7 @@ void PurePursuitController::ComputeControlCommand(common_msgs::msg::HuatControlC
                      pedal_ratio_);
         pedal_ratio_ = static_cast<int>(cmd.throttle.data);
 
-        if (steering_ < steer.mapping.clamp_min) {
-            steering_ = steer.mapping.clamp_min;
-        } else if (steering_ > steer.mapping.clamp_max) {
-            steering_ = steer.mapping.clamp_max;
-        }
-
+        // 限幅已在 SteeringCalibration::encodeRad 内完成（min_raw/max_raw）
         if (pedal_ratio_ < throt.pedal_min) {
             pedal_ratio_ = throt.pedal_min;
         } else if (pedal_ratio_ > throt.pedal_max) {

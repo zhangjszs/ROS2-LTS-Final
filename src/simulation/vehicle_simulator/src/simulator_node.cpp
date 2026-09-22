@@ -54,6 +54,12 @@ void SimulatorNode::LoadParameters() {
     declare_parameter<double>("max_decel", 9.0);
     declare_parameter<double>("max_speed", 25.0);
 
+    // 转向指令解码标定（issue #2），与控制器侧 steering.* 保持同一协议
+    declare_parameter<double>("steering.neutral", 90.0);
+    declare_parameter<double>("steering.units_per_degree", 1.0);
+    declare_parameter<double>("steering.min_raw", 65.0);
+    declare_parameter<double>("steering.max_raw", 115.0);
+
     get_parameter("sim_rate", sim_rate_);
     get_parameter("sensor_rate", sensor_rate_);
     get_parameter("fov_deg", fov_deg_);
@@ -73,6 +79,10 @@ void SimulatorNode::LoadParameters() {
     get_parameter("max_accel", p.max_accel);
     get_parameter("max_decel", p.max_decel);
     get_parameter("max_speed", p.max_speed);
+    get_parameter("steering.neutral", steering_calib_.neutral);
+    get_parameter("steering.units_per_degree", steering_calib_.units_per_degree);
+    get_parameter("steering.min_raw", steering_calib_.min_raw);
+    get_parameter("steering.max_raw", steering_calib_.max_raw);
 
     bicycle_model_.set_params(p);
     bicycle_model_.Reset(init_x, init_y, init_theta, init_v);
@@ -111,9 +121,8 @@ void SimulatorNode::OnVehicleCommand(const common_msgs::msg::HuatVehicleCmd::Con
     if (stop_active_)
         return;
 
-    // 解码转向: 90 为居中, 左转 < 90, 右转 > 90
-    double steer_deg = static_cast<double>(msg->steering) - 90.0;
-    current_cmd_.target_steering = steer_deg * (kPi / 180.0);
+    // 转向解码统一走 SteeringCalibration（零位/比例由 steering.* 参数配置，默认 90 居中）
+    current_cmd_.target_steering = steering_calib_.decodeRad(static_cast<int>(msg->steering));
 
     // 解码油门与制动
     if (msg->brake_force > 0) {

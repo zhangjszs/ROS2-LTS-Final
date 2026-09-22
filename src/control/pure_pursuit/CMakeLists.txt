@@ -75,6 +75,12 @@ if(BUILD_TESTING)
     tf2::tf2
     tf2_eigen::tf2_eigen
   )
+  ament_add_gtest(test_steering_calibration
+    test/test_steering_calibration.cpp
+  )
+  target_link_libraries(test_steering_calibration
+    common_msgs::common_msgs
+  )
 endif()
 
 ament_export_dependencies(

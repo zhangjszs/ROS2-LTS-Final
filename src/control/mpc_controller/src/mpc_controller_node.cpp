@@ -4,15 +4,8 @@
 #include <chrono>
 #include <cmath>
 #include <geometry_msgs/msg/pose_stamped.hpp>
-#include <numbers>
 
 namespace mpc {
-
-namespace {
-
-constexpr double kPi = std::numbers::pi_v<double>;
-
-}  // namespace
 
 MpcControllerNode::MpcControllerNode(const rclcpp::NodeOptions& options) : Node("mpc_controller_node", options) {
     LoadParameters();
@@ -52,6 +45,12 @@ void MpcControllerNode::LoadParameters() {
     declare_parameter<double>("mpc.min_accel", -4.0);
     declare_parameter<double>("mpc.max_accel", 3.0);
 
+    // 转向指令编码（issue #2）：默认与仿真器/评测一致（零位 90，1 raw/度，±25°），真实底盘协议由参数覆盖
+    declare_parameter<double>("steering.neutral", 90.0);
+    declare_parameter<double>("steering.units_per_degree", 1.0);
+    declare_parameter<double>("steering.min_raw", 65.0);
+    declare_parameter<double>("steering.max_raw", 115.0);
+
     declare_parameter<std::string>("topics.vehicle_state", "/localization/vehicle_state");
     declare_parameter<std::string>("topics.path", "/planning/skidpad_predict_path");
     declare_parameter<std::string>("topics.stop", "/system/stop");
@@ -85,6 +84,11 @@ void MpcControllerNode::LoadParameters() {
     get_parameter("mpc.max_steer_rate", config_.limits.max_steer_rate);
     get_parameter("mpc.min_accel", config_.limits.min_accel);
     get_parameter("mpc.max_accel", config_.limits.max_accel);
+
+    get_parameter("steering.neutral", steering_calib_.neutral);
+    get_parameter("steering.units_per_degree", steering_calib_.units_per_degree);
+    get_parameter("steering.min_raw", steering_calib_.min_raw);
+    get_parameter("steering.max_raw", steering_calib_.max_raw);
 
     get_parameter("topics.vehicle_state", config_.topics.vehicle_state);
     get_parameter("topics.path", config_.topics.path);
@@ -219,10 +223,8 @@ void MpcControllerNode::PublishVehicleCommand(double steering_rad, double accel_
     cmd.racing_num = static_cast<uint8_t>(config_.system.racing_num);
     cmd.racing_status = 1;
 
-    // 前轮转角映射: 90 度居中, 范围 [90 - 25, 90 + 25] = [65, 115]
-    double steer_deg = steering_rad * (180.0 / kPi);
-    int steer_cmd = 90 + static_cast<int>(std::round(steer_deg));
-    cmd.steering = static_cast<uint8_t>(std::clamp(steer_cmd, 65, 115));
+    // 前轮转角映射统一走 SteeringCalibration（零位/比例/限幅均由 steering.* 参数配置）
+    cmd.steering = static_cast<uint8_t>(steering_calib_.encodeRad(steering_rad));
 
     // 加速度映射为油门 (pedal_ratio) 与制动 (brake_force)
     if (accel_mps2 >= 0.0) {
@@ -249,7 +251,7 @@ void MpcControllerNode::PublishEmergencyBrake() {
     cmd.working_mode = 1;
     cmd.racing_num = static_cast<uint8_t>(config_.system.racing_num);
     cmd.racing_status = 4;
-    cmd.steering = 90;
+    cmd.steering = static_cast<uint8_t>(steering_calib_.neutralRaw());
     cmd.pedal_ratio = 0;
     cmd.brake_force = 80;
     cmd.checksum = static_cast<uint16_t>(cmd.steering + cmd.brake_force + cmd.pedal_ratio + cmd.gear_position +

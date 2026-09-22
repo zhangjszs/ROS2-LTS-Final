@@ -10,6 +10,7 @@
 #include "common_msgs/msg/huat_vehicle_cmd.hpp"
 #include "mpc_controller/mpc_model.hpp"
 #include "mpc_controller/mpc_params.hpp"
+#include "steering_calibration.h"  // 仓库约定：common_msgs 手写头不带前缀（同 cone_types.h）
 
 namespace mpc {
 
@@ -34,6 +35,7 @@ class MpcControllerNode : public rclcpp::Node {
 
     MpcConfig config_;
     MpcModel mpc_model_;
+    common_msgs::vehicle::SteeringCalibration steering_calib_;
 
     // 状态记录
     double current_x_{0.0};

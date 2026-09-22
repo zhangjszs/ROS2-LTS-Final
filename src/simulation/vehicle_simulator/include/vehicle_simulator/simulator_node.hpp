@@ -12,6 +12,7 @@
 #include "common_msgs/msg/huat_map.hpp"
 #include "common_msgs/msg/huat_stop.hpp"
 #include "common_msgs/msg/huat_vehicle_cmd.hpp"
+#include "steering_calibration.h"  // 仓库约定：common_msgs 手写头不带前缀（同 cone_types.h）
 #include "vehicle_simulator/bicycle_model.hpp"
 #include "vehicle_simulator/sensor_simulator.hpp"
 
@@ -44,6 +45,7 @@ class SimulatorNode : public rclcpp::Node {
 
     // 参数
     double sim_rate_{100.0};
+    common_msgs::vehicle::SteeringCalibration steering_calib_;
     double sensor_rate_{20.0};
     double fov_deg_{120.0};
     double max_range_{15.0};

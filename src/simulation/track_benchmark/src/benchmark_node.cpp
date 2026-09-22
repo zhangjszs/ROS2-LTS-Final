@@ -4,15 +4,8 @@
 #include <format>
 #include <fstream>
 #include <iostream>
-#include <numbers>
 
 namespace benchmark {
-
-namespace {
-
-constexpr double kPi = std::numbers::pi_v<double>;
-
-}  // namespace
 
 BenchmarkNode::BenchmarkNode(const rclcpp::NodeOptions& options) : Node("track_benchmark_node", options) {
     LoadParameters();
@@ -87,8 +80,9 @@ void BenchmarkNode::SetupSubscribersAndPublishers() {
 }
 
 void BenchmarkNode::OnVehicleCommand(const common_msgs::msg::HuatVehicleCmd::ConstSharedPtr& msg) {
-    double steer_deg = static_cast<double>(msg->steering) - 90.0;
-    current_steer_rad_ = steer_deg * (kPi / 180.0);
+    // 转向解码统一走 SteeringCalibration（issue #2）：零位 90、1 raw/度，与仿真器/控制器默认一致
+    static const common_msgs::vehicle::SteeringCalibration kSteeringCalib{};
+    current_steer_rad_ = kSteeringCalib.decodeRad(static_cast<int>(msg->steering));
 }
 
 void BenchmarkNode::OnVehicleState(const common_msgs::msg::HuatCarstate::ConstSharedPtr& msg) {

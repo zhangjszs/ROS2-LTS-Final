@@ -8,7 +8,8 @@
 
 class VehicleCommandEncoder {
    public:
-    VehicleCommandEncoder() = default;
+    // neutral_steering：零转角 raw 指令值，由 SteeringCalibration（issue #2）统一提供，默认与仿真协议一致
+    explicit VehicleCommandEncoder(int neutral_steering = 90) : neutral_steering_(neutral_steering) {}
 
     common_msgs::msg::HuatVehicleCmd encode(int steering, int brake_force, int pedal_ratio, int gear_position,
                                             int working_mode, int racing_num, int racing_status) const;
@@ -29,6 +30,8 @@ class VehicleCommandEncoder {
 
    private:
     static void setHeader(common_msgs::msg::HuatVehicleCmd& cmd);
+
+    int neutral_steering_;
 };
 
 #endif

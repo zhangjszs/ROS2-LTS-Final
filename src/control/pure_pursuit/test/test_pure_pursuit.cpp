@@ -303,13 +303,19 @@ TEST(InputGuard, SimTimeZeroIsValidOnceReceived) {
 TEST(VehicleCommandEncoder, BrakeCommandFields) {
     VehicleCommandEncoder enc;
     auto cmd = enc.encodeBrake(1, 80);
-    EXPECT_EQ(cmd.steering, 110);
+    EXPECT_EQ(cmd.steering, 90);  // 默认零位与仿真/评测一致（issue #2，不再硬编码 110）
     EXPECT_EQ(cmd.brake_force, 80);
     EXPECT_EQ(cmd.pedal_ratio, 0);
     EXPECT_EQ(cmd.racing_num, 1);
     EXPECT_EQ(cmd.racing_status, 4);
     EXPECT_EQ(cmd.head1, 0xAA);
     EXPECT_EQ(cmd.head2, 0x55);
+}
+
+TEST(VehicleCommandEncoder, BrakeCommandUsesConfiguredNeutral) {
+    VehicleCommandEncoder enc(110);  // 真实底盘协议待确认后可参数化切回旧零位，无需改代码
+    auto cmd = enc.encodeBrake(1, 80);
+    EXPECT_EQ(cmd.steering, 110);
 }
 
 TEST(VehicleCommandEncoder, DriveCommandFields) {

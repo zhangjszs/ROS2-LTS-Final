@@ -17,7 +17,7 @@ common_msgs::msg::HuatVehicleCmd VehicleCommandEncoder::encode(int steering, int
 }
 
 common_msgs::msg::HuatVehicleCmd VehicleCommandEncoder::encodeBrake(int racing_num, int brake_force) const {
-    return encode(110, brake_force, 0, 1, 1, racing_num, 4);
+    return encode(neutral_steering_, brake_force, 0, 1, 1, racing_num, 4);
 }
 
 common_msgs::msg::HuatVehicleCmd VehicleCommandEncoder::encodeDrive(int steering, int pedal_ratio, int racing_num,

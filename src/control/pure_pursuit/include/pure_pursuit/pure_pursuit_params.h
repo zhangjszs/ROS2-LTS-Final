@@ -36,10 +36,12 @@ struct PurePursuitParams {
             double filter_threshold;
             double filter_blend_ratio;
             struct Mapping {
-                double deg_per_rad;
-                int center_offset;
-                int clamp_min;
-                int clamp_max;
+                // 见 common_msgs/steering_calibration.h：raw = neutral + deg * units_per_degree，clamp 到 [min_raw,
+                // max_raw]
+                double units_per_degree;
+                int neutral;
+                int min_raw;
+                int max_raw;
             } mapping;
         } steering;
 

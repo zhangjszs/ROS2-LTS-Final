@@ -24,6 +24,7 @@
 #include "pure_pursuit/vehicle_command_encoder.h"
 #include "std_msgs/msg/float64_multi_array.hpp"
 #include "std_msgs/msg/u_int64.hpp"
+#include "steering_calibration.h"  // 仓库约定：common_msgs 手写头不带前缀（同 cone_types.h）
 
 class PurePursuitController {
    public:
@@ -59,6 +60,7 @@ class PurePursuitController {
     int steering_, pedal_ratio_, racing_num_, racing_status_;
     VehicleCommandEncoder encoder_;
     PurePursuitParams params_;
+    common_msgs::vehicle::SteeringCalibration steering_calib_;
     InputGuard input_guard_;
     Eigen::Affine3d localTf_;
     bool localTfValid_ = false;

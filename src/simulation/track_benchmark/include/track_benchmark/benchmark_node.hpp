@@ -7,6 +7,7 @@
 #include "common_msgs/msg/huat_carstate.hpp"
 #include "common_msgs/msg/huat_map.hpp"
 #include "common_msgs/msg/huat_vehicle_cmd.hpp"
+#include "steering_calibration.h"  // 仓库约定：common_msgs 手写头不带前缀（同 cone_types.h）
 #include "track_benchmark/kpi_evaluator.hpp"
 #include "track_benchmark/track_generator.hpp"
 
