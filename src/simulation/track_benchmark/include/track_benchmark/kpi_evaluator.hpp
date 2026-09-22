@@ -14,15 +14,16 @@ namespace benchmark {
  * @brief 实时运行步 KPI 数据帧
  */
 struct KpiStepData {
-    double cross_track_error{0.0};         // 垂直航迹误差 (m, 左正右负)
-    double heading_error{0.0};             // 航向角误差 (rad)
-    double lateral_accel_g{0.0};           // 参考曲率推算侧向加速度 (g) —— 非实测
-    double measured_lateral_accel_g{0.0};  // 由状态航向变化率估计的侧向加速度 (g)
-    double speed{0.0};                     // 实时车速 (m/s)
-    double steering_angle{0.0};            // 前轮转角 (rad)
-    double timestamp{0.0};                 // 时间戳 (s)
-    bool out_of_bounds{false};             // 本样本是否越出合法走廊
-    bool cone_contact{false};              // 本样本车辆外廓是否与某锥桶接触
+    double cross_track_error{0.0};  // 垂直航迹误差 (m, 左正右负)
+    double heading_error{0.0};      // 航向角误差 (rad)
+    double lateral_accel_g{0.0};    // 参考曲率推算侧向加速度 (g)，非实测
+    // #17 新增（字段行不带尾注，避免跨 clang-format 版本对齐差异）：
+    double measured_lateral_accel_g{0.0};
+    double speed{0.0};           // 实时车速 (m/s)
+    double steering_angle{0.0};  // 前轮转角 (rad)
+    double timestamp{0.0};       // 时间戳 (s)
+    bool out_of_bounds{false};
+    bool cone_contact{false};
 };
 
 /**
@@ -45,24 +46,29 @@ struct KpiSummary {
     double steering_jerk{0.0};         // 转向平滑度 / 抖动均方值
     size_t total_samples{0};           // 采样点数
 
-    // —— #17 C：判据与可信性字段（一律追加于末尾，保持既有聚合初始化向后兼容）——
-    std::string track_version{"unversioned"};             // 赛道/评测几何版本标识
-    bool closed_circuit{false};                           // 仅闭合赛道计圈
-    bool finished{false};                                 // 是否满足成功判据（由 runner 置位）
-    bool timed_out{false};                                // 是否超过最大运行时长
-    bool stopped{false};                                  // 是否中途停车/中止
-    int valid_laps{0};                                    // 通过有序进度+方向校验的有效圈数
-    double best_valid_lap_time_s{0.0};                    // 仅当存在有效圈时 >0；未完赛不产出
-    int collision_events{0};                              // 外廓判定、按锥桶去重的碰撞事件数
-    int collision_cones{0};                               // 被碰到的不同锥桶数
-    int out_of_bounds_events{0};                          // 越出合法走廊事件数（进入越界的边沿计数）
-    size_t out_of_bounds_samples{0};                      // 处于越界状态的样本数
-    double max_abs_cross_track_m{0.0};                    // 最大横向偏差（含符号信息之外的绝对量）
-    double peak_measured_lat_accel_g{0.0};                // 状态估计侧向加速度峰值
-    double elapsed_s{0.0};                                // 总运行时长
-    double total_length_m{0.0};                           // 单圈参考线长度
-    std::string lat_accel_source{"reference_curvature"};  // lateral_accel_g/peak_lat_accel_g 来源标注
-    std::string run_status{"running"};                    // running|finished|timeout|stopped|crashed
+    // —— #17 C：判据与可信性字段（追加于末尾保持聚合初始化向后兼容；字段行不带尾注，
+    //    以免不同 clang-format 版本的 AlignTrailingComments 产生分歧）。含义：
+    //    track_version 赛道/评测版本; closed_circuit 仅闭合赛道计圈; finished/timed_out/
+    //    stopped 运行终态; valid_laps 有序进度+方向校验的有效圈; best_valid_lap_time_s 仅有效
+    //    圈时>0; collision_events/cones 外廓去重碰撞; out_of_bounds_* 合法走廊越界;
+    //    peak_measured_lat_accel_g 状态估计侧向加速度; lat_accel_source 侧向加速度来源。
+    std::string track_version{"unversioned"};
+    bool closed_circuit{false};
+    bool finished{false};
+    bool timed_out{false};
+    bool stopped{false};
+    int valid_laps{0};
+    double best_valid_lap_time_s{0.0};
+    int collision_events{0};
+    int collision_cones{0};
+    int out_of_bounds_events{0};
+    size_t out_of_bounds_samples{0};
+    double max_abs_cross_track_m{0.0};
+    double peak_measured_lat_accel_g{0.0};
+    double elapsed_s{0.0};
+    double total_length_m{0.0};
+    std::string lat_accel_source{"reference_curvature"};
+    std::string run_status{"running"};
 };
 
 /**
