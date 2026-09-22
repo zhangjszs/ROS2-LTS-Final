@@ -9,6 +9,8 @@ on:
 jobs:
   build-test-lint:
     runs-on: ubuntu-24.04
+    # 兜底护栏：防任何步骤挂起拖到 GitHub 默认 6h 超时（曾发生，见 #14 QoS 检查）
+    timeout-minutes: 45
     env:
       ROS_DISTRO: jazzy
       # Keep ccache inside the workspace so actions/cache can persist it.
@@ -80,18 +82,21 @@ jobs:
           colcon test-result --verbose
 
       - name: Headless startup smoke (no GUI/hardware)
+        timeout-minutes: 5
         run: |
           source "/opt/ros/${ROS_DISTRO}/setup.bash"
           source install/setup.bash
           bash scripts/headless_smoke.sh
 
       - name: Interface contract runtime QoS check (#14)
+        timeout-minutes: 5
         run: |
           source "/opt/ros/${ROS_DISTRO}/setup.bash"
           source install/setup.bash
           bash scripts/qos_contract_check.sh
 
       - name: Benchmark regression (offline deterministic core, #17)
+        timeout-minutes: 5
         run: |
           source "/opt/ros/${ROS_DISTRO}/setup.bash"
           source install/setup.bash

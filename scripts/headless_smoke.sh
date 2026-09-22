@@ -49,18 +49,23 @@ for entry in "${SMOKES[@]}"; do
     if ! kill -0 "${launcher}" 2>/dev/null; then
       break  # launcher died early
     fi
-    if ros2 node list 2>/dev/null | grep -qx "${node}"; then
+    if timeout 8 ros2 node list 2>/dev/null | grep -qx "${node}"; then
       found=1
       break
     fi
     sleep 1
   done
-  # teardown: SIGINT the launch process tree, then kill leftover by node/binary name
-  kill -INT "${launcher}" 2>/dev/null || true
+  # teardown：按 PID 精确清理（launch 进程的直接子进程即真实节点），
+  # 递进升级 INT→TERM→KILL。不用 `pkill -x <name>`：Linux comm 名截断到
+  # 15 字符，长名节点（如 velocity_profiler_node）匹配失败会泄漏到后续 CI 步骤（实测）。
+  kids=()
+  while read -r c; do kids+=("$c"); done < <(pgrep -P "${launcher}" 2>/dev/null || true)
+  kill -INT "${launcher}" "${kids[@]}" 2>/dev/null || true
   for _ in $(seq 1 10); do kill -0 "${launcher}" 2>/dev/null || break; sleep 0.5; done
-  kill -TERM "${launcher}" 2>/dev/null || true
+  kill -TERM "${launcher}" "${kids[@]}" 2>/dev/null || true
+  for _ in $(seq 1 4); do kill -0 "${launcher}" 2>/dev/null || break; sleep 0.5; done
+  kill -KILL "${launcher}" "${kids[@]}" 2>/dev/null || true
   wait "${launcher}" 2>/dev/null || true
-  pkill -x "${proc}" 2>/dev/null || true
 
   if [ "${found}" -eq 1 ]; then
     echo "OK   ${node} registered"
