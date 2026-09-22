@@ -8,6 +8,7 @@
 #include <utility>
 #include <vector>
 
+#include "interface_contract_qos.hpp"  // #14：stop 锁存 QoS 由契约单一来源构造
 #include "pure_pursuit/pp_math.h"
 
 using std::vector;
@@ -37,7 +38,7 @@ PurePursuitController::PurePursuitController(rclcpp::Node::SharedPtr node)
     sub_path_ = node_->create_subscription<common_msgs::msg::HuatPathLimits>(
         params_.topics.path, 1,
         [this](const common_msgs::msg::HuatPathLimits::ConstSharedPtr& msg) { OnPathLimitsMessage(msg); });
-    const auto stop_qos = rclcpp::QoS(rclcpp::KeepLast(1)).reliable().transient_local();
+    const auto stop_qos = common_msgs::contract::makeQoS(common_msgs::contract::kQosStop);
     sub_stop_ = node_->create_subscription<common_msgs::msg::HuatStop>(
         params_.topics.stop, stop_qos,
         [this](const common_msgs::msg::HuatStop::ConstSharedPtr& msg) { OnStopMessage(msg); });

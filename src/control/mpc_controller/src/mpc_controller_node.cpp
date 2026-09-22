@@ -5,7 +5,8 @@
 #include <cmath>
 #include <geometry_msgs/msg/pose_stamped.hpp>
 
-#include "interface_contract.h"  // #14：统一接口契约（坐标系/有效性判定集中于此）
+#include "interface_contract.h"        // #14：统一接口契约（坐标系/有效性判定集中于此）
+#include "interface_contract_qos.hpp"  // #14：stop 锁存 QoS 由契约单一来源构造
 
 namespace mpc {
 
@@ -112,7 +113,7 @@ void MpcControllerNode::SetupSubscribersAndPublishers() {
     path_sub_ = create_subscription<common_msgs::msg::HuatPathLimits>(
         config_.topics.path, 10, [this](const common_msgs::msg::HuatPathLimits::ConstSharedPtr msg) { OnPath(msg); });
 
-    const auto stop_qos = rclcpp::QoS(rclcpp::KeepLast(1)).reliable().transient_local();
+    const auto stop_qos = common_msgs::contract::makeQoS(common_msgs::contract::kQosStop);
     stop_sub_ = create_subscription<common_msgs::msg::HuatStop>(
         config_.topics.stop, stop_qos, [this](const common_msgs::msg::HuatStop::ConstSharedPtr msg) { OnStop(msg); });
 

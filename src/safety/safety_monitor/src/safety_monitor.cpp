@@ -9,6 +9,7 @@
 #include "common_msgs/msg/huat_carstate.hpp"
 #include "common_msgs/msg/huat_path_limits.hpp"
 #include "common_msgs/msg/huat_stop.hpp"
+#include "interface_contract_qos.hpp"  // #14：stop 锁存 QoS 由契约单一来源构造
 #include "safety_monitor/stop_state_machine.h"
 
 class SafetyMonitor {
@@ -54,7 +55,7 @@ class SafetyMonitor {
             RCLCPP_INFO(node_->get_logger(), "%s",
                         std::format("[safety_monitor] Manual reset enabled on: {}", reset_stop_topic).c_str());
         }
-        const auto stop_qos = rclcpp::QoS(rclcpp::KeepLast(1)).reliable().transient_local();
+        const auto stop_qos = common_msgs::contract::makeQoS(common_msgs::contract::kQosStop);
         pub_stop_ = node_->create_publisher<common_msgs::msg::HuatStop>(stop_topic, stop_qos);
         publishStop(false);
 
