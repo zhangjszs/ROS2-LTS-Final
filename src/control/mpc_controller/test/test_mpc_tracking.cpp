@@ -83,3 +83,38 @@ TEST(MpcModelTest, ExplicitZeroSpeedRemainsAStopTarget) {
     ASSERT_TRUE(solution.success);
     EXPECT_LT(solution.accel_mps2, -0.2);
 }
+
+// issue #3：同一几何轨迹分别以 map（非零平移+非零航向）与 base_link（局部契约）输入，控制解应等价
+TEST(MpcModelTest, GlobalAndLocalFrameInputsYieldEquivalentControls) {
+    MpcConfig config;
+    config.system.wheelbase = 1.53;
+    config.horizon.Np = 15;
+    config.horizon.Nc = 10;
+    config.horizon.Ts = 0.05;
+    config.horizon.target_speed = 8.0;
+    MpcModel model(config);
+
+    const double theta0 = 0.7;  // 非零全局航向
+    const double tx = 100.0, ty = 50.0;
+    const double c = std::cos(theta0), s = std::sin(theta0);
+
+    std::vector<ReferencePoint> local_path;
+    std::vector<ReferencePoint> global_path;
+    for (double x = 0.0; x <= 50.0; x += 0.5) {
+        // 局部系：沿 X 轴直线（已知可收敛场景），全局系：同一轨迹经非零平移+旋转
+        local_path.push_back({.x = x, .y = 0.0, .theta = 0.0, .curvature = 0.0, .speed = 8.0, .speed_valid = true});
+        global_path.push_back(
+            {.x = tx + c * x, .y = ty + s * x, .theta = theta0, .curvature = 0.0, .speed = 8.0, .speed_valid = true});
+    }
+
+    // 同一物理场景：车辆在局部系 (5, 0.4, 0) ⇔ 全局系 T + R(θ0)·(5, 0.4)，航向 θ0
+    const auto sol_local = model.Step(5.0, 0.4, 0.0, 8.0, 0.0, 0.0, local_path);
+    const auto sol_global =
+        model.Step(tx + c * 5.0 - s * 0.4, ty + s * 5.0 + c * 0.4, theta0, 8.0, 0.0, 0.0, global_path);
+
+    ASSERT_TRUE(sol_local.success);
+    ASSERT_TRUE(sol_global.success);
+    EXPECT_NEAR(sol_global.steering_rad, sol_local.steering_rad, 1e-3);
+    EXPECT_NEAR(sol_global.accel_mps2, sol_local.accel_mps2, 1e-3);
+    EXPECT_LT(sol_local.steering_rad, -0.01);  // 与既有纠偏方向断言一致（左偏→右打）
+}

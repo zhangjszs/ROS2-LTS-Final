@@ -125,6 +125,18 @@ void MpcControllerNode::OnCarState(const common_msgs::msg::HuatCarstate::ConstSh
 }
 
 void MpcControllerNode::OnPath(const common_msgs::msg::HuatPathLimits::ConstSharedPtr& msg) {
+    // 坐标系门禁（issue #3）：未知/缺失 frame_id 不得静默当作 map，直接拒绝并进入降级（has_path_=false → 急停）
+    const std::string& frame = msg->header.frame_id;
+    if (frame != "map" && frame != "base_link") {
+        RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 1000,
+                             "[MPC] Unsupported path frame '%s' (expect 'map' or 'base_link'), path rejected!",
+                             frame.c_str());
+        has_path_ = false;
+        return;
+    }
+    path_frame_ = frame;
+    path_in_base_frame_ = (frame == "base_link");
+
     if (msg->path.size() < 2) {
         return;
     }
@@ -194,9 +206,12 @@ void MpcControllerNode::ControlLoop() {
         return;
     }
 
-    // 2. 执行 MPC 优化计算
-    auto solution = mpc_model_.Step(current_x_, current_y_, current_theta_, current_speed_, prev_steer_rad_,
-                                    prev_accel_mps2_, reference_path_);
+    // 2. 执行 MPC 优化计算：局部路径契约下车辆位姿变换到路径参考系（原点、航向 0），与 PP 同语义
+    const double ref_x = path_in_base_frame_ ? 0.0 : current_x_;
+    const double ref_y = path_in_base_frame_ ? 0.0 : current_y_;
+    const double ref_theta = path_in_base_frame_ ? 0.0 : current_theta_;
+    auto solution =
+        mpc_model_.Step(ref_x, ref_y, ref_theta, current_speed_, prev_steer_rad_, prev_accel_mps2_, reference_path_);
 
     if (solution.success) {
         prev_steer_rad_ = solution.steering_rad;
@@ -261,7 +276,7 @@ void MpcControllerNode::PublishEmergencyBrake() {
 
 void MpcControllerNode::PublishPredictedPath(const std::vector<PredictedPoint>& trajectory) {
     nav_msgs::msg::Path path;
-    path.header.frame_id = "map";
+    path.header.frame_id = path_frame_;  // 预测轨迹与参考路径同系，RViz 展示与实际数值一致（issue #3）
     path.header.stamp = now();
 
     for (const auto& pt : trajectory) {
@@ -278,7 +293,7 @@ void MpcControllerNode::PublishPredictedPath(const std::vector<PredictedPoint>& 
 
 void MpcControllerNode::PublishReferencePath(const std::vector<ReferencePoint>& reference) {
     nav_msgs::msg::Path path;
-    path.header.frame_id = "map";
+    path.header.frame_id = path_frame_;
     path.header.stamp = now();
 
     for (const auto& pt : reference) {

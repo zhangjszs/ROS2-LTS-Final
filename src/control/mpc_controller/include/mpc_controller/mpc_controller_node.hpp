@@ -56,6 +56,10 @@ class MpcControllerNode : public rclcpp::Node {
 
     std::vector<ReferencePoint> reference_path_;
 
+    // 路径坐标系契约（issue #3）：map = 全局路径；base_link = 局部路径（车辆视为原点，与 Pure Pursuit 一致）
+    bool path_in_base_frame_{false};
+    std::string path_frame_{"map"};
+
     // ROS 2 通信接口
     rclcpp::Subscription<common_msgs::msg::HuatCarstate>::SharedPtr state_sub_;
     rclcpp::Subscription<common_msgs::msg::HuatPathLimits>::SharedPtr path_sub_;
