@@ -35,7 +35,8 @@ target_link_libraries(${PROJECT_NAME}_node
   diagnostic_updater::diagnostic_updater
   geometry_msgs::geometry_msgs
   message_filters::message_filters
-  pcl_conversions::pcl_conversions
+  ${pcl_conversions_TARGETS}
+  ${pcl_conversions_LIBRARIES}
   rclcpp::rclcpp
   sensor_msgs::sensor_msgs
   std_msgs::std_msgs

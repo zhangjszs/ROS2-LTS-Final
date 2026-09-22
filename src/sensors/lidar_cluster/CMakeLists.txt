@@ -32,7 +32,8 @@ target_link_libraries(${PROJECT_NAME}_viewer
   common_msgs::common_msgs
   geometry_msgs::geometry_msgs
   nav_msgs::nav_msgs
-  pcl_conversions::pcl_conversions
+  ${pcl_conversions_TARGETS}
+  ${pcl_conversions_LIBRARIES}
   rclcpp::rclcpp
   sensor_msgs::sensor_msgs
   std_msgs::std_msgs
@@ -59,7 +60,8 @@ target_link_libraries(${PROJECT_NAME}
   common_msgs::common_msgs
   geometry_msgs::geometry_msgs
   nav_msgs::nav_msgs
-  pcl_conversions::pcl_conversions
+  ${pcl_conversions_TARGETS}
+  ${pcl_conversions_LIBRARIES}
   pluginlib::pluginlib
   rclcpp::rclcpp
   rclcpp_components::component

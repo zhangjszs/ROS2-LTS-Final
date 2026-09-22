@@ -24,7 +24,8 @@ add_executable(${PROJECT_NAME}_node src/cone_dedup.cpp src/cone_dedup_main.cpp)
 target_link_libraries(${PROJECT_NAME}_node
   ${PROJECT_NAME}_algo
   common_msgs::common_msgs
-  pcl_conversions::pcl_conversions
+  ${pcl_conversions_TARGETS}
+  ${pcl_conversions_LIBRARIES}
   rclcpp::rclcpp
   std_msgs::std_msgs
   ${PCL_LIBRARIES}
