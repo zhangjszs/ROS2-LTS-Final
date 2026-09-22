@@ -1,6 +1,7 @@
 # ROS2-LTS-Final — HUAT FSAC 无人驾驶系统 (ROS 2 & Modern C++20)
 
-[![ROS 2](https://img.shields.io/badge/ROS_2-Humble%20%7C%20Iron%20%7C%20Rolling-22314E?logo=ros)](https://docs.ros.org/)
+[![CI](https://github.com/zhangjszs/ROS2-LTS-Final/actions/workflows/ci.yml/badge.svg)](https://github.com/zhangjszs/ROS2-LTS-Final/actions/workflows/ci.yml)
+[![ROS 2](https://img.shields.io/badge/ROS_2-Jazzy%20(CI)%20%7C%20Rolling-22314E?logo=ros)](https://docs.ros.org/)
 [![C++ Standard](https://img.shields.io/badge/C%2B%2B-20-00599C?logo=c%2B%2B)](https://en.cppreference.com/w/cpp/20)
 [![Build System](https://img.shields.io/badge/Build-Colcon%20%2B%20CMake-064F8C?logo=cmake)](https://colcon.readthedocs.io/)
 [![License](https://img.shields.io/badge/License-BSD_3--Clause-blue.svg)](LICENSE)
