@@ -79,6 +79,12 @@ jobs:
           source install/setup.bash
           colcon test-result --verbose
 
+      - name: Headless startup smoke (no GUI/hardware)
+        run: |
+          source "/opt/ros/${ROS_DISTRO}/setup.bash"
+          source install/setup.bash
+          bash scripts/headless_smoke.sh
+
       - name: Show ccache stats
         if: always()
         run: ccache -s || true
