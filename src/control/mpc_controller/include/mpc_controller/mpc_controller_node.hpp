@@ -60,6 +60,9 @@ class MpcControllerNode : public rclcpp::Node {
     bool path_in_base_frame_{false};
     std::string path_frame_{"map"};
 
+    // issue #12：状态来源年龄验证容差（<0 禁用，与 PP 同语义）
+    double state_source_age_tolerance_sec_{-1.0};
+
     // ROS 2 通信接口
     rclcpp::Subscription<common_msgs::msg::HuatCarstate>::SharedPtr state_sub_;
     rclcpp::Subscription<common_msgs::msg::HuatPathLimits>::SharedPtr path_sub_;

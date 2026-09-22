@@ -15,6 +15,10 @@ VehicleStateEstimator::VehicleStateEstimator(rclcpp::Node::SharedPtr node)
 
     node_->declare_parameter<int>("azimuth_init_frames", 5);
     node_->get_parameter<int>("azimuth_init_frames", azimuth_init_frames_);
+    // issue #12：重复设备时间帧丢弃。默认关闭：sec_of_week 语义/更新率未经设备标定前，
+    // 合法的高频重复时间戳不得被误丢；标定后可显式开启。
+    node_->declare_parameter<bool>("reject_duplicate_device_time", false);
+    node_->get_parameter<bool>("reject_duplicate_device_time", reject_duplicate_device_time_);
     ins_sub_ = node_->create_subscription<common_msgs::msg::HuatASENSING>(
         ins_topic, 1, [this](const common_msgs::msg::HuatASENSING::ConstSharedPtr msg) { OnInsMessage(msg); });
     state_pub_ = node_->create_publisher<common_msgs::msg::HuatCarstate>(vehicle_state_topic, 1);
@@ -49,6 +53,10 @@ void VehicleStateEstimator::DiagnoseHealth(diagnostic_updater::DiagnosticStatusW
         stat.add("current_y", 0.0);
         stat.add("current_theta", 0.0);
     }
+    // issue #12：定位质量透传到诊断（原始设备值，枚举解释以真实设备协议为准）
+    stat.add("ins_status_raw", static_cast<int>(vehicle_state_msg_.ins_status));
+    stat.add("position_type_raw", static_cast<int>(vehicle_state_msg_.position_type));
+    stat.add("quality_validated", vehicle_state_msg_.quality_validated);
 }
 
 void VehicleStateEstimator::GeodeticToEnu(double lat, double lon, double h, double lat0, double lon0, double h0,
@@ -87,6 +95,24 @@ void VehicleStateEstimator::PublishState() {
 }
 
 void VehicleStateEstimator::OnInsMessage(const common_msgs::msg::HuatASENSING::ConstSharedPtr msgs) {
+    // issue #12：重复设备时间帧丢弃（需显式开启且设备时间字段可信），防止持续到达的重复旧状态被当作新测量
+    if (ShouldRejectDuplicateDeviceTime(reject_duplicate_device_time_, last_device_week_, last_device_sec_,
+                                        msgs->gps_week_number, msgs->sec_of_week)) {
+        RCLCPP_WARN_THROTTLE(node_->get_logger(), *node_->get_clock(), 1000,
+                             "[vehicle_state] Duplicate device time (week=%.1f sec=%.6f), frame dropped",  //
+                             msgs->gps_week_number, msgs->sec_of_week);
+        return;
+    }
+    last_device_week_ = msgs->gps_week_number;
+    last_device_sec_ = msgs->sec_of_week;
+
+    // issue #12：质量字段原样透传；quality_validated 保持 false，直到建立经标定的状态/精度映射
+    vehicle_state_msg_.ins_status = static_cast<int32_t>(msgs->ins_status);
+    vehicle_state_msg_.position_type = static_cast<int32_t>(msgs->position_type);
+    vehicle_state_msg_.device_gps_week_number = msgs->gps_week_number;
+    vehicle_state_msg_.device_sec_of_week = msgs->sec_of_week;
+    vehicle_state_msg_.quality_validated = false;
+
     ins_data_.east_velocity = msgs->east_velocity;
     ins_data_.north_velocity = msgs->north_velocity;
     ins_data_.ground_velocity = msgs->ground_velocity;

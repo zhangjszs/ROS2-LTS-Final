@@ -30,7 +30,10 @@ PurePursuitParams::PurePursuitParams(rclcpp::Node::SharedPtr node) {
                     .racing_num = get("system.racing_num", 1)};
 
     // 安全配置 (C++20 指定初始化器)
-    safety = Safety{.path_timeout = get("safety.path_timeout", 0.5), .state_timeout = get("safety.state_timeout", 0.3)};
+    safety = Safety{.path_timeout = get("safety.path_timeout", 0.5),
+                    .state_timeout = get("safety.state_timeout", 0.3),
+                    .state_source_age_tolerance_sec = get("safety.state_source_age_tolerance_sec", -1.0),
+                    .path_replay_stamp_gap_sec = get("safety.path_replay_stamp_gap_sec", 10.0)};
 
     // 算法配置 (C++20 嵌套指定初始化器)
     double lookahead_min = get("algorithm.steering.lookahead_min", 1.0);

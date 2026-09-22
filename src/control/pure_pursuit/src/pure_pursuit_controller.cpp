@@ -102,7 +102,9 @@ void PurePursuitController::OnPathLimitsMessage(const common_msgs::msg::HuatPath
     rclcpp::Time now = node_->now();
     last_path_time_ = now;
     double stamp_age = (now - msgs->header.stamp).seconds();
-    if (stamp_age > 10.0) {
+    // issue #12：回放识别由显式参数控制；<0 为严格模式（取消 10s 猜测，一律按真实延迟判定）
+    const double replay_gap = params_.safety.path_replay_stamp_gap_sec;
+    if (replay_gap >= 0.0 && stamp_age > replay_gap) {
         if (last_path_time_prev_.nanoseconds() / 1e9 > 0) {
             last_latency_ = (now - last_path_time_prev_).seconds();
         }
@@ -126,6 +128,18 @@ void PurePursuitController::OnPathLimitsMessage(const common_msgs::msg::HuatPath
 }
 
 void PurePursuitController::OnCarStateMessage(const common_msgs::msg::HuatCarstate::ConstSharedPtr& msgs) {
+    // issue #12：在接收活性（last_state_time_）之外叠加来源年龄验证；超龄/异常未来时间不刷新看门狗，
+    // 由既有 input_guard 超时路径触发 braking。默认 -1 禁用（设备时钟未标定前不臆判）
+    const double age_tol = params_.safety.state_source_age_tolerance_sec;
+    if (age_tol >= 0.0) {
+        const double source_age = (node_->now() - msgs->header.stamp).seconds();
+        if (source_age > age_tol || source_age < -age_tol) {
+            RCLCPP_WARN_THROTTLE(node_->get_logger(), *node_->get_clock(), 1000,
+                                 "[pure_pursuit] Stale/invalid vehicle_state (source age %.3fs, tol %.3fs), ignored",
+                                 source_age, age_tol);
+            return;
+        }
+    }
     geometry_msgs::msg::Pose pose;
     pose.position.x = msgs->car_state.x;
     pose.position.y = msgs->car_state.y;

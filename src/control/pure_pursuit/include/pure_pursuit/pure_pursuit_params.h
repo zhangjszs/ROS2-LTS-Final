@@ -23,6 +23,12 @@ struct PurePursuitParams {
     struct Safety {
         double path_timeout;
         double state_timeout;
+        // issue #12：输入来源年龄验证（独立于接收活性）。<0 = 禁用（默认，设备时钟未标定时不臆判）；
+        // ≥0 = HuatCarstate header.stamp 年龄超过该容差或为异常未来时间时拒收，由接收看门狗触发 braking
+        double state_source_age_tolerance_sec;
+        // issue #12：回放识别改为显式配置。>0 = stamp 间隔超过该值视为回放（仅诊断不计延迟）；
+        // <0 = 严格模式，取消 10s 猜测，一律按真实延迟判定
+        double path_replay_stamp_gap_sec;
     } safety;
 
     struct Algorithm {

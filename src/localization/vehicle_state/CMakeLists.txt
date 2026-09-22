@@ -55,4 +55,22 @@ install(
   DESTINATION share/${PROJECT_NAME}/config
 )
 
+if(BUILD_TESTING)
+  find_package(ament_cmake_gtest REQUIRED)
+  ament_add_gtest(test_vehicle_state_estimator
+    test/test_vehicle_state_estimator.cpp
+  )
+  target_include_directories(test_vehicle_state_estimator PRIVATE include)
+  target_link_libraries(test_vehicle_state_estimator
+    common_msgs::common_msgs
+    diagnostic_msgs::diagnostic_msgs
+    diagnostic_updater::diagnostic_updater
+    geometry_msgs::geometry_msgs
+    rclcpp::rclcpp
+    std_msgs::std_msgs
+    tf2::tf2
+    tf2_ros::tf2_ros
+  )
+endif()
+
 ament_package()

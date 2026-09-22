@@ -76,6 +76,19 @@ class VehicleStateEstimator {
     void OnInsMessage(const common_msgs::msg::HuatASENSING::ConstSharedPtr msgs);
     void UpdateDiagnostics();
 
+    // issue #12：设备时间重复帧判定（纯函数，便于单元测试）。仅在启用且设备时间字段可信时丢帧；
+    // 负值表示未知/未填字段，不判定为重复。
+    static bool ShouldRejectDuplicateDeviceTime(bool enabled, double prev_week, double prev_sec, double week,
+                                                double sec) {
+        if (!enabled) {
+            return false;
+        }
+        if (week < 0.0 || sec < 0.0 || prev_week < 0.0 || prev_sec < 0.0) {
+            return false;
+        }
+        return week == prev_week && sec == prev_sec;
+    }
+
    private:
     // 纯坐标变换：大地坐标 → ENU，无发布副作用
     void GeodeticToEnu(double lat, double lon, double h, double lat0, double lon0, double h0, double enu_xyz[3]);
@@ -91,4 +104,9 @@ class VehicleStateEstimator {
     double azimuth_sin_sum_ = 0.0;
     double azimuth_cos_sum_ = 0.0;
     bool azimuth_locked_ = false;
+
+    // issue #12: 设备时间透传与重复帧检测（默认关闭，设备时间语义未经标定前不得丢帧）
+    bool reject_duplicate_device_time_ = false;
+    double last_device_week_ = -1.0;
+    double last_device_sec_ = -1.0;
 };

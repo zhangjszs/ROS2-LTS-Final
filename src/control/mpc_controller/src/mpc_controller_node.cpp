@@ -51,6 +51,9 @@ void MpcControllerNode::LoadParameters() {
     declare_parameter<double>("steering.min_raw", 65.0);
     declare_parameter<double>("steering.max_raw", 115.0);
 
+    // issue #12：状态来源年龄验证（<0 禁用；≥0 时超龄/异常未来时间不刷新接收看门狗）
+    declare_parameter<double>("safety.state_source_age_tolerance_sec", -1.0);
+
     declare_parameter<std::string>("topics.vehicle_state", "/localization/vehicle_state");
     declare_parameter<std::string>("topics.path", "/planning/skidpad_predict_path");
     declare_parameter<std::string>("topics.stop", "/system/stop");
@@ -89,6 +92,7 @@ void MpcControllerNode::LoadParameters() {
     get_parameter("steering.units_per_degree", steering_calib_.units_per_degree);
     get_parameter("steering.min_raw", steering_calib_.min_raw);
     get_parameter("steering.max_raw", steering_calib_.max_raw);
+    get_parameter("safety.state_source_age_tolerance_sec", state_source_age_tolerance_sec_);
 
     get_parameter("topics.vehicle_state", config_.topics.vehicle_state);
     get_parameter("topics.path", config_.topics.path);
@@ -116,6 +120,16 @@ void MpcControllerNode::SetupSubscribersAndPublishers() {
 }
 
 void MpcControllerNode::OnCarState(const common_msgs::msg::HuatCarstate::ConstSharedPtr& msg) {
+    // issue #12：来源年龄验证叠加在接收活性（last_state_time_）之外，防持续到达的延迟/旧戳状态刷新看门狗
+    if (state_source_age_tolerance_sec_ >= 0.0) {
+        const double source_age = (now() - msg->header.stamp).seconds();
+        if (source_age > state_source_age_tolerance_sec_ || source_age < -state_source_age_tolerance_sec_) {
+            RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 1000,
+                                 "[MPC] Stale/invalid vehicle_state (source age %.3fs, tol %.3fs), ignored", source_age,
+                                 state_source_age_tolerance_sec_);
+            return;
+        }
+    }
     current_x_ = msg->car_state.x;
     current_y_ = msg->car_state.y;
     current_theta_ = msg->car_state.theta;
