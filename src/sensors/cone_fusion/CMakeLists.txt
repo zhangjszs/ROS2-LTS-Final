@@ -20,6 +20,7 @@ find_package(Eigen3 REQUIRED)
 
 include_directories(
   include
+  ${pcl_conversions_INCLUDE_DIRS}
   ${PCL_INCLUDE_DIRS}
   ${EIGEN3_INCLUDE_DIRS}
 )

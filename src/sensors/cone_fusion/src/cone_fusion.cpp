@@ -1,5 +1,7 @@
 #include "cone_fusion.h"
 
+#include <rclcpp/version.h>
+
 #include <algorithm>
 #include <chrono>
 #include <functional>
@@ -89,10 +91,18 @@ ConeFusion::ConeFusion(rclcpp::Node::SharedPtr node) : node_(node), diag_updater
     node_->get_parameter("vision_detections_topic", vision_detections_topic);
 
     // P1-H: ApproximateTime 同步订阅——DDS 深度与同步器队列分别配置
+    // message_filters::Subscriber::subscribe 的 QoS 形参类型跨发行版不兼容：
+    //   Jazzy/Humble 只接受 rmw_qos_profile_t；Rolling/lyrical(统一 message_filters) 只接受 rclcpp::QoS。
+    // 以 rclcpp 主版本作阈值（Jazzy=28 < 29 <= Rolling/lyrical=32）分别传对应类型。
     const auto cone_qos = rclcpp::QoS(rclcpp::KeepLast(5)).reliable().durability_volatile();
     const auto vehicle_state_qos = rclcpp::QoS(rclcpp::KeepLast(10)).reliable().durability_volatile();
+#if RCLCPP_VERSION_MAJOR >= 29
     cone_sub_mf_.subscribe(node.get(), input_cones_topic, cone_qos);
     car_state_sub_mf_.subscribe(node.get(), vehicle_state_topic, vehicle_state_qos);
+#else
+    cone_sub_mf_.subscribe(node.get(), input_cones_topic, cone_qos.get_rmw_qos_profile());
+    car_state_sub_mf_.subscribe(node.get(), vehicle_state_topic, vehicle_state_qos.get_rmw_qos_profile());
+#endif
     sync_ = std::make_unique<message_filters::Synchronizer<ApproxSyncPolicy>>(
         ApproxSyncPolicy(static_cast<uint32_t>(approx_queue)), cone_sub_mf_, car_state_sub_mf_);
     sync_->registerCallback([this](const common_msgs::msg::HuatConeCluster::ConstSharedPtr& lidar_msg,

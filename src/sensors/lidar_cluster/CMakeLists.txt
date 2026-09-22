@@ -24,6 +24,7 @@ find_package(PCL REQUIRED COMPONENTS common filters io kdtree search segmentatio
 
 include_directories(
   include
+  ${pcl_conversions_INCLUDE_DIRS}
   ${PCL_INCLUDE_DIRS}
 )
 
