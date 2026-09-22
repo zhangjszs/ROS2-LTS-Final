@@ -13,6 +13,10 @@ jobs:
       ROS_DISTRO: jazzy
       # Keep ccache inside the workspace so actions/cache can persist it.
       CCACHE_DIR: ${{ github.workspace }}/.ccache
+      # hello_world: ament_python demo (linters), not built.
+      # cone_fusion: Jazzy message_filters incompat, tracked in #28 (remove when fixed).
+      # huat_launch: launch-only ament_cmake package, no C++ tests.
+      CI_IGNORE_PKGS: hello_world cone_fusion huat_launch
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -52,13 +56,10 @@ jobs:
           source "/opt/ros/${ROS_DISTRO}/setup.bash"
           # --cmake-args below re-states the colcon_defaults.yaml cmake-args
           # (a CLI --cmake-args list replaces the file's list) plus BUILD_TESTING=ON.
-          # --packages-ignore overrides colcon_defaults.yaml's list, so re-list
-          # hello_world and add cone_fusion:
-          # TODO(#28): cone_fusion message_filters Synchronizer::registerCallback
-          #   does not compile on Jazzy (unified-vs-legacy message_filters API).
-          #   Remove 'cone_fusion' from this list once #28 is fixed.
+          # --packages-ignore overrides colcon_defaults.yaml's list; CI_IGNORE_PKGS
+          # holds hello_world + cone_fusion (TODO #28) + huat_launch.
           colcon build --symlink-install \
-            --packages-ignore hello_world cone_fusion \
+            --packages-ignore ${CI_IGNORE_PKGS} \
             --cmake-args \
               -DCMAKE_BUILD_TYPE=Release \
               -DCMAKE_CXX_STANDARD=20 \
@@ -71,7 +72,7 @@ jobs:
         run: |
           source "/opt/ros/${ROS_DISTRO}/setup.bash"
           source install/setup.bash
-          colcon test --event-handlers console_cohesion+
+          colcon test --packages-ignore ${CI_IGNORE_PKGS} --event-handlers console_cohesion+
 
       - name: Enforce test results (fail on any failure)
         run: |
