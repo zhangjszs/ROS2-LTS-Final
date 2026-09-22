@@ -1,0 +1,17 @@
+# clangd (IDE language server) configuration.
+# This file is consumed ONLY by clangd; it does NOT affect the colcon/GCC build.
+#
+# Problem: PCL/Eigen propagate -fopenmp into the compile commands, and Eigen's
+# Core.h does `#if defined _OPENMP -> #include <omp.h>`. On this machine clang-21
+# ships no OpenMP header (omp.h exists only under the GCC include dir, which
+# clangd's --query-driver does not add), so clangd reports:
+#   'omp.h' file not found   (surfaced inside /usr/include/eigen3/Eigen/Core)
+# which then cascades into bogus "Eigen::Matrix4f is not a class" errors.
+#
+# No project source uses OpenMP directly (it is only pulled transitively by
+# PCL), so dropping -fopenmp for the language server is safe and leaves the
+# real -fopenmp GCC build untouched. If clang/OpenMP headers are installed later
+# (e.g. `apt install libomp-21-dev`), this block can be removed.
+CompileFlags:
+  Remove:
+    - -fopenmp
