@@ -85,6 +85,12 @@ jobs:
           source install/setup.bash
           bash scripts/headless_smoke.sh
 
+      - name: Interface contract runtime QoS check (#14)
+        run: |
+          source "/opt/ros/${ROS_DISTRO}/setup.bash"
+          source install/setup.bash
+          bash scripts/qos_contract_check.sh
+
       - name: Benchmark regression (offline deterministic core, #17)
         run: |
           source "/opt/ros/${ROS_DISTRO}/setup.bash"
