@@ -5,6 +5,8 @@
 #include <cmath>
 #include <geometry_msgs/msg/pose_stamped.hpp>
 
+#include "interface_contract.h"  // #14：统一接口契约（坐标系/有效性判定集中于此）
+
 namespace mpc {
 
 MpcControllerNode::MpcControllerNode(const rclcpp::NodeOptions& options) : Node("mpc_controller_node", options) {
@@ -139,9 +141,9 @@ void MpcControllerNode::OnCarState(const common_msgs::msg::HuatCarstate::ConstSh
 }
 
 void MpcControllerNode::OnPath(const common_msgs::msg::HuatPathLimits::ConstSharedPtr& msg) {
-    // 坐标系门禁（issue #3）：未知/缺失 frame_id 不得静默当作 map，直接拒绝并进入降级（has_path_=false → 急停）
+    // 坐标系门禁（issue #3/#14）：未知/缺失 frame_id 不得静默当作 map，直接拒绝并进入降级（has_path_=false → 急停）
     const std::string& frame = msg->header.frame_id;
-    if (frame != "map" && frame != "base_link") {
+    if (!common_msgs::contract::isFrameSupported(frame)) {
         RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 1000,
                              "[MPC] Unsupported path frame '%s' (expect 'map' or 'base_link'), path rejected!",
                              frame.c_str());
@@ -149,7 +151,7 @@ void MpcControllerNode::OnPath(const common_msgs::msg::HuatPathLimits::ConstShar
         return;
     }
     path_frame_ = frame;
-    path_in_base_frame_ = (frame == "base_link");
+    path_in_base_frame_ = (frame == common_msgs::contract::kFrameBaseLink);
 
     if (msg->path.size() < 2) {
         return;

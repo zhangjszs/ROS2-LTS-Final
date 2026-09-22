@@ -81,6 +81,12 @@ if(BUILD_TESTING)
   target_link_libraries(test_steering_calibration
     common_msgs::common_msgs
   )
+  ament_add_gtest(test_interface_contract
+    test/test_interface_contract.cpp
+  )
+  target_link_libraries(test_interface_contract
+    common_msgs::common_msgs
+  )
 endif()
 
 ament_export_dependencies(
