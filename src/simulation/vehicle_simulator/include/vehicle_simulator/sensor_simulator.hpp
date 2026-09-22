@@ -57,6 +57,11 @@ class SensorSimulator {
     [[nodiscard]] const std::vector<TrackCone>& global_cones() const noexcept { return global_cones_; }
     [[nodiscard]] size_t cone_count() const noexcept { return global_cones_.size(); }
 
+    /**
+     * @brief 设置感知噪声随机种子（#17 可复现回归；默认 42）
+     */
+    void SetSeed(uint32_t seed) { rng_.seed(seed); }
+
    private:
     std::vector<TrackCone> global_cones_;
     std::mt19937 rng_{42};

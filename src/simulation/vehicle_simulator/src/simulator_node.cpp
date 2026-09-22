@@ -42,6 +42,18 @@ void SimulatorNode::LoadParameters() {
     declare_parameter<double>("max_range", 15.0);
     declare_parameter<double>("noise_stddev", 0.01);
     declare_parameter<std::string>("track_file", "");
+    // #17-B：publish_clock=true 时由物理 tick 以固定步长递进并发布 /clock（确定性回放/回归）；
+    // seed 为感知噪声随机种子（默认 42，固定可复现）。
+    declare_parameter<bool>("publish_clock", false);
+    declare_parameter<int>("seed", 42);
+    get_parameter<bool>("publish_clock", publish_clock_);
+    int seed_param = 42;
+    get_parameter<int>("seed", seed_param);
+    seed_ = static_cast<uint32_t>(seed_param);
+    if (seed_param < 0) {
+        seed_ = 42;
+    }
+    sensor_sim_.SetSeed(seed_);
 
     declare_parameter<double>("init_x", 0.0);
     declare_parameter<double>("init_y", 0.0);
@@ -105,6 +117,11 @@ void SimulatorNode::SetupPublishersAndSubscribers() {
     cone_map_pub_ = create_publisher<common_msgs::msg::HuatMap>("/sensors/cones/fused", 10);
     global_map_pub_ = create_publisher<common_msgs::msg::HuatMap>("/simulation/global_map", 1);
     path_pub_ = create_publisher<nav_msgs::msg::Path>("/simulation/ground_truth_path", 10);
+    clock_pub_ = create_publisher<rosgraph_msgs::msg::Clock>("/clock", rclcpp::QoS(1).reliable());
+}
+
+rclcpp::Time SimulatorNode::now_stamp() {
+    return publish_clock_ ? sim_time_ : this->now();
 }
 
 void SimulatorNode::SetupTimers() {
@@ -155,7 +172,14 @@ void SimulatorNode::OnStopMessage(const common_msgs::msg::HuatStop::ConstSharedP
 void SimulatorNode::UpdatePhysics() {
     const double dt = 1.0 / sim_rate_;
     const auto& state = bicycle_model_.Step(current_cmd_, dt);
-    const auto now = this->now();
+    // #17-B：publish_clock_ 时以固定 dt 递进仿真时间并发布 /clock，使整链按仿真时钟确定性推进
+    if (publish_clock_) {
+        sim_time_ = sim_time_ + rclcpp::Duration(std::chrono::duration<double>(dt));
+        rosgraph_msgs::msg::Clock clk;
+        clk.clock = sim_time_;
+        clock_pub_->publish(clk);
+    }
+    const auto now = now_stamp();
 
     // 1. 发布车辆状态 (/localization/vehicle_state)
     common_msgs::msg::HuatCarstate carstate_msg;
@@ -204,7 +228,7 @@ void SimulatorNode::UpdatePhysics() {
 }
 
 void SimulatorNode::PublishSensorData() {
-    const auto now = this->now();
+    const auto now = now_stamp();
     const auto& state = bicycle_model_.state();
 
     // 动态模拟局部探测锥桶
@@ -218,7 +242,7 @@ void SimulatorNode::PublishSensorData() {
 void SimulatorNode::PublishTf() {
     const auto& state = bicycle_model_.state();
     geometry_msgs::msg::TransformStamped t;
-    t.header.stamp = this->now();
+    t.header.stamp = now_stamp();
     t.header.frame_id = "map";
     t.child_frame_id = "base_link";
 

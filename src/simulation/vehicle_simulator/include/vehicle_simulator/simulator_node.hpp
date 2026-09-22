@@ -3,6 +3,7 @@
 #include <geometry_msgs/msg/transform_stamped.hpp>
 #include <nav_msgs/msg/path.hpp>
 #include <rclcpp/rclcpp.hpp>
+#include <rosgraph_msgs/msg/clock.hpp>
 #include <tf2/LinearMath/Quaternion.hpp>
 #include <tf2_ros/transform_broadcaster.hpp>
 
@@ -35,6 +36,9 @@ class SimulatorNode : public rclcpp::Node {
     void PublishSensorData();
     void PublishTf();
 
+    // #17-B：publish_clock_ 为真时返回递进的固定步长仿真时间，否则返回墙钟 now()
+    [[nodiscard]] rclcpp::Time now_stamp();
+
     // 核心仿真模型
     BicycleModel bicycle_model_;
     SensorSimulator sensor_sim_;
@@ -51,6 +55,12 @@ class SimulatorNode : public rclcpp::Node {
     double max_range_{15.0};
     double noise_stddev_{0.02};
     std::string track_file_{""};
+
+    // #17-B：确定性仿真时钟（默认关闭，保持墙钟行为不变；场景 runner 启用）
+    bool publish_clock_{false};
+    uint32_t seed_{42};
+    rclcpp::Time sim_time_{0, 0, RCL_ROS_TIME};
+    rclcpp::Publisher<rosgraph_msgs::msg::Clock>::SharedPtr clock_pub_;
 
     // ROS 接口
     rclcpp::Subscription<common_msgs::msg::HuatVehicleCmd>::SharedPtr vehicle_cmd_sub_;

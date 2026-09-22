@@ -14,6 +14,7 @@ find_package(common_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
+find_package(rosgraph_msgs REQUIRED)
 find_package(tf2 REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
@@ -47,6 +48,7 @@ target_link_libraries(vehicle_simulator_node
   geometry_msgs::geometry_msgs
   nav_msgs::nav_msgs
   std_msgs::std_msgs
+  rosgraph_msgs::rosgraph_msgs
   tf2::tf2
   tf2_ros::tf2_ros
   tf2_geometry_msgs::tf2_geometry_msgs
