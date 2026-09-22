@@ -19,6 +19,7 @@ ConeDedup::ConeDedup(rclcpp::Node::SharedPtr node) : node_(node) {
     node_->declare_parameter("speed_ref", 15.0);
     node_->declare_parameter("enable_sliding_window", false);
     node_->declare_parameter("sliding_window_radius", 30.0);
+    node_->declare_parameter("sliding_window_rear_radius", 30.0);
     node_->declare_parameter("enable_kalman", false);
     node_->declare_parameter("kf_q", 0.01);
     node_->declare_parameter("kf_r", 0.1);
@@ -40,6 +41,7 @@ ConeDedup::ConeDedup(rclcpp::Node::SharedPtr node) : node_(node) {
     node_->get_parameter("speed_ref", speed_ref_);
     node_->get_parameter("enable_sliding_window", enable_sliding_window_);
     node_->get_parameter("sliding_window_radius", sliding_window_radius_);
+    node_->get_parameter("sliding_window_rear_radius", sliding_window_rear_radius_);
 
     node_->get_parameter("enable_kalman", enable_kalman_);
     node_->get_parameter("kf_q", kf_q_);
