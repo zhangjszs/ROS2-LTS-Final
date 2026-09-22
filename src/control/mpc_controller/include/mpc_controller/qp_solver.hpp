@@ -5,6 +5,7 @@
 #include <cmath>
 #include <cstddef>
 #include <optional>
+#include <utility>
 
 namespace mpc {
 
@@ -41,7 +42,7 @@ struct QpResult {
  */
 class BoxQpSolver {
    public:
-    explicit BoxQpSolver(QpSettings settings = QpSettings{}) : settings_(settings) {}
+    explicit BoxQpSolver(QpSettings settings = QpSettings{}) : settings_(std::move(settings)) {}
 
     /**
      * @brief 求解盒约束凸二次规划

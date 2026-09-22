@@ -106,8 +106,7 @@ TEST(VelocityProfilerTest, CornerLimitOverridesMinimumCruisingSpeed) {
     bool produced_below_minimum = false;
     for (const auto& point : profile) {
         EXPECT_LE(point.target_speed, expected_max_speed + 0.05);
-        EXPECT_LE(point.target_speed * point.target_speed * std::abs(point.curvature),
-                  limits.max_lat_accel + 0.05);
+        EXPECT_LE(point.target_speed * point.target_speed * std::abs(point.curvature), limits.max_lat_accel + 0.05);
         produced_below_minimum = produced_below_minimum || point.target_speed < limits.min_velocity;
     }
     EXPECT_TRUE(produced_below_minimum);

@@ -1,8 +1,8 @@
 #include <diagnostic_msgs/msg/diagnostic_status.hpp>
 #include <diagnostic_updater/diagnostic_updater.hpp>
 #include <format>
-#include <rclcpp/rclcpp.hpp>
 #include <mutex>
+#include <rclcpp/rclcpp.hpp>
 #include <stop_token>
 #include <thread>
 

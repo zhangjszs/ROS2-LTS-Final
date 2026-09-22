@@ -39,9 +39,8 @@ PurePursuitController::PurePursuitController(rclcpp::Node::SharedPtr node)
         [this](const common_msgs::msg::HuatPathLimits::ConstSharedPtr& msg) { OnPathLimitsMessage(msg); });
     const auto stop_qos = rclcpp::QoS(rclcpp::KeepLast(1)).reliable().transient_local();
     sub_stop_ = node_->create_subscription<common_msgs::msg::HuatStop>(
-        params_.topics.stop, stop_qos, [this](const common_msgs::msg::HuatStop::ConstSharedPtr& msg) {
-            OnStopMessage(msg);
-        });
+        params_.topics.stop, stop_qos,
+        [this](const common_msgs::msg::HuatStop::ConstSharedPtr& msg) { OnStopMessage(msg); });
 
     RCLCPP_INFO(node_->get_logger(),
                 "[pure_pursuit] Topics: state=%s path=%s stop=%s cmd=%s latency=%s rate=%.1fHz startup_delay=%.2fs",
