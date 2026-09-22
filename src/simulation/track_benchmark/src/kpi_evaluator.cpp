@@ -11,6 +11,8 @@ namespace {
 
 constexpr double kPi = std::numbers::pi_v<double>;
 constexpr double kGravity = 9.80665;
+constexpr double kLapCoverageFraction = 0.95;  // 累计正向弧长需达单圈长的比例才算完成一圈
+constexpr double kMinLapDurationS = 5.0;       // 防止抖动/回退导致重复计圈的最短圈时
 
 [[nodiscard]] inline double NormalizeAngle(double angle) noexcept {
     while (angle > kPi)
@@ -39,6 +41,22 @@ void KpiEvaluator::Reset() {
     completed_laps_ = 0;
     in_start_zone_ = true;
     cone_collisions_ = 0;
+
+    // #17 C
+    cone_hit_.assign(cones_.size(), false);
+    collision_events_ = 0;
+    lap_progress_ = 0.0;
+    prev_s_ = 0.0;
+    have_prev_s_ = false;
+    last_lap_time_ = 0.0;
+    in_bounds_ = true;
+    oob_events_ = 0;
+    oob_samples_ = 0;
+    max_abs_cte_ = 0.0;
+    peak_measured_lat_g_ = 0.0;
+    prev_speed_ = 0.0;
+    prev_theta_ = 0.0;
+    have_prev_state_ = false;
 }
 
 double KpiEvaluator::ComputeCrossTrackError(double x, double y, [[maybe_unused]] double theta,
@@ -73,23 +91,37 @@ double KpiEvaluator::ComputeCrossTrackError(double x, double y, [[maybe_unused]]
 }
 
 KpiStepData KpiEvaluator::Update(double x, double y, double theta, double v, double steering_angle, double timestamp) {
-    if (samples_count_ == 0) {
-        lap_start_time_ = timestamp;
-        prev_time_ = timestamp;
-        prev_steering_ = steering_angle;
-    }
-
     size_t closest_idx = 0;
     const double cte = ComputeCrossTrackError(x, y, theta, &closest_idx);
     const double abs_cte = std::abs(cte);
 
-    // 航向角偏差
+    if (samples_count_ == 0) {
+        lap_start_time_ = timestamp;
+        prev_time_ = timestamp;
+        prev_steering_ = steering_angle;
+        have_prev_state_ = false;
+        // in_bounds_ 保持 Reset 的 true，使首次越界也能触发一个边沿事件
+        if (closed_ && !centerline_.empty()) {
+            prev_s_ = centerline_[closest_idx].s;
+            have_prev_s_ = true;
+        }
+    }
+
     double heading_err = 0.0;
-    double lat_accel_g = 0.0;
+    double ref_lat_g = 0.0;
+    double meas_lat_g = 0.0;
     if (!centerline_.empty()) {
         heading_err = NormalizeAngle(theta - centerline_[closest_idx].theta);
-        // 侧向加速度 a_y = v^2 * kappa
-        lat_accel_g = (v * v * std::abs(centerline_[closest_idx].curvature)) / kGravity;
+        // 参考曲率推算侧向加速度 a_y = v^2 * kappa（标注为参考，非实测）
+        ref_lat_g = (v * v * std::abs(centerline_[closest_idx].curvature)) / kGravity;
+    }
+    // 状态估计侧向加速度 a_y ≈ v * d(theta)/dt
+    if (have_prev_state_) {
+        double dtm = timestamp - prev_time_;
+        if (dtm > 1e-4) {
+            double theta_dot = NormalizeAngle(theta - prev_theta_) / dtm;
+            meas_lat_g = std::abs(0.5 * (v + prev_speed_) * theta_dot) / kGravity;
+        }
     }
 
     // 统计累加
@@ -97,51 +129,88 @@ KpiStepData KpiEvaluator::Update(double x, double y, double theta, double v, dou
     sum_sq_error_ += cte * cte;
     sum_abs_error_ += abs_cte;
     max_error_ = std::max(max_error_, abs_cte);
-    peak_lat_g_ = std::max(peak_lat_g_, lat_accel_g);
+    max_abs_cte_ = std::max(max_abs_cte_, abs_cte);
+    peak_lat_g_ = std::max(peak_lat_g_, ref_lat_g);
+    peak_measured_lat_g_ = std::max(peak_measured_lat_g_, meas_lat_g);
     max_speed_ = std::max(max_speed_, v);
     sum_speed_ += v;
 
-    // 转向角抖动与控制平滑度
+    // 转向角抖动
     double dt = timestamp - prev_time_;
     if (dt > 1e-4) {
         double steer_rate = (steering_angle - prev_steering_) / dt;
         sum_steer_rate_sq_ += steer_rate * steer_rate;
     }
+
+    // 走廊越界（事件边沿计数 + 样本计数）
+    bool now_out = (abs_cte > corridor_half_width_);
+    if (now_out) {
+        oob_samples_++;
+        if (in_bounds_) {
+            oob_events_++;
+        }
+    }
+    in_bounds_ = !now_out;
+
+    // 有效圈：仅闭合赛道，按累计正向弧长进度判定（反向不会累计 -> 反向过线不计圈）
+    if (closed_ && have_prev_s_ && !centerline_.empty()) {
+        double s = centerline_[closest_idx].s;
+        double d = s - prev_s_;
+        if (total_length_ > 0.0) {
+            if (d > 0.5 * total_length_)
+                d -= total_length_;
+            else if (d < -0.5 * total_length_)
+                d += total_length_;
+        }
+        if (d > 0.0)
+            lap_progress_ += d;
+        prev_s_ = s;
+        double lap_time = timestamp - lap_start_time_;
+        if (total_length_ > 0.0 && lap_progress_ >= kLapCoverageFraction * total_length_ &&
+            lap_time > kMinLapDurationS) {
+            completed_laps_++;
+            last_lap_time_ = lap_time;
+            best_lap_time_ = std::min(best_lap_time_, lap_time);
+            lap_start_time_ = timestamp;
+            lap_progress_ = 0.0;
+        }
+    }
+
+    // 撞桶：车辆外廓（含锥桶半径）判定 + 按锥桶去重的事件计数
+    bool cone_contact = false;
+    const double hx = 0.5 * vehicle_length_ + cone_radius_;
+    const double hy = 0.5 * vehicle_width_ + cone_radius_;
+    const double cs = std::cos(theta), sn = std::sin(theta);
+    for (size_t i = 0; i < cones_.size(); ++i) {
+        const double dx = cones_[i].x - x;
+        const double dy = cones_[i].y - y;
+        const double local_x = dx * cs + dy * sn;   // 车体系纵向
+        const double local_y = -dx * sn + dy * cs;  // 车体系横向
+        if (std::abs(local_x) <= hx && std::abs(local_y) <= hy) {
+            cone_contact = true;
+            if (i < cone_hit_.size() && !cone_hit_[i]) {
+                cone_hit_[i] = true;
+                collision_events_++;
+            }
+        }
+    }
+    cone_collisions_ = collision_events_;  // 兼容旧字段：现为去重后的碰撞事件数
+
     prev_time_ = timestamp;
     prev_steering_ = steering_angle;
-
-    // 圈速检测 (对于闭合赛道)
-    if (!centerline_.empty() && centerline_.size() > 20) {
-        double dist_to_start = std::hypot(x - centerline_.front().x, y - centerline_.front().y);
-        if (dist_to_start < 3.0) {
-            if (!in_start_zone_ && (timestamp - lap_start_time_) > 5.0) {
-                // 完成一圈
-                completed_laps_++;
-                double lap_time = timestamp - lap_start_time_;
-                best_lap_time_ = std::min(best_lap_time_, lap_time);
-                lap_start_time_ = timestamp;
-                in_start_zone_ = true;
-            }
-        } else {
-            in_start_zone_ = false;
-        }
-    }
-
-    // 撞桶违规检查
-    for (const auto& cone : cones_) {
-        double cd = std::hypot(x - cone.x, y - cone.y);
-        if (cd < 0.35) {  // 赛车外缘碰触锥桶半径
-            cone_collisions_++;
-            break;
-        }
-    }
+    prev_speed_ = v;
+    prev_theta_ = theta;
+    have_prev_state_ = true;
 
     return KpiStepData{.cross_track_error = cte,
                        .heading_error = heading_err,
-                       .lateral_accel_g = lat_accel_g,
+                       .lateral_accel_g = ref_lat_g,
+                       .measured_lateral_accel_g = meas_lat_g,
                        .speed = v,
                        .steering_angle = steering_angle,
-                       .timestamp = timestamp};
+                       .timestamp = timestamp,
+                       .out_of_bounds = now_out,
+                       .cone_contact = cone_contact};
 }
 
 KpiSummary KpiEvaluator::GetSummary() const {
@@ -157,10 +226,31 @@ KpiSummary KpiEvaluator::GetSummary() const {
     summary.max_speed_mps = max_speed_;
     summary.avg_speed_mps = sum_speed_ / static_cast<double>(samples_count_);
     summary.current_lap_time_s = prev_time_ - lap_start_time_;
-    summary.best_lap_time_s = (best_lap_time_ < 1e8) ? best_lap_time_ : summary.current_lap_time_s;
+    // 未完赛不产出最佳圈速：仅当有有效圈时报告 best_lap
+    const double valid_best = (completed_laps_ > 0 && best_lap_time_ < 1e8) ? best_lap_time_ : 0.0;
+    summary.best_lap_time_s = valid_best;
+    summary.best_valid_lap_time_s = valid_best;
     summary.completed_laps = completed_laps_;
+    summary.valid_laps = completed_laps_;
     summary.cone_collisions = cone_collisions_;
     summary.steering_jerk = std::sqrt(sum_steer_rate_sq_ / static_cast<double>(samples_count_));
+
+    // #17 C 可信性字段
+    int distinct_cones = 0;
+    for (char c : cone_hit_) {
+        if (c)
+            ++distinct_cones;
+    }
+    summary.closed_circuit = closed_;
+    summary.track_version = track_version_;
+    summary.collision_events = collision_events_;
+    summary.collision_cones = distinct_cones;
+    summary.out_of_bounds_events = oob_events_;
+    summary.out_of_bounds_samples = oob_samples_;
+    summary.max_abs_cross_track_m = max_abs_cte_;
+    summary.peak_measured_lat_accel_g = peak_measured_lat_g_;
+    summary.total_length_m = total_length_;
+    summary.lat_accel_source = "reference_curvature";
 
     return summary;
 }
