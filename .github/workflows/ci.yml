@@ -85,6 +85,21 @@ jobs:
           source install/setup.bash
           bash scripts/headless_smoke.sh
 
+      - name: Benchmark regression (offline deterministic core, #17)
+        run: |
+          source "/opt/ros/${ROS_DISTRO}/setup.bash"
+          source install/setup.bash
+          bash scripts/benchmark_regression.sh
+
+      - name: Upload benchmark results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-regression
+          path: build/benchmark_regression/*.json
+          if-no-files-found: ignore
+          retention-days: 14
+
       - name: Show ccache stats
         if: always()
         run: ccache -s || true

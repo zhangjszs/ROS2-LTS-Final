@@ -15,6 +15,7 @@ find_package(geometry_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(visualization_msgs REQUIRED)
+find_package(vehicle_simulator REQUIRED)
 
 include_directories(
   include
@@ -48,9 +49,19 @@ target_link_libraries(track_benchmark_node
   visualization_msgs::visualization_msgs
 )
 
+# #17-B：离线确定性核心回归 runner（纯定步长积分，不依赖 ROS 调度）
+add_executable(benchmark_runner src/benchmark_runner.cpp)
+target_include_directories(benchmark_runner PRIVATE ${vehicle_simulator_INCLUDE_DIRS})
+target_link_libraries(benchmark_runner
+  track_benchmark_lib
+  ${vehicle_simulator_LIBRARIES}
+  common_msgs::common_msgs
+)
+
 install(TARGETS
   track_benchmark_lib
   track_benchmark_node
+  benchmark_runner
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION lib/${PROJECT_NAME}
