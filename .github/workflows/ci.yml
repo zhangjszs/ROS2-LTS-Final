@@ -27,7 +27,7 @@ jobs:
       - name: Prepare ROS 2 ${{ env.ROS_DISTRO }}
         uses: ros-tooling/setup-ros@v0.7
         with:
-          required-ros2-distro: ${{ env.ROS_DISTRO }}
+          required-ros-distributions: ${{ env.ROS_DISTRO }}
 
       - name: Restore ccache
         uses: actions/cache@v4
