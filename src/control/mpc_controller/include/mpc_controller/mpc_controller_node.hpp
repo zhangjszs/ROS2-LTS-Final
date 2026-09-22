@@ -63,6 +63,9 @@ class MpcControllerNode : public rclcpp::Node {
     // issue #12：状态来源年龄验证容差（<0 禁用，与 PP 同语义）
     double state_source_age_tolerance_sec_{-1.0};
 
+    // issue #14：缺失显式 target_speeds 时的默认参考速度（不再从 Point.z 取速度）
+    double reference_speed_default_{0.0};
+
     // ROS 2 通信接口
     rclcpp::Subscription<common_msgs::msg::HuatCarstate>::SharedPtr state_sub_;
     rclcpp::Subscription<common_msgs::msg::HuatPathLimits>::SharedPtr path_sub_;

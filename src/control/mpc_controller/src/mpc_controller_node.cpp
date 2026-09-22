@@ -57,6 +57,9 @@ void MpcControllerNode::LoadParameters() {
     // issue #12：状态来源年龄验证（<0 禁用；≥0 时超龄/异常未来时间不刷新接收看门狗）
     declare_parameter<double>("safety.state_source_age_tolerance_sec", -1.0);
 
+    // issue #14：缺失显式 target_speeds 时的默认参考速度（绝不再从 Point.z 取速度）
+    declare_parameter<double>("path.reference_speed_default", 0.0);
+
     declare_parameter<std::string>("topics.vehicle_state", "/localization/vehicle_state");
     declare_parameter<std::string>("topics.path", "/planning/skidpad_predict_path");
     declare_parameter<std::string>("topics.stop", "/system/stop");
@@ -96,6 +99,7 @@ void MpcControllerNode::LoadParameters() {
     get_parameter("steering.min_raw", steering_calib_.min_raw);
     get_parameter("steering.max_raw", steering_calib_.max_raw);
     get_parameter("safety.state_source_age_tolerance_sec", state_source_age_tolerance_sec_);
+    get_parameter("path.reference_speed_default", reference_speed_default_);
 
     get_parameter("topics.vehicle_state", config_.topics.vehicle_state);
     get_parameter("topics.path", config_.topics.path);
@@ -160,7 +164,7 @@ void MpcControllerNode::OnPath(const common_msgs::msg::HuatPathLimits::ConstShar
 
     std::vector<ReferencePoint> pts;
     pts.reserve(msg->path.size());
-    const bool has_explicit_speeds = msg->target_speeds.size() == msg->path.size();
+    const bool has_explicit_speeds = common_msgs::contract::targetSpeedsEffective(msg->target_speeds, msg->path.size());
 
     for (size_t i = 0; i < msg->path.size(); ++i) {
         ReferencePoint pt;
@@ -170,7 +174,8 @@ void MpcControllerNode::OnPath(const common_msgs::msg::HuatPathLimits::ConstShar
             pt.speed = msg->target_speeds[i];
             pt.speed_valid = std::isfinite(pt.speed) && pt.speed >= 0.0;
         } else {
-            pt.speed = msg->path[i].z;
+            // #14：缺失显式速度时用配置的默认参考速度，不再把 Point.z 当速度载体
+            pt.speed = reference_speed_default_;
             pt.speed_valid = std::isfinite(pt.speed) && pt.speed > 0.1;
         }
 

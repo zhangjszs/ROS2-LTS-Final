@@ -26,7 +26,7 @@ QoS 值即 `interface_contract.h` 中对应 `kQos*` 描述符；消费者据此�
   - 与 `path` **等长**时视为显式速度，逐点须有限且 ≥0；**0 m/s 合法 = 停车目标**（#11）。
   - 缺失（长度不符）时消费者**不得**静默把缺失当 0：走 `kUnknownSpeed=NaN` 语义，
     用 `targetSpeedsEffective()` 判定；不满足即回退或拒绝（见迁移矩阵）。
-- **速度语义不再藏在 `Point.z`**：新链路一律用 `target_speeds`；`Point.z` 的读取仅作**兼容旧发布者的过渡路径**（见 §6）。
+- **速度语义已从 `Point.z` 彻底移除**：消费者不再读 `Point.z` 作速度（已删 MPC 的 z 回退，PP 本就不读）；发布侧统一用 `target_speeds[]`，缺失时走消费者配置默认。
 - **标识/状态**：`replan` 表达重规划请求；轨迹几何版本经 `header` 与来源话题约定。
 
 ## 3. 坐标系（#3）
@@ -57,15 +57,14 @@ QoS 值即 `interface_contract.h` 中对应 `kQos*` 描述符；消费者据此�
 
 | 模块 | 现状 | 迁移到契约 | 状态 |
 | --- | --- | --- | --- |
-| MPC 控制器 | frame 门禁 + 局部路径契约 + `target_speeds` 优先 | 采用 `contract::isFrameSupported`/`kFrameBaseLink`；stop 订阅 `makeQoS(kQosStop)` | ✅ 已采用 |
-| Pure Pursuit | 订阅 `target_speeds`，含显式零速测试 | stop 订阅 `makeQoS(kQosStop)`；frame/话题常量待全面接入 | ◐ stop 链路已采用 |
-| velocity_profiler | 发布 `target_speeds`（不写 z 速度） | 直接引用契约话题常量 | ⏳ 待接入 |
-| skidpad / straight_line 规划器 | 仍向 `Point.z` 写值（旧协议） | 迁移为 `target_speeds[]`，z 仅作占位/高度 | ⏳ **兼容退出项**：下游全部读 `target_speeds` 后移除 z 速度语义 |
+| MPC 控制器 | frame 门禁 + 局部路径契约 + `target_speeds` 优先 | 采用 `contract::isFrameSupported`/`kFrameBaseLink`/`targetSpeedsEffective`；stop 订阅 `makeQoS(kQosStop)`；**已移除 `Point.z` 速度回退**→缺失时用 `path.reference_speed_default` | ✅ 已采用 |
+| Pure Pursuit | 速度来自参数 `algorithm.throttle.target_speed`（不读 path 速度） | stop 订阅 `makeQoS(kQosStop)` | ✅ 无 z 依赖；话题常量待全面接入 |
+| velocity_profiler | 速度权威：输出 `target_speeds[]`（与 path 等长，不写 z 速度） | 直接引用契约话题常量 | ✅ 已符合契约（话题常量待接入） |
+| skidpad / straight_line 规划器 | `MakePoint(x, y, 0.0)`：z 恒为 0，仅为几何占位（不载速） | — | ✅ 已无 z 速度语义 |
 | vehicle_state / 仿真器 | 透传质量/设备时间（#12） | 复用契约哨兵常量 | ⏳ 待接入 |
-| safety_monitor | `transient_local` 锁存 stop（#8） | stop 发布 `makeQoS(kQosStop)` | ✅ 已采用（本 PR） |
+| safety_monitor | `transient_local` 锁存 stop（#8） | stop 发布 `makeQoS(kQosStop)` | ✅ 已采用 |
 
 **stop 链路已端到端统一到契约**：发布端（safety_monitor）与订阅端（MPC/PP）的锁存 QoS 均由
 `common_msgs::contract::makeQoS(kQosStop)` 单一来源构造（`interface_contract_qos.hpp`），杜绝三处散落构造漂移；行为与原 `KeepLast(1).reliable().transient_local()` 完全一致。
 
-**兼容退出条件**：当某话题的全部消费者均改用契约判定、且无发布者依赖 `Point.z` 传速后，删除对应
-回退分支；在此之前保留回退但记录为过渡。集成验证遵循"一条链路迁移→逐步推广"，避免一次性改动所有算法。
+**兼容退出条件**：`Point.z` 作速度的回退分支已删除（见上）；当剩余节点（vehicle_state/仿真器话题常量）全面接入契约后，本矩阵全部 ✅，即可关闭 #14。集成验证遵循"一条链路迁移→逐步推广"。
