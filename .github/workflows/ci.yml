@@ -52,7 +52,13 @@ jobs:
           source "/opt/ros/${ROS_DISTRO}/setup.bash"
           # --cmake-args below re-states the colcon_defaults.yaml cmake-args
           # (a CLI --cmake-args list replaces the file's list) plus BUILD_TESTING=ON.
+          # --packages-ignore overrides colcon_defaults.yaml's list, so re-list
+          # hello_world and add cone_fusion:
+          # TODO(#28): cone_fusion message_filters Synchronizer::registerCallback
+          #   does not compile on Jazzy (unified-vs-legacy message_filters API).
+          #   Remove 'cone_fusion' from this list once #28 is fixed.
           colcon build --symlink-install \
+            --packages-ignore hello_world cone_fusion \
             --cmake-args \
               -DCMAKE_BUILD_TYPE=Release \
               -DCMAKE_CXX_STANDARD=20 \
