@@ -105,10 +105,11 @@ ConeFusion::ConeFusion(rclcpp::Node::SharedPtr node) : node_(node), diag_updater
 #endif
     sync_ = std::make_unique<message_filters::Synchronizer<ApproxSyncPolicy>>(
         ApproxSyncPolicy(static_cast<uint32_t>(approx_queue)), cone_sub_mf_, car_state_sub_mf_);
-    sync_->registerCallback([this](const common_msgs::msg::HuatConeCluster::ConstSharedPtr& lidar_msg,
-                                   const common_msgs::msg::HuatCarstate::ConstSharedPtr& state_msg) {
-        OnSyncedMessages(lidar_msg, state_msg);
-    });
+    // 用 std::bind 而非 lambda 注册同步回调：旧版 message_filters(Humble/Jazzy)的
+    // 通用 addCallback(C&) 会以 9 个占位符 std::bind 包裹回调，2 参 lambda 会被当 9 参调用而编译失败；
+    // std::bind 结果的 operator() 变参且忽略多余实参，新旧发行版均可编译(#28)。
+    sync_->registerCallback(
+        std::bind(&ConeFusion::OnSyncedMessages, this, std::placeholders::_1, std::placeholders::_2));
 
     if (enable_vision_color_injection_) {
         vision_sub_ = node_->create_subscription<autodrive_msgs::msg::HuatVisionDetections>(
