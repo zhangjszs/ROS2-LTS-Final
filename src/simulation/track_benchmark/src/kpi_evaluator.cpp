@@ -4,6 +4,7 @@
 #include <format>
 #include <numbers>
 #include <sstream>
+#include <string_view>
 
 namespace benchmark {
 
@@ -20,6 +21,34 @@ constexpr double kMinLapDurationS = 5.0;       // 防止抖动/回退导致重�
     while (angle < -kPi)
         angle += 2.0 * kPi;
     return angle;
+}
+
+// 最小 JSON 字符串转义（仅处理引号/反斜杠/控制字符）
+[[nodiscard]] inline std::string JsonEscape(std::string_view s) {
+    std::string out;
+    out.reserve(s.size() + 8);
+    for (char ch : s) {
+        switch (ch) {
+            case '"':
+                out += "\\\"";
+                break;
+            case '\\':
+                out += "\\\\";
+                break;
+            case '\n':
+                out += "\\n";
+                break;
+            case '\r':
+                out += "\\r";
+                break;
+            case '\t':
+                out += "\\t";
+                break;
+            default:
+                out += ch;
+        }
+    }
+    return out;
 }
 
 }  // namespace
@@ -284,6 +313,44 @@ std::string KpiEvaluator::GenerateMarkdownReport(const KpiSummary& s) {
         s.cone_collisions);
     ss << "\n> 💡 *提示：本基准数据可直接用于后续 MPC 与 Pure Pursuit 的量化性能对比！*\n";
     return ss.str();
+}
+
+std::string KpiEvaluator::GenerateJsonReport(const KpiSummary& s) {
+    std::string j;
+    j += "{\n";
+    j += "  \"schema\": \"fsac.benchmark.kpi/v1\",\n";
+    j += "  \"track_name\": \"" + JsonEscape(s.track_name) + "\",\n";
+    j += "  \"track_version\": \"" + JsonEscape(s.track_version) + "\",\n";
+    j += "  \"controller_name\": \"" + JsonEscape(s.controller_name) + "\",\n";
+    j += "  \"run_status\": \"" + JsonEscape(s.run_status) + "\",\n";
+    j += "  \"lat_accel_source\": \"" + JsonEscape(s.lat_accel_source) + "\",\n";
+    j += "  \"closed_circuit\": " + std::string(s.closed_circuit ? "true" : "false") + ",\n";
+    j += "  \"finished\": " + std::string(s.finished ? "true" : "false") + ",\n";
+    j += "  \"timed_out\": " + std::string(s.timed_out ? "true" : "false") + ",\n";
+    j += "  \"stopped\": " + std::string(s.stopped ? "true" : "false") + ",\n";
+    j += "  \"valid_laps\": " + std::to_string(s.valid_laps) + ",\n";
+    j += "  \"completed_laps\": " + std::to_string(s.completed_laps) + ",\n";
+    j += std::format("  \"best_valid_lap_time_s\": {:.6},\n", s.best_valid_lap_time_s);
+    j += std::format("  \"best_lap_time_s\": {:.6},\n", s.best_lap_time_s);
+    j += std::format("  \"current_lap_time_s\": {:.6},\n", s.current_lap_time_s);
+    j += std::format("  \"rmse_lateral_m\": {:.6},\n", s.rmse_lateral_m);
+    j += std::format("  \"mean_lateral_error_m\": {:.6},\n", s.mean_lateral_error_m);
+    j += std::format("  \"max_lateral_error_m\": {:.6},\n", s.max_lateral_error_m);
+    j += std::format("  \"max_abs_cross_track_m\": {:.6},\n", s.max_abs_cross_track_m);
+    j += std::format("  \"peak_lat_accel_g\": {:.6},\n", s.peak_lat_accel_g);
+    j += std::format("  \"peak_measured_lat_accel_g\": {:.6},\n", s.peak_measured_lat_accel_g);
+    j += std::format("  \"max_speed_mps\": {:.6},\n", s.max_speed_mps);
+    j += std::format("  \"avg_speed_mps\": {:.6},\n", s.avg_speed_mps);
+    j += std::format("  \"steering_jerk\": {:.6},\n", s.steering_jerk);
+    j += std::format("  \"total_length_m\": {:.6},\n", s.total_length_m);
+    j += "  \"collision_events\": " + std::to_string(s.collision_events) + ",\n";
+    j += "  \"collision_cones\": " + std::to_string(s.collision_cones) + ",\n";
+    j += "  \"cone_collisions\": " + std::to_string(s.cone_collisions) + ",\n";
+    j += "  \"out_of_bounds_events\": " + std::to_string(s.out_of_bounds_events) + ",\n";
+    j += "  \"out_of_bounds_samples\": " + std::to_string(s.out_of_bounds_samples) + ",\n";
+    j += "  \"total_samples\": " + std::to_string(s.total_samples) + "\n";
+    j += "}\n";
+    return j;
 }
 
 }  // namespace benchmark

@@ -200,3 +200,31 @@ TEST(KpiEvaluatorTest, LateralAccelSourceLabelledAsReference) {
     eval.Update(ce.R * std::cos(a), ce.R * std::sin(a), a, 5.0, 0.0, 0.0);
     EXPECT_EQ(eval.GetSummary().lat_accel_source, "reference_curvature");
 }
+
+TEST(KpiEvaluatorTest, JsonReportMachineReadableFields) {
+    CircleEval ce;
+    auto eval = ce.make(true);
+    eval.SetTrackVersion("trackdrive/v1");
+    int n = 200;
+    for (int i = 0; i <= n; ++i) {
+        double a = 2.0 * std::numbers::pi_v<double> * i / n;
+        eval.Update(ce.R * std::cos(a), ce.R * std::sin(a), a, 5.0, 0.0, i * 0.05);
+    }
+    std::string json = KpiEvaluator::GenerateJsonReport(eval.GetSummary());
+    EXPECT_EQ(json.front(), '{');
+    EXPECT_EQ(json[json.find_last_not_of(" \n\r\t")], '}');  // 去除尾部空白后以 } 结尾
+    EXPECT_NE(json.find("\"schema\": \"fsac.benchmark.kpi/v1\""), std::string::npos);
+    EXPECT_NE(json.find("\"track_version\": \"trackdrive/v1\""), std::string::npos);
+    EXPECT_NE(json.find("\"valid_laps\":"), std::string::npos);
+    EXPECT_NE(json.find("\"best_valid_lap_time_s\":"), std::string::npos);
+    EXPECT_NE(json.find("\"lat_accel_source\": \"reference_curvature\""), std::string::npos);
+    // 括号平衡（基本结构校验）
+    size_t open = 0, close = 0;
+    for (char ch : json) {
+        if (ch == '{')
+            ++open;
+        if (ch == '}')
+            ++close;
+    }
+    EXPECT_EQ(open, close);
+}

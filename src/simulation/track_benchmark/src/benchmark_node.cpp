@@ -25,6 +25,11 @@ BenchmarkNode::BenchmarkNode(const rclcpp::NodeOptions& options) : Node("track_b
 
     evaluator_.SetCenterline(current_track_.centerline);
     evaluator_.SetTrackCones(current_track_.cones);
+    // #17 A/C：告知评估器赛道几何（闭合性/单圈长/合法走廊）与版本标识，供有效圈/越界/回归使用
+    const bool track_closed = (track_type_ != "acceleration");
+    const double corridor_half = (current_track_.track_width > 0.0) ? current_track_.track_width * 0.5 : 1.5;
+    evaluator_.SetCircuitGeometry(current_track_.total_length, corridor_half, track_closed);
+    evaluator_.SetTrackVersion(current_track_.name + "/v1");
 
     // 延迟 1 秒后发布中心线可视化
     path_timer_ = create_wall_timer(std::chrono::seconds(1), [this]() {
@@ -52,6 +57,20 @@ BenchmarkNode::~BenchmarkNode() {
         if (out.is_open()) {
             out << report;
             RCLCPP_INFO(get_logger(), "Saved benchmark report to %s", report_file_.c_str());
+        }
+        // 同时输出机读 JSON（供 CI 回归/基线比较）：同名 .md→.json，否则追加 .json
+        std::string json_path = report_file_;
+        const std::string md_ext = ".md";
+        if (json_path.size() >= md_ext.size() &&
+            json_path.compare(json_path.size() - md_ext.size(), md_ext.size(), md_ext) == 0) {
+            json_path.replace(json_path.size() - md_ext.size(), md_ext.size(), ".json");
+        } else {
+            json_path += ".json";
+        }
+        std::ofstream jout(json_path);
+        if (jout.is_open()) {
+            jout << KpiEvaluator::GenerateJsonReport(summary);
+            RCLCPP_INFO(get_logger(), "Saved machine-readable JSON report to %s", json_path.c_str());
         }
     }
 }

@@ -121,6 +121,11 @@ class KpiEvaluator {
     [[nodiscard]] static std::string GenerateMarkdownReport(const KpiSummary& summary);
 
     /**
+     * @brief 导出机读 JSON 结果（含判据/版本/状态字段），供 CI 回归与基线比较使用 (#17 A)
+     */
+    [[nodiscard]] static std::string GenerateJsonReport(const KpiSummary& summary);
+
+    /**
      * @brief 计算车辆到参考中心线最近点的横向垂直偏差 e_y
      */
     [[nodiscard]] double ComputeCrossTrackError(double x, double y, [[maybe_unused]] double theta = 0.0,
