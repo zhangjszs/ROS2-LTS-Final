@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# pre-commit：仅对【本次暂存的 C++ 文件】跑 clang-format 的快速门禁（秒级）。
+# cppcheck 与构建/测试/#13/#14/#17 全量门禁仍由 CI 负责（见 scripts/ 与 ci.yml）；
+# 本钩子只解决“格式问题在 commit 前拦一道”，避免整轮 CI 只为 formatting 失败。
+# 安装： cp scripts/git-hooks/pre-commit .git/hooks/ && chmod +x .git/hooks/pre-commit
+# 跳过： git commit --no-verify
+# ==============================================================================
+set -uo pipefail
+
+if ! command -v clang-format >/dev/null 2>&1; then
+    echo "pre-commit: clang-format 未安装，跳过格式门禁" >&2
+    exit 0
+fi
+
+files="$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(c|cc|cpp|h|hpp)$' || true)"
+[ -z "${files}" ] && exit 0
+
+if ! echo "${files}" | xargs clang-format --dry-run --Werror; then
+    echo ""
+    echo "pre-commit FAILED: 以上文件不符合 .clang-format。"
+    echo "  自动修复:  echo \"\$(git diff --cached --name-only)\" | grep -E '\\.(c|cc|cpp|h|hpp)\$' | xargs clang-format -i && git add -u"
+    echo "  本地全量:  bash scripts/lint_cpp.sh"
+    exit 1
+fi

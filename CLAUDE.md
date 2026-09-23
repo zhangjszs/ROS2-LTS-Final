@@ -28,6 +28,25 @@ source install/setup.bash
 
 **Important**: `colcon_defaults.yaml` at the workspace root auto-applies mold linker, ccache, and limits parallel workers to 4. Do NOT override `parallel-workers` to a high value — the 24-thread machine has only 19GB RAM and excessive concurrency causes swap thrashing deadlock.
 
+## Local Validation Loop (mirrors CI)
+
+`.github/workflows/ci.yml` gates every push with the scripts below. Run the same loop locally instead of waiting for CI:
+
+```bash
+bash scripts/lint_cpp.sh              # clang-format + cppcheck, no build — seconds; run after every edit batch
+bash scripts/check_cpp20.sh           # lint + full build with -DBUILD_TESTING=ON
+colcon test && colcon test-result     # enforce gtest results after build
+
+source /opt/ros/jazzy/setup.bash && source install/setup.bash   # runtime checks need both
+bash scripts/headless_smoke.sh        # #13: nodes actually register on graph (no GUI/hardware)
+bash scripts/qos_contract_check.sh    # #14: live pub/sub endpoints + QoS on stop/state topics
+bash scripts/benchmark_regression.sh  # #17: offline deterministic core via track_benchmark
+```
+
+Do NOT write ad-hoc verification when a script above already covers a gate — extend the script instead, so the fix lands in CI too.
+
+A fast commit-time gate (clang-format on staged C++ files only) ships in `scripts/git-hooks/pre-commit`. Install per clone: `cp scripts/git-hooks/pre-commit .git/hooks/ && chmod +x .git/hooks/pre-commit`.
+
 ## Launch Commands
 
 ```bash
@@ -49,8 +68,9 @@ ros2 service call /planner_mux/select topic_tools/srv/MuxSelect "{topic: '/plann
 /velodyne_points → lidar_cluster → /sensors/cones/raw
   → cone_fusion + vehicle_state → /sensors/cones/transformed
   → cone_tracker → /sensors/cones/fused
-  → planners → /planning/<event>/pathlimits
-  → pure_pursuit → /control/vehicle_command
+  → planners → /planning/<event>/pathlimits (geometry only; Point.z no longer carries speed)
+  → velocity_profiler → target_speeds[] on pathlimits
+  → pure_pursuit | mpc_controller → /control/vehicle_command
 ```
 
 Safety path: `/planning/track/stop_request → safety_monitor → /system/stop → pure_pursuit`
@@ -68,6 +88,12 @@ Safety path: `/planning/track/stop_request → safety_monitor → /system/stop �
 | `straight_line_planner` | Straight-line acceleration planner |
 | `pure_pursuit` | Adaptive look-ahead lateral controller |
 | `safety_monitor` | Planning heartbeat watchdog + dual-redundant emergency stop (AS/EBS) |
+| `vehicle_state` | Ego state estimator: Asensing INS → ENU pose/heading/speed at 50 Hz, TF broadcast (`HuatCarstate`) |
+| `ins` | Asensing INS raw message bridge (rosbag compatibility) |
+| `velocity_profiler` | Speed authority: G-G diagram + forward/backward DP → `target_speeds[]` on `HuatPathLimits` (#14 contract) |
+| `mpc_controller` | Model predictive controller — contract consumer of pathlimits/state/stop (alternative to pure_pursuit; not wired into `fsac.launch.py` by default) |
+| `vehicle_simulator` | Closed-loop kinematic bicycle model (hardware-free; opt-in `/clock` + noise seeds for #17) |
+| `track_benchmark` | Track generator + KPI evaluator; `benchmark_runner` JSON feeds the #17 CI regression gate |
 | `fsac_viz` | RViz2 visualization (cones, trajectory, vehicle state) |
 | `huat_launch` | Centralized launch management with topic remapping args |
 | `common_msgs` | Shared message definitions (HuatCone, HuatConeCluster, HuatPathLimits, HuatControlCommand, etc.) |
@@ -82,6 +108,8 @@ Safety path: `/planning/track/stop_request → safety_monitor → /system/stop �
 **vision_ros**: Python node with threaded inference pipeline. ONNX Runtime backend with CPU/CUDA providers, HSV color fallback when model unavailable. Image quality state machine (NORMAL→DEGRADED→FALLBACK→VISION_LOST) drives model vs fallback selection. Publishes `HuatVisionDetections` to `/perception/vision/detections`.
 
 **Topic naming convention**: `/sensors/<source-or-object>/<stage>`, `/localization/<state>`, `/planning/<event>/<artifact>`, `/control/<command>`, `/system/stop`, `/debug/<node>/<artifact>`, `/fsd/viz/<object>`.
+
+**Interface contract (#14)** (`docs/INTERFACE_CONTRACT.md`): single source of truth for the four contract topics (vehicle_state / pathlimits / vehicle_command / stop) — QoS, frames, units, speed semantics, staleness rules. Machine-checkable primitives live in `common_msgs/include/common_msgs/interface_contract.h`; all pub/sub for contract topics MUST build QoS via `contract::makeQoS(kQos*)` (e.g. `kQosStop` is transient_local latched). When adding or rewiring any of these topics, update the spec + `scripts/qos_contract_check.sh` together.
 
 ## CMake Conventions
 
