@@ -140,3 +140,17 @@ Ongoing incremental modernization (tracked in `docs/CPP20_REFACTORING_ROADMAP.md
 ## Language & Documentation
 
 Code comments and documentation are in **Chinese (Simplified)**. Message field comments are bilingual. Maintain this convention when adding comments.
+
+## Agent skills
+
+### Issue tracker
+
+Issues 以 GitHub Issues 形式跟踪(`zhangjszs/ROS2-LTS-Final`,经 `gh` CLI)。见 `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+使用默认五角色标签词汇(`needs-triage` / `needs-info` / `ready-for-agent` / `ready-for-human` / `wontfix`)。见 `docs/agents/triage-labels.md`。
+
+### Domain docs
+
+单上下文布局:根目录 `CONTEXT.md` + `docs/adr/`。见 `docs/agents/domain.md`。
