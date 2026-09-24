@@ -5,6 +5,10 @@
 #include <numbers>
 #include <random>
 #include <ranges>
+#include <span>
+
+// #22：锥桶左右分离谓词收敛到纯 std core（无 ROS context）
+#include "cone_boundary.h"
 
 LineDetector::LineDetector(const LineDetectorConfig& cfg) : cfg_(cfg) {}
 
@@ -13,12 +17,17 @@ void LineDetector::ClusterCones(const std::vector<common_msgs::msg::HuatCone>& c
                                 std::vector<common_msgs::msg::HuatCone>& right) {
     left.clear();
     right.clear();
-    std::ranges::copy_if(
-        cones, std::back_inserter(left), [this](float y) { return y < -cfg_.center_margin; },
-        [](const common_msgs::msg::HuatCone& c) { return c.position_base_link.y; });
-    std::ranges::copy_if(
-        cones, std::back_inserter(right), [this](float y) { return y > cfg_.center_margin; },
-        [](const common_msgs::msg::HuatCone& c) { return c.position_base_link.y; });
+    // #22：分离谓词收敛到 slp_core::SplitConesBySide（纯 std），此处仅做索引→拷贝（保序，与 copy_if 等价）。
+    const slp_core::ConeSideSplit split =
+        slp_core::SplitConesBySide(std::span<const common_msgs::msg::HuatCone>{cones}, cfg_.center_margin);
+    left.reserve(split.left.size());
+    right.reserve(split.right.size());
+    for (const auto i : split.left) {
+        left.push_back(cones[i]);
+    }
+    for (const auto i : split.right) {
+        right.push_back(cones[i]);
+    }
 }
 
 LineParams LineDetector::HoughFit(const std::vector<common_msgs::msg::HuatCone>& cones) {

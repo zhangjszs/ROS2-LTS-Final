@@ -4,7 +4,10 @@
 #include <cmath>
 #include <common_msgs/msg/huat_tracklimits.hpp>
 #include <ranges>
+#include <span>
 
+// #22：锥桶左右分离与边界阈值判定 core（纯 std，无 ROS context）
+#include "cone_boundary.h"
 #include "straight_line_geom.h"
 
 StraightLinePlannerNode::StraightLinePlannerNode(rclcpp::Node::SharedPtr node)
@@ -112,31 +115,33 @@ void StraightLinePlannerNode::PublishEmptyPathLimits() {
 }
 
 bool StraightLinePlannerNode::IsBoundaryPlausible(const DetectedBoundaries& b) const {
-    if (!b.left.valid || !b.right.valid)
-        return false;
-    if (std::abs(b.left.slope) > plausibility_max_abs_slope_) {
-        RCLCPP_DEBUG(node_->get_logger(), "[straight_line_planner] Plausibility fail: left slope=%.3f > max=%.3f",
-                     b.left.slope, plausibility_max_abs_slope_);
-        return false;
+    // #22：判定与阈值收敛到 slp_core::EvaluateBoundaryPlausibility（纯 std），节点仅保留逐条日志副作用。
+    const slp_core::PlausibilityThresholds thresholds{plausibility_max_abs_slope_, plausibility_max_intercept_diff_};
+    const slp_core::PlausibilityVerdict verdict = slp_core::EvaluateBoundaryPlausibility(b.left, b.right, thresholds);
+    switch (verdict.issue) {
+        case slp_core::PlausibilityIssue::LeftSlopeExceeds:
+            RCLCPP_DEBUG(node_->get_logger(), "[straight_line_planner] Plausibility fail: left slope=%.3f > max=%.3f",
+                         b.left.slope, plausibility_max_abs_slope_);
+            break;
+        case slp_core::PlausibilityIssue::RightSlopeExceeds:
+            RCLCPP_DEBUG(node_->get_logger(), "[straight_line_planner] Plausibility fail: right slope=%.3f > max=%.3f",
+                         b.right.slope, plausibility_max_abs_slope_);
+            break;
+        case slp_core::PlausibilityIssue::InterceptOrderViolated:
+            RCLCPP_DEBUG(node_->get_logger(),
+                         "[straight_line_planner] Plausibility fail: right_int=%.3f <= left_int=%.3f",
+                         b.right.intercept, b.left.intercept);
+            break;
+        case slp_core::PlausibilityIssue::WidthOutOfRange:
+            RCLCPP_DEBUG(node_->get_logger(),
+                         "[straight_line_planner] Plausibility fail: width=%.3f out of [0.5, %.3f]",
+                         b.right.intercept - b.left.intercept, 2.0 * plausibility_max_intercept_diff_);
+            break;
+        case slp_core::PlausibilityIssue::NotBothValid:
+        case slp_core::PlausibilityIssue::None:
+            break;
     }
-    if (std::abs(b.right.slope) > plausibility_max_abs_slope_) {
-        RCLCPP_DEBUG(node_->get_logger(), "[straight_line_planner] Plausibility fail: right slope=%.3f > max=%.3f",
-                     b.right.slope, plausibility_max_abs_slope_);
-        return false;
-    }
-    // 右侧截距应大于左侧截距（在 base_link 中右侧为 +y，左侧为 -y）
-    if (!(b.right.intercept > b.left.intercept)) {
-        RCLCPP_DEBUG(node_->get_logger(), "[straight_line_planner] Plausibility fail: right_int=%.3f <= left_int=%.3f",
-                     b.right.intercept, b.left.intercept);
-        return false;
-    }
-    double width_at_origin = b.right.intercept - b.left.intercept;
-    if (width_at_origin < 0.5 || width_at_origin > 2.0 * plausibility_max_intercept_diff_) {
-        RCLCPP_DEBUG(node_->get_logger(), "[straight_line_planner] Plausibility fail: width=%.3f out of [0.5, %.3f]",
-                     width_at_origin, 2.0 * plausibility_max_intercept_diff_);
-        return false;
-    }
-    return true;
+    return verdict.plausible;
 }
 
 void StraightLinePlannerNode::BuildPathLimits(const DetectedBoundaries& boundaries,
@@ -173,12 +178,17 @@ void StraightLinePlannerNode::BuildPathLimits(const DetectedBoundaries& boundari
 
     out.tracklimits.left.clear();
     out.tracklimits.right.clear();
-    std::ranges::copy_if(
-        cones, std::back_inserter(out.tracklimits.left), [this](float y) { return y < -center_margin_; },
-        [](const common_msgs::msg::HuatCone& c) { return c.position_base_link.y; });
-    std::ranges::copy_if(
-        cones, std::back_inserter(out.tracklimits.right), [this](float y) { return y > center_margin_; },
-        [](const common_msgs::msg::HuatCone& c) { return c.position_base_link.y; });
+    // #22：左右分离与 LineDetector::ClusterCones 共用同一 core（保序拷贝 + 原排序）。
+    const slp_core::ConeSideSplit split =
+        slp_core::SplitConesBySide(std::span<const common_msgs::msg::HuatCone>{cones}, center_margin_);
+    out.tracklimits.left.reserve(split.left.size());
+    out.tracklimits.right.reserve(split.right.size());
+    for (const auto i : split.left) {
+        out.tracklimits.left.push_back(cones[i]);
+    }
+    for (const auto i : split.right) {
+        out.tracklimits.right.push_back(cones[i]);
+    }
     std::ranges::sort(out.tracklimits.left, {}, [](const auto& c) { return c.position_base_link.x; });
     std::ranges::sort(out.tracklimits.right, {}, [](const auto& c) { return c.position_base_link.x; });
     out.replan = true;
@@ -313,9 +323,9 @@ void StraightLinePlannerNode::OnConeMapMessage(const common_msgs::msg::HuatMap::
 
     DetectedBoundaries boundaries = line_detector_->Detect(accumulated_cones);
     bool plausible = IsBoundaryPlausible(boundaries);
-    bool single_side_ok = (boundaries.left.valid != boundaries.right.valid) &&
-                          (boundaries.left.valid ? std::abs(boundaries.left.slope) <= plausibility_max_abs_slope_
-                                                 : std::abs(boundaries.right.slope) <= plausibility_max_abs_slope_);
+    // #22：单侧可用性判定收敛到 slp_core::IsSingleSideUsable（纯 std）。
+    const bool single_side_ok =
+        slp_core::IsSingleSideUsable(boundaries.left, boundaries.right, plausibility_max_abs_slope_);
 
     if (!plausible && !single_side_ok) {
         HandleDegradedBoundaries(boundaries, msg->cone);

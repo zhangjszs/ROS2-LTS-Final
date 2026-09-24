@@ -42,6 +42,8 @@ if(BUILD_TESTING)
   find_package(ament_cmake_gtest REQUIRED)
   ament_add_gtest(test_line_detector test/test_line_detector.cpp)
   target_link_libraries(test_line_detector ${PROJECT_NAME}_core)
+  # #22：core 头（cone_boundary.h）为纯 std，测试刻意不链接本包 ROS 库，证明可脱离 ROS 独立编译
+  ament_add_gtest(test_cone_boundary test/test_cone_boundary.cpp)
 endif()
 
 ament_package()
