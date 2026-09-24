@@ -1,0 +1,3 @@
+# colcon 忽略标记（空文件，勿删）：tests/ 为 #22 的非 ROS 独立检查域，
+# 由 tests/core_standalone（标准 CMake/CTest）与 scripts/core_standalone_check.sh 使用，
+# 不参与 colcon/ament 构建与测试。该文件本身在 .gitignore 中做了入库存档例外。

@@ -22,12 +22,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install build tools (ccache, mold, clang-format, cppcheck)
+      - name: Install build tools (ccache, mold, clang-format, cppcheck, libgtest-dev)
         run: |
           sudo apt-get update
           # mold: colcon_defaults.yaml forces -DCMAKE_LINKER_TYPE=MOLD
           # clang-format/cppcheck: consumed by scripts/lint_cpp.sh
-          sudo apt-get install -y ccache mold clang-format cppcheck
+          # libgtest-dev: system GTest for the no-ROS core check (#22)
+          sudo apt-get install -y ccache mold clang-format cppcheck libgtest-dev
 
       - name: Prepare ROS 2 ${{ env.ROS_DISTRO }}
         uses: ros-tooling/setup-ros@v0.7
@@ -51,6 +52,12 @@ jobs:
 
       - name: Lint (clang-format + cppcheck, no build)
         run: bash scripts/lint_cpp.sh
+
+      # #22: builds & runs the pure-std core tests without ROS (no colcon/DDS),
+      # with ASan+UBSan. Plain CMake/CTest entry at tests/core_standalone.
+      - name: Core standalone check (no ROS, ASan+UBSan, #22)
+        timeout-minutes: 5
+        run: bash scripts/core_standalone_check.sh
 
       - name: Build (Release, C++20, mold + ccache, tests on)
         run: |

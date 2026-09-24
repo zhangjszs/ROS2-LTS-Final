@@ -7,6 +7,8 @@ log/
 logs/
 .built_by
 COLCON_IGNORE
+# 例外：tests/ 为 #22 的非 ROS 独立检查域，其 COLCON_IGNORE 需入库存档
+!tests/COLCON_IGNORE
 
 # ROS 2 bag files & recorded data
 *.bag
