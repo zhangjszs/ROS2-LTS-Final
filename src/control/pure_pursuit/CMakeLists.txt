@@ -93,6 +93,10 @@ if(BUILD_TESTING)
   target_link_libraries(test_vehicle_command_codec
     common_msgs::common_msgs
   )
+  # #22：pp_core::ThrottleController（纯 std core，仅 gtest + 包内 include）
+  ament_add_gtest(test_throttle_controller
+    test/test_throttle_controller.cpp
+  )
 endif()
 
 ament_export_dependencies(

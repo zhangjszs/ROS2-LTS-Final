@@ -21,6 +21,7 @@
 #include "geometry_msgs/msg/point.hpp"
 #include "pure_pursuit/input_guard.h"
 #include "pure_pursuit/pure_pursuit_params.h"
+#include "pure_pursuit/throttle_controller.h"  // #22：纵向油门控制律 core（纯 std）
 #include "pure_pursuit/vehicle_command_encoder.h"
 #include "std_msgs/msg/float64_multi_array.hpp"
 #include "std_msgs/msg/u_int64.hpp"
@@ -75,7 +76,8 @@ class PurePursuitController {
     rclcpp::Time last_path_time_;
     rclcpp::Time last_path_time_prev_;
     rclcpp::Time last_state_time_;
-    double current_speed_ = 0.0, long_error_ = 0.0, long_current_ = 0.0, sum_error_ = 0.0;
+    double current_speed_ = 0.0;
+    pp_core::ThrottleController throttle_ctrl_;  // #22：持有积分/抗饱和状态，替代散落的 sum_error_/long_current_
     std::vector<double> refx_;
     std::vector<double> refy_;
 };

@@ -10,6 +10,7 @@
 
 #include "interface_contract_qos.hpp"  // #14：stop 锁存 QoS 由契约单一来源构造
 #include "pure_pursuit/pp_math.h"
+#include "pure_pursuit/throttle_controller.h"  // #22：纵向油门控制律 core
 
 using std::vector;
 constexpr double kPi = std::numbers::pi_v<double>;
@@ -221,7 +222,7 @@ void PurePursuitController::ComputeControlCommand(common_msgs::msg::HuatControlC
     if (guard.decision != GuardDecision::PROCEED) {
         RCLCPP_WARN_THROTTLE(node_->get_logger(), *node_->get_clock(), 1000, "[pure_pursuit] %s, braking",
                              guard.reason);
-        sum_error_ = 0.0;
+        throttle_ctrl_.reset();
         filtered_angle_ = 0.0;
         finall_cmd = encoder_.encodeBrake(racing_num_, guard.brake_force);
         pub_finall_cmd_->publish(finall_cmd);
@@ -240,7 +241,7 @@ void PurePursuitController::ComputeControlCommand(common_msgs::msg::HuatControlC
     if (goal_idx < 0) {
         RCLCPP_WARN_THROTTLE(node_->get_logger(), *node_->get_clock(), 1000,
                              "[pure_pursuit] No valid goal index, hard braking");
-        sum_error_ = 0.0;
+        throttle_ctrl_.reset();
         filtered_angle_ = 0.0;
         finall_cmd = encoder_.encodeBrake(racing_num_, 80);
         pub_finall_cmd_->publish(finall_cmd);
@@ -249,7 +250,7 @@ void PurePursuitController::ComputeControlCommand(common_msgs::msg::HuatControlC
     if (goal_idx >= 0 && path_len - goal_idx <= params_.algorithm.path_search.end_decel_points) {
         RCLCPP_WARN_THROTTLE(node_->get_logger(), *node_->get_clock(), 1000,
                              "[pure_pursuit] Approaching path end (%d/%d), braking", goal_idx, path_len);
-        sum_error_ = 0.0;
+        throttle_ctrl_.reset();
         filtered_angle_ = 0.0;
         finall_cmd = encoder_.encodeBrake(racing_num_, 40);
         pub_finall_cmd_->publish(finall_cmd);
@@ -282,57 +283,13 @@ void PurePursuitController::ComputeControlCommand(common_msgs::msg::HuatControlC
         RCLCPP_DEBUG(node_->get_logger(), "[pure_pursuit] Steering angle: %f, steering: %d, speed: %f", delta,
                      steering_, current_speed_);
         steering_ = steering_calib_.encodeRad(cmd.steering_angle.data);
-        long_error_ = throt.target_speed - current_speed_;
-        {
-            const double zone = throt.speed_blend_zone > 0.0 ? throt.speed_blend_zone : 0.0;
-            const double v = current_speed_;
-            const double lo_hi_pre = static_cast<double>(throt.speed_low_threshold);
-            const double hi_lo_pre = static_cast<double>(throt.speed_high_threshold);
-            const bool freeze_integral = (v <= lo_hi_pre - zone) || (v >= hi_lo_pre + zone);
-            if (!freeze_integral) {
-                sum_error_ += long_error_;
-                sum_error_ = std::max(-throt.pid_integral_max, std::min(throt.pid_integral_max, sum_error_));
-            }
-        }
-        long_current_ = throt.pid_kp * long_error_ + throt.pid_ki * sum_error_;
-
-        {
-            const double zone = throt.speed_blend_zone > 0.0 ? throt.speed_blend_zone : 0.0;
-            const double v = current_speed_;
-
-            double lo_hi = static_cast<double>(throt.speed_low_threshold);
-            double lo_lo = lo_hi - zone;
-            if (v <= lo_lo) {
-                long_current_ = throt.current_low_speed;
-            } else if (zone > 0.0 && v < lo_hi) {
-                double t = (v - lo_lo) / zone;
-                long_current_ = (1.0 - t) * throt.current_low_speed + t * long_current_;
-            }
-
-            double hi_lo = static_cast<double>(throt.speed_high_threshold);
-            double hi_hi = hi_lo + zone;
-            if (v >= hi_hi) {
-                long_current_ = throt.current_high_speed;
-            } else if (zone > 0.0 && v > hi_lo) {
-                double t = (v - hi_lo) / zone;
-                long_current_ = (1.0 - t) * long_current_ + t * throt.current_high_speed;
-            }
-
-            if (v > lo_hi && v < hi_lo && long_current_ > throt.current_clamp_max) {
-                long_current_ = throt.current_clamp_max;
-            }
-        }
-        cmd.throttle.data = static_cast<float>(static_cast<int>(long_current_));
+        // #22：纵向油门控制律抽到 pp_core::ThrottleController（P+I + 抗饱和 + 低/高速 blend + 限幅）。
+        pedal_ratio_ = throttle_ctrl_.update(current_speed_, throt);
+        cmd.throttle.data = static_cast<float>(static_cast<int>(throttle_ctrl_.lastCurrent()));
         RCLCPP_DEBUG(node_->get_logger(), "[pure_pursuit] Throttle: %f, pedal ratio: %d", cmd.throttle.data,
                      pedal_ratio_);
-        pedal_ratio_ = static_cast<int>(cmd.throttle.data);
 
         // 限幅已在 SteeringCalibration::encodeRad 内完成（min_raw/max_raw）
-        if (pedal_ratio_ < throt.pedal_min) {
-            pedal_ratio_ = throt.pedal_min;
-        } else if (pedal_ratio_ > throt.pedal_max) {
-            pedal_ratio_ = throt.pedal_max;
-        }
         finall_cmd = encoder_.encodeDrive(steering_, pedal_ratio_, racing_num_, racing_status_);
         pub_finall_cmd_->publish(finall_cmd);
         dropped_commands_ = 0;
