@@ -5,6 +5,8 @@
 #include <iomanip>
 #include <sstream>
 
+#include "interface_contract.h"  // #14：契约话题名缺省常量（common_msgs 手写头不带前缀）
+
 namespace velocity_profiler {
 
 namespace {
@@ -71,8 +73,8 @@ void VelocityProfilerNode::InitParameters() {
     declare_parameter<bool>("limits.enable_friction_circle", true);
 
     declare_parameter<std::string>("topics.input_path", "/planning/raw_pathlimits");
-    declare_parameter<std::string>("topics.output_path", "/planning/pathlimits");
-    declare_parameter<std::string>("topics.vehicle_state", "/localization/vehicle_state");
+    declare_parameter<std::string>("topics.output_path", std::string(common_msgs::contract::kTopicPathLimits));
+    declare_parameter<std::string>("topics.vehicle_state", std::string(common_msgs::contract::kTopicVehicleState));
     declare_parameter<std::string>("topics.speed_markers", "/planning/viz/speed_markers");
 
     get_parameter("limits.max_velocity", config_.limits.max_velocity);

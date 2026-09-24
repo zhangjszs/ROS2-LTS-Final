@@ -57,14 +57,19 @@ QoS 值即 `interface_contract.h` 中对应 `kQos*` 描述符；消费者据此�
 
 | 模块 | 现状 | 迁移到契约 | 状态 |
 | --- | --- | --- | --- |
-| MPC 控制器 | frame 门禁 + 局部路径契约 + `target_speeds` 优先 | 采用 `contract::isFrameSupported`/`kFrameBaseLink`/`targetSpeedsEffective`；stop 订阅 `makeQoS(kQosStop)`；**已移除 `Point.z` 速度回退**→缺失时用 `path.reference_speed_default` | ✅ 已采用 |
-| Pure Pursuit | 速度来自参数 `algorithm.throttle.target_speed`（不读 path 速度） | stop 订阅 `makeQoS(kQosStop)` | ✅ 无 z 依赖；话题常量待全面接入 |
-| velocity_profiler | 速度权威：输出 `target_speeds[]`（与 path 等长，不写 z 速度） | 直接引用契约话题常量 | ✅ 已符合契约（话题常量待接入） |
+| MPC 控制器 | frame 门禁 + 局部路径契约 + `target_speeds` 优先 | 采用 `contract::isFrameSupported`/`kFrameBaseLink`；速度逐点由 `contract::selectReferenceSpeed` 集中判定（`target_speeds` 优先，缺失→`path.reference_speed_default`）；stop 订阅 `makeQoS(kQosStop)`；**已移除 `Point.z` 速度回退** | ✅ 已采用 |
+| Pure Pursuit | 速度来自参数 `algorithm.throttle.target_speed`（不读 path 速度） | stop 订阅 `makeQoS(kQosStop)` | ✅ 无 z 依赖；话题名可按参数覆盖，闭环冒烟在契约话题上验证接线 |
+| velocity_profiler | 速度权威：输出 `target_speeds[]`（与 path 等长，不写 z 速度） | 话题名缺省引用 `contract::kTopicPathLimits`/`kTopicVehicleState`；输出经 `targetSpeedsEffective` 单测锁定为合法载体 | ✅ 已采用 |
 | skidpad / straight_line 规划器 | `MakePoint(x, y, 0.0)`：z 恒为 0，仅为几何占位（不载速） | — | ✅ 已无 z 速度语义 |
-| vehicle_state / 仿真器 | 透传质量/设备时间（#12） | 复用契约哨兵常量 | ⏳ 待接入 |
+| vehicle_state / 仿真器 | 透传质量/设备时间（#12） | 话题名缺省引用 `contract::kTopicVehicleState`；仿真器 state 发布/指令·stop 订阅均由 `makeQoS(kQos*)` 构造（stop 锁存） | ✅ 已采用 |
 | safety_monitor | `transient_local` 锁存 stop（#8） | stop 发布 `makeQoS(kQosStop)` | ✅ 已采用 |
 
 **stop 链路已端到端统一到契约**：发布端（safety_monitor）与订阅端（MPC/PP）的锁存 QoS 均由
 `common_msgs::contract::makeQoS(kQosStop)` 单一来源构造（`interface_contract_qos.hpp`），杜绝三处散落构造漂移；行为与原 `KeepLast(1).reliable().transient_local()` 完全一致。
 
-**兼容退出条件**：`Point.z` 作速度的回退分支已删除（见上）；当剩余节点（vehicle_state/仿真器话题常量）全面接入契约后，本矩阵全部 ✅，即可关闭 #14。集成验证遵循"一条链路迁移→逐步推广"。
+**兼容退出条件**：`Point.z` 作速度的回退分支已删除，且其选择逻辑集中到 `contract::selectReferenceSpeed`
+并由 `test_interface_contract` 锁定；vehicle_state / velocity_profiler / 仿真器 的契约话题名缺省值与 QoS
+均已改引 `contract::kTopic*` / `makeQoS(kQos*)`。运行时端点/QoS 兼容检查 `scripts/qos_contract_check.sh`
+已升级为**闭环集成冒烟**：无界面拉起 sim→velocity_profiler→pure_pursuit→sim 四节点回路，用 `ros2 topic info -v`
+断言每条契约话题 pub/sub 端点齐备且 QoS 合规（stop=TRANSIENT_LOCAL、state/path/command=RELIABLE），并纳入 CI。
+矩阵全部 ✅ 即具备关闭 #14 的条件。

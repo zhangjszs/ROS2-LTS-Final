@@ -2,8 +2,14 @@
 
 #include <chrono>
 #include <numbers>
+#include <string>
+
+#include "interface_contract.h"        // #14：话题名缺省引用契约常量
+#include "interface_contract_qos.hpp"  // #14：契约话题 QoS 由 makeQoS 单一来源构造
 
 namespace simulation {
+
+namespace contract = common_msgs::contract;  // #14：契约命名空间别名（话题名/QoS 单一来源）
 
 namespace {
 
@@ -102,7 +108,7 @@ void SimulatorNode::LoadParameters() {
 
 void SimulatorNode::SetupPublishersAndSubscribers() {
     vehicle_cmd_sub_ = create_subscription<common_msgs::msg::HuatVehicleCmd>(
-        "/vehicle_command", 10,
+        std::string(contract::kTopicVehicleCommand), contract::makeQoS(contract::kQosCommand),
         [this](const common_msgs::msg::HuatVehicleCmd::ConstSharedPtr msg) { OnVehicleCommand(msg); });
 
     control_cmd_sub_ = create_subscription<common_msgs::msg::HuatControlCommand>(
@@ -110,9 +116,11 @@ void SimulatorNode::SetupPublishersAndSubscribers() {
         [this](const common_msgs::msg::HuatControlCommand::ConstSharedPtr msg) { OnControlCommand(msg); });
 
     stop_sub_ = create_subscription<common_msgs::msg::HuatStop>(
-        "/system/stop", 10, [this](const common_msgs::msg::HuatStop::ConstSharedPtr msg) { OnStopMessage(msg); });
+        std::string(contract::kTopicStop), contract::makeQoS(contract::kQosStop),
+        [this](const common_msgs::msg::HuatStop::ConstSharedPtr msg) { OnStopMessage(msg); });
 
-    carstate_pub_ = create_publisher<common_msgs::msg::HuatCarstate>("/localization/vehicle_state", 10);
+    carstate_pub_ = create_publisher<common_msgs::msg::HuatCarstate>(std::string(contract::kTopicVehicleState),
+                                                                     contract::makeQoS(contract::kQosState));
     ins_pub_ = create_publisher<common_msgs::msg::HuatASENSING>("/INS/ASENSING_INS", 10);
     cone_map_pub_ = create_publisher<common_msgs::msg::HuatMap>("/sensors/cones/fused", 10);
     global_map_pub_ = create_publisher<common_msgs::msg::HuatMap>("/simulation/global_map", 1);

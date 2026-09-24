@@ -69,6 +69,22 @@ inline constexpr double kUnknownDeviceTime = -1.0;                              
     return true;
 }
 
+// 消费者逐点参考速度选择（issue #14）：这是“速度载体唯一由 target_speeds 表达”的集中判定点。
+//   - has_explicit_speeds==true：返回 target_speed（来自 target_speeds[i]，允许 0=停车，valid 当且仅当有限且 >=0）；
+//   - 否则：缺失速度，回退到调用方配置的 default_reference_speed（仅当 >0.1 才视为可行驶，
+//     否则 valid=false 触发降级/停车）。
+// 关键契约：本函数**从不接受几何 Point.z 作速度输入** —— z 仅作几何占位，杜绝旧“z 藏速度”回退复活。
+struct SpeedSelection {
+    double speed;
+    bool valid;
+};
+[[nodiscard]] inline constexpr SpeedSelection selectReferenceSpeed(bool has_explicit_speeds, double target_speed,
+                                                                   double default_reference_speed) noexcept {
+    if (has_explicit_speeds)
+        return {target_speed, isFinite(target_speed) && target_speed >= 0.0};
+    return {default_reference_speed, isFinite(default_reference_speed) && default_reference_speed > 0.1};
+}
+
 // 来源年龄校验（issue #12）：age 为非负且不超过容差才视为新鲜。tolerance<0 表示禁用该检查。
 [[nodiscard]] inline constexpr bool sourceAgeAcceptable(double age_sec, double tolerance_sec) noexcept {
     if (tolerance_sec < 0.0)

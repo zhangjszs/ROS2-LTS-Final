@@ -4,12 +4,15 @@
 #include <functional>
 #include <geometry_msgs/msg/transform_stamped.hpp>
 
+#include "interface_contract.h"  // #14：话题名缺省引用契约常量（common_msgs 手写头不带前缀）
+
 VehicleStateEstimator::VehicleStateEstimator(rclcpp::Node::SharedPtr node)
     : node_(node), tf_broadcaster_(*node), diag_updater_(node) {
     std::string ins_topic;
     std::string vehicle_state_topic;
     node_->declare_parameter<std::string>("ins_topic", "/INS/ASENSING_INS");
-    node_->declare_parameter<std::string>("vehicle_state_topic", "/localization/vehicle_state");
+    node_->declare_parameter<std::string>("vehicle_state_topic",
+                                          std::string(common_msgs::contract::kTopicVehicleState));
     node_->get_parameter<std::string>("ins_topic", ins_topic);
     node_->get_parameter<std::string>("vehicle_state_topic", vehicle_state_topic);
 

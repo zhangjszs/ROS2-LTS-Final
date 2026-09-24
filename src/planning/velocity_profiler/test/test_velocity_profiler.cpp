@@ -2,7 +2,9 @@
 
 #include <cmath>
 #include <numbers>
+#include <vector>
 
+#include "interface_contract.h"  // #14：验证剖面形成合法的 target_speeds 速度载体
 #include "velocity_profiler/velocity_profiler.hpp"
 
 namespace velocity_profiler {
@@ -124,6 +126,34 @@ TEST(VelocityProfilerTest, EmptyAndDegeneratePath) {
     ASSERT_EQ(p1.size(), 1u);
     EXPECT_DOUBLE_EQ(p1[0].x, 10.0);
     EXPECT_DOUBLE_EQ(p1[0].y, 20.0);
+}
+
+// #14 项②：作为速度权威，velocity_profiler 输出的 target_speeds 必须是下游
+// 契约门 (targetSpeedsEffective) 接受的合法载体：与路径等长、逐点有限且 >=0（允许 0）。
+TEST(VelocityProfilerTest, ProfileFormsValidTargetSpeedsCarrier) {
+    ProfilerLimits limits;
+    limits.max_velocity = 20.0;
+    limits.min_velocity = 2.0;
+    limits.max_lat_accel = 9.8;
+    VelocityProfiler profiler(limits);
+
+    std::vector<std::pair<double, double>> path;
+    for (double x = 0.0; x <= 50.0; x += 1.0) {
+        path.emplace_back(x, 0.0);
+    }
+
+    const auto profile = profiler.ComputeProfile(path, 0.0);
+    ASSERT_EQ(profile.size(), path.size());
+
+    // 将剖面展开为节点将写入 HuatPathLimits.target_speeds 的 double 数组
+    std::vector<double> speeds;
+    speeds.reserve(profile.size());
+    for (const auto& pp : profile) {
+        speeds.push_back(pp.target_speed);
+    }
+
+    // 下游消费者据此判定是否采用 target_speeds（而非回退默认/绝不应从 z 取速）
+    EXPECT_TRUE(common_msgs::contract::targetSpeedsEffective(speeds, path.size()));
 }
 
 }  // namespace velocity_profiler

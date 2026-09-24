@@ -170,14 +170,12 @@ void MpcControllerNode::OnPath(const common_msgs::msg::HuatPathLimits::ConstShar
         ReferencePoint pt;
         pt.x = msg->path[i].x;
         pt.y = msg->path[i].y;
-        if (has_explicit_speeds) {
-            pt.speed = msg->target_speeds[i];
-            pt.speed_valid = std::isfinite(pt.speed) && pt.speed >= 0.0;
-        } else {
-            // #14：缺失显式速度时用配置的默认参考速度，不再把 Point.z 当速度载体
-            pt.speed = reference_speed_default_;
-            pt.speed_valid = std::isfinite(pt.speed) && pt.speed > 0.1;
-        }
+        // #14：速度载体唯一为 target_speeds；缺失时回退到配置的默认参考速度，绝不读 Point.z。
+        const double target_speed = has_explicit_speeds ? msg->target_speeds[i] : 0.0;
+        const auto speed =
+            common_msgs::contract::selectReferenceSpeed(has_explicit_speeds, target_speed, reference_speed_default_);
+        pt.speed = speed.speed;
+        pt.speed_valid = speed.valid;
 
         // 计算航向角与曲率估计
         if (i + 1 < msg->path.size()) {

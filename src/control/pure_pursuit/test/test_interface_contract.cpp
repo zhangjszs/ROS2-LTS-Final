@@ -63,3 +63,34 @@ TEST(InterfaceContract, QosDescriptorsEncodeLatchContract) {
     EXPECT_TRUE(kQosStop.reliable);
     EXPECT_EQ(kQosStop.depth, 1u);
 }
+
+// #14 项②：速度载体唯一为 target_speeds；Point.z 从不参与速度选择。
+TEST(InterfaceContract, ReferenceSpeedNeverReadsPointZ) {
+    // 旧约定把速度藏在 Point.z=5.0；新契约下，当 target_speeds 缺失（如空）时，
+    // selectReferenceSpeed 只能返回“配置的默认参考速度”，绝不会因 z=5.0 而返回 5.0。
+    const double legacy_point_z = 5.0;  // 仅作几何占位，任何路径都不得当速度读取
+    const double configured_default = 2.5;
+
+    // 1) 缺失显式速度：走默认参考速度分支（valid 当 >0.1）
+    const auto missing = selectReferenceSpeed(/*has_explicit=*/false, /*target_speed=*/legacy_point_z,
+                                              /*default_ref=*/configured_default);
+    EXPECT_DOUBLE_EQ(missing.speed, configured_default);
+    EXPECT_TRUE(missing.valid);
+    EXPECT_NE(missing.speed, legacy_point_z);  // 关键：未采纳 z
+
+    // 2) 有显式 target_speeds：逐点用该值（允许 0=停车），即使与 z 不同
+    const double stop_speed = 0.0;
+    const auto explicit_stop = selectReferenceSpeed(/*has_explicit=*/true, /*target_speed=*/stop_speed,
+                                                    /*default_ref=*/configured_default);
+    EXPECT_DOUBLE_EQ(explicit_stop.speed, 0.0);
+    EXPECT_TRUE(explicit_stop.valid);  // 0 是合法停车目标，不等于缺失
+
+    // 3) 默认参考速度过小（<=0.1）时 valid=false，触发降级/停车，而非静默行驶
+    const auto weak_default = selectReferenceSpeed(/*has_explicit=*/false, /*target_speed=*/0.0,
+                                                   /*default_ref=*/0.05);
+    EXPECT_FALSE(weak_default.valid);
+
+    // 4) 缺失且默认值为 NaN 哨兵时不可信
+    const auto nan_default = selectReferenceSpeed(/*has_explicit=*/false, /*target_speed=*/0.0, kUnknownSpeed);
+    EXPECT_FALSE(nan_default.valid);
+}
