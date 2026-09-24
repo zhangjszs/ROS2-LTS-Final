@@ -50,16 +50,23 @@ struct VehicleCommandRaw {
 
 // 纵向执行器标定：加速度 (m/s^2) <-> 油门/制动百分比 raw [0, pedal_full_scale]。
 struct ActuatorCalibration {
-    double max_accel{5.0};                             // 正向满量程加速度（>0）
-    double max_decel{8.0};                             // 制动满量程加速度幅值（>0）
-    double pedal_full_scale{100.0};                    // 满油门/满制动对应 raw（默认 0-100；某些底盘为 0-255）
-    int emergency_brake_raw{80};                       // 急停/非有限输入时的锁定制动指令
-    std::string calibration_version{"sim-default-0"};  // 标定版本；实车确认后递增，禁止隐式漂移
+    // 字段尾注均置于独立注释行：规避 clang-format v18/v21 对结构体字段尾注对齐的差异。
+    // 正向满量程加速度（>0）
+    double max_accel{5.0};
+    // 制动满量程加速度幅值（>0）
+    double max_decel{8.0};
+    // 满油门/满制动对应 raw（默认 0-100；某些底盘为 0-255）
+    double pedal_full_scale{100.0};
+    // 急停/非有限输入时的锁定制动指令
+    int emergency_brake_raw{80};
+    // 标定版本；实车确认后递增，禁止隐式漂移
+    std::string calibration_version{"sim-default-0"};
 
     struct ThrottleBrake {
         uint8_t pedal{};
         uint8_t brake{};
-        bool safe_fallback{};  // true 表示因非有限输入触发了安全降级
+        // true 表示因非有限输入触发了安全降级
+        bool safe_fallback{};
     };
 
     // 加速度 -> (油门, 制动)。互斥：正加速给油门、负加速给制动、零=滑行、非有限=安全制动。
