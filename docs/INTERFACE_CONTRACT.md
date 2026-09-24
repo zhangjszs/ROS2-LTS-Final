@@ -94,12 +94,21 @@ QoS 值即 `interface_contract.h` 中对应 `kQos*` 描述符；消费者据此�
   优先级（高→低）：**安全/故障（stopActive）> 任务态约束（非 canDrive）> 正常控制源选择**。可信候选需同时满足
   `present` + `verifyChecksum`（#15）+ `sourceAgeAcceptable`（#12）；冲突按 `preferred` 选，无任一可信源则安全降级。
   安全降级输出确定性：`ActuatorCalibration`（#15）的 `emergencyBrakeRaw()` + 零油门 + 零转角，绝不越界/负值→255。
-  滞回/去抖（切换驻留）需跨帧记忆，由接线节点维护；本层保持无状态以便故障注入。
+- **`command_arbitration.h` · `CommandArbiterFilter`**（跨帧有状态）：在单帧仲裁器外加一层去抖/切换驻留（`switch_dwell_sec`）
+  与 stale 老化，时钟由调用方（节点用 ROS clock / 单测用虚拟时钟）逐帧传入。**语义**：已 committed 且当前可信→保持（sticky）；
+  冷启动（无 committed）→立即接管任一可信源；从已失效的 committed 源切换→需候选连续可信 >=dwell（防抓不住抖动新源）。
 
-**验收门禁（软件侧）**：`test_task_state_machine`（8）+ `test_command_arbitration`（故障注入矩阵 10：源超时/数据无效/
-checksum 失败/stop 锁存/源冲突/无任一可信源降级 等）纳入 `colcon test` → CI。
+**接线节点 `safety_monitor/command_arbiter_node`**（#16 独立出口）：订阅两路控制源（`topics.source_a` 默认
+`/control/vehicle_command`、`topics.source_b` 默认 `/mpc/vehicle_command`）+ 锁存 `stop`（`makeQoS(kQosStop)`），
+经 `CommandArbiterFilter` 在 `topics.output`（默认 `/vehicle_command`）产出**单一**最终指令；启动即发安全制动，
+源话题/输出/超时/去抖/急停字节均参数化，无散落硬编码。
+
+**验收门禁（软件侧）**：`test_task_state_machine`（8）+ `test_command_arbitration`（单帧矩阵 10：源超时/数据无效/
+checksum 失败/stop 锁存/源冲突/无任一可信源降级）+ `test_command_arbiter_filter`（跨帧 6：去抖/sticky/stale 回退/
+stop 复位后重接管 等）纳入 `colcon test` → CI。`headless_smoke.sh` 断言 `command_arbiter_node` 无界面启动；
+`qos_contract_check.sh` 新增仲裁器接线断言（两路源 sub + 单一输出 pub），与 #14 闭环共存且不扰动其 `/vehicle_command` 不变量。
 
 **仍卡在硬件/台架/集成（不据此关闭 #16）**：
-- 实车故障注入端到端验收（真实 VCU 断连/掉电/急停按钮）：依赖实车，未标定项保持“未标定”。
-- 独立仲裁节点接线 + 现有 PP/MPC/safety 实际汇入单一出口（跨帧去抖/stale 时钟）：需 e2e 时序验证，未在本次软件侧改动 live 接线（避免扰动 #14 闭环冒烟与 #17 位级回归）。
+- 实车故障注入端到端验收（真实 VCU 断连/掉电/急停按钮优先级）：依赖实车，未标定项保持“未标定”。
+- 把仲裁器接入 `fsac.launch` 作为权威单出口（控制器改发源话题）：需 e2e 时序验证；本次仅新增节点+单测+冒烟，未改现有 launch（避免扰动 #14/#17）。
 - 具体底盘通道/硬件急停优先级属仓库外，按 #15/#23 记录接口与证据归属。

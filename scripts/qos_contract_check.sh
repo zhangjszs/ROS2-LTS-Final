@@ -52,6 +52,10 @@ TOPIC_RAW_PATH="/planning/raw_pathlimits"
 TOPIC_PATH="/planning/pathlimits"
 TOPIC_COMMAND="/vehicle_command"
 TOPIC_STOP="/system/stop"
+# #16：仲裁器源话题 + 最终输出（用独立输出话题，避免与 sim 回路的 /vehicle_command 双发布者冲突）。
+TOPIC_SRC_A="/control/vehicle_command"
+TOPIC_SRC_B="/mpc/vehicle_command"
+TOPIC_ARB_OUT="/vehicle_command_arb"
 
 ros2 run vehicle_simulator vehicle_simulator_node --ros-args -p use_sim_time:=true -p publish_clock:=true >build/qcc_sim.log 2>&1 & PIDS+=($!)
 ros2 run safety_monitor safety_monitor >build/qcc_safety.log 2>&1 & PIDS+=($!)
@@ -60,20 +64,24 @@ ros2 run velocity_profiler velocity_profiler_node >build/qcc_profiler.log 2>&1 &
 # 使 sim→profiler→pp→sim 闭环在契约话题上真正闭合（演示 #14 项① 话题名统一）。
 ros2 run pure_pursuit pure_pursuit_controller --ros-args -p topics.vehicle_command:="$TOPIC_COMMAND" \
     >build/qcc_pp.log 2>&1 & PIDS+=($!)
+# #16：最终指令仲裁器——订阅 PP/MPC 源 + 锁存 stop，在独立输出话题上产出单一最终指令。
+ros2 run safety_monitor command_arbiter_node --ros-args -p topics.output:="$TOPIC_ARB_OUT" \
+    >build/qcc_arbiter.log 2>&1 & PIDS+=($!)
 
-# 等四节点上节点图（最多 ~25s；单次查询限时，避免 CLI/daemon 异常时无限阻塞）
+# 等五节点上节点图（最多 ~25s；单次查询限时，避免 CLI/daemon 异常时无限阻塞）
 ready=0
 for _ in $(seq 1 25); do
     nodes="$(timeout 8 ros2 node list 2>/dev/null)"
     if grep -q vehicle_simulator <<<"$nodes" && grep -q safety_monitor <<<"$nodes" &&
-        grep -q velocity_profiler <<<"$nodes" && grep -q pure_pursuit <<<"$nodes"; then
+        grep -q velocity_profiler <<<"$nodes" && grep -q pure_pursuit <<<"$nodes" &&
+        grep -q command_arbiter <<<"$nodes"; then
         ready=1
         break
     fi
     sleep 1
 done
 if [ "$ready" -ne 1 ]; then
-    echo "FAIL: nodes did not register; sim/safety/profiler/pp logs:"
+    echo "FAIL: nodes did not register; sim/safety/profiler/pp/arbiter logs:"
     tail -5 build/qcc_*.log
     exit 1
 fi
@@ -140,6 +148,11 @@ for t in "$TOPIC_STATE" "$TOPIC_PATH" "$TOPIC_COMMAND"; do
         fail=1
     fi
 done
+
+echo "=== 指令仲裁器接线（#16：源入 + 单一最终输出） ==="
+check_endpoints "$TOPIC_SRC_A" 0 1 || fail=1       # 仲裁器订阅 PP 源（本冒烟无发布者）
+check_endpoints "$TOPIC_SRC_B" 0 1 || fail=1       # 仲裁器订阅 MPC 源
+check_endpoints "$TOPIC_ARB_OUT" 1 0 || fail=1     # 仲裁器最终输出（启动即发布安全指令；本冒烟无订阅者）
 
 if [ "$fail" -ne 0 ]; then
     echo "Closed-loop contract/QoS integration smoke: FAILED"

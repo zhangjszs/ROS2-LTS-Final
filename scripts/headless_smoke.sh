@@ -29,6 +29,7 @@ fi
 #  node to construct and register on the graph.)
 SMOKES=(
   "/safety_monitor|ros2 run safety_monitor safety_monitor"
+  "/command_arbiter_node|ros2 run safety_monitor command_arbiter_node"
   "/skidpad_planner|ros2 launch skidpad_planner skidpad_planner.launch.py"
   "/straight_line_planner|ros2 launch straight_line_planner straight_line_planner.launch.py"
   "/velocity_profiler_node|ros2 launch velocity_profiler velocity_profiler.launch.py"

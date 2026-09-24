@@ -31,8 +31,19 @@ target_link_libraries(safety_monitor
   std_msgs::std_msgs
 )
 
+# #16：最终指令仲裁节点（订阅 PP/MPC 源 + 锁存 stop -> 单一 /vehicle_command）
+add_executable(command_arbiter_node
+  src/command_arbiter_node.cpp
+)
+
+target_link_libraries(command_arbiter_node
+  common_msgs::common_msgs
+  rclcpp::rclcpp
+)
+
 install(TARGETS
   safety_monitor
+  command_arbiter_node
   DESTINATION lib/${PROJECT_NAME}
 )
 
@@ -59,6 +70,13 @@ if(BUILD_TESTING)
     test/test_command_arbitration.cpp
   )
   target_link_libraries(test_command_arbitration
+    common_msgs::common_msgs
+  )
+  # #16 接线：跨帧去抖/stale 的有状态滤波器（确定性、虚拟时钟可测）
+  ament_add_gtest(test_command_arbiter_filter
+    test/test_command_arbiter_filter.cpp
+  )
+  target_link_libraries(test_command_arbiter_filter
     common_msgs::common_msgs
   )
 endif()
