@@ -87,6 +87,12 @@ if(BUILD_TESTING)
   target_link_libraries(test_interface_contract
     common_msgs::common_msgs
   )
+  ament_add_gtest(test_vehicle_command_codec
+    test/test_vehicle_command_codec.cpp
+  )
+  target_link_libraries(test_vehicle_command_codec
+    common_msgs::common_msgs
+  )
 endif()
 
 ament_export_dependencies(

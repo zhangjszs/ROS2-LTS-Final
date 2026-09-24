@@ -72,6 +72,9 @@ void SimulatorNode::LoadParameters() {
     declare_parameter<double>("max_decel", 9.0);
     declare_parameter<double>("max_speed", 25.0);
 
+    // #15：纵向执行器解码标定版本（与控制器侧 actuator.* 保持同一标定源）
+    declare_parameter<std::string>("actuator.calibration_version", "sim-default-0");
+
     // 转向指令解码标定（issue #2），与控制器侧 steering.* 保持同一协议
     declare_parameter<double>("steering.neutral", 90.0);
     declare_parameter<double>("steering.units_per_degree", 1.0);
@@ -104,6 +107,12 @@ void SimulatorNode::LoadParameters() {
 
     bicycle_model_.set_params(p);
     bicycle_model_.Reset(init_x, init_y, init_theta, init_v);
+
+    // #15：解码侧纵向标定与物理模型满量程保持一致（既有数值不变，仅集中到共用编解码层）。
+    get_parameter("actuator.calibration_version", actuator_calib_.calibration_version);
+    actuator_calib_.max_accel = p.max_accel;
+    actuator_calib_.max_decel = p.max_decel;
+    actuator_calib_.pedal_full_scale = 100.0;
 }
 
 void SimulatorNode::SetupPublishersAndSubscribers() {
@@ -149,13 +158,8 @@ void SimulatorNode::OnVehicleCommand(const common_msgs::msg::HuatVehicleCmd::Con
     // 转向解码统一走 SteeringCalibration（零位/比例由 steering.* 参数配置，默认 90 居中）
     current_cmd_.target_steering = steering_calib_.decodeRad(static_cast<int>(msg->steering));
 
-    // 解码油门与制动
-    if (msg->brake_force > 0) {
-        current_cmd_.target_accel =
-            -(static_cast<double>(msg->brake_force) / 100.0) * bicycle_model_.params().max_decel;
-    } else {
-        current_cmd_.target_accel = (static_cast<double>(msg->pedal_ratio) / 100.0) * bicycle_model_.params().max_accel;
-    }
+    // #15：油门/制动 -> 加速度 解码统一走共用执行器标定层（与原 (raw/100)*满量程、制动优先语义一致）。
+    current_cmd_.target_accel = actuator_calib_.decode(msg->pedal_ratio, msg->brake_force);
 }
 
 void SimulatorNode::OnControlCommand(const common_msgs::msg::HuatControlCommand::ConstSharedPtr& msg) {

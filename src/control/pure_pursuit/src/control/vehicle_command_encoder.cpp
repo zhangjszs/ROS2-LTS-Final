@@ -1,5 +1,7 @@
 #include "pure_pursuit/vehicle_command_encoder.h"
 
+#include "vehicle_command_codec.h"  // #15：指令帧常量 + 校验和单一来源
+
 common_msgs::msg::HuatVehicleCmd VehicleCommandEncoder::encode(int steering, int brake_force, int pedal_ratio,
                                                                int gear_position, int working_mode, int racing_num,
                                                                int racing_status) const {
@@ -26,9 +28,9 @@ common_msgs::msg::HuatVehicleCmd VehicleCommandEncoder::encodeDrive(int steering
 }
 
 void VehicleCommandEncoder::setHeader(common_msgs::msg::HuatVehicleCmd& cmd) {
-    cmd.head1 = 0xAA;
-    cmd.head2 = 0x55;
-    cmd.length = 10;
+    cmd.head1 = common_msgs::vehicle::kCmdHead1;
+    cmd.head2 = common_msgs::vehicle::kCmdHead2;
+    cmd.length = common_msgs::vehicle::kCmdLength;
 }
 
 uint16_t VehicleCommandEncoder::computeChecksum(std::span<const uint8_t> payload) {
@@ -44,6 +46,14 @@ bool VehicleCommandEncoder::verifyChecksum(std::span<const uint8_t> payload, uin
 }
 
 uint16_t VehicleCommandEncoder::computeChecksum(const common_msgs::msg::HuatVehicleCmd& cmd) {
-    return static_cast<uint16_t>(cmd.steering + cmd.brake_force + cmd.pedal_ratio + cmd.gear_position +
-                                 cmd.working_mode + cmd.racing_num + cmd.racing_status);
+    // #15：委托共用编解码层的累加和（与 MPC/仿真解码同一来源，杜绝漂移）。
+    common_msgs::vehicle::VehicleCommandRaw raw;
+    raw.steering = cmd.steering;
+    raw.brake_force = cmd.brake_force;
+    raw.pedal_ratio = cmd.pedal_ratio;
+    raw.gear_position = cmd.gear_position;
+    raw.working_mode = cmd.working_mode;
+    raw.racing_num = cmd.racing_num;
+    raw.racing_status = cmd.racing_status;
+    return common_msgs::vehicle::checksumRaw(raw);
 }

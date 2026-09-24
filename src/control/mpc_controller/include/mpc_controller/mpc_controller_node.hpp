@@ -10,7 +10,8 @@
 #include "common_msgs/msg/huat_vehicle_cmd.hpp"
 #include "mpc_controller/mpc_model.hpp"
 #include "mpc_controller/mpc_params.hpp"
-#include "steering_calibration.h"  // 仓库约定：common_msgs 手写头不带前缀（同 cone_types.h）
+#include "steering_calibration.h"   // 仓库约定：common_msgs 手写头不带前缀（同 cone_types.h）
+#include "vehicle_command_codec.h"  // #15：纵向执行器标定 + 指令编解码共用层
 
 namespace mpc {
 
@@ -36,6 +37,8 @@ class MpcControllerNode : public rclcpp::Node {
     MpcConfig config_;
     MpcModel mpc_model_;
     common_msgs::vehicle::SteeringCalibration steering_calib_;
+    // issue #15：纵向执行器（油门/制动）标定与指令编解码共用层；从 mpc.* 限幅参数派生，单一来源。
+    common_msgs::vehicle::ActuatorCalibration actuator_calib_;
 
     // 状态记录
     double current_x_{0.0};

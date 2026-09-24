@@ -39,11 +39,18 @@ QoS 值即 `interface_contract.h` 中对应 `kQos*` 描述符；消费者据此�
 
 ## 4. 控制指令（#2/#15）
 
-- 控制器内部统一用**物理前轮转角 `steering_rad`[rad]**（右正）与**纵向加速度/目标速度**。
-- 到底盘 raw 的字节编码由**共用执行器适配层**（`SteeringCalibration`，#15）负责：
-  `raw = neutral + deg·units_per_degree`，clamp `[min_raw,max_raw]`；默认对齐仿真协议 90/1/±25°。
-- 真实底盘协议待实车标定后仅改参数，禁止在模块内散落硬编码。往返一致性与方向/量化由
-  `test_steering_calibration` 断言。
+- 控制器内部统一用**物理前轮转角 `steering_rad`[rad]**（右正）与**纵向加速度**。
+- 到底盘 raw 的字节编码由**共用执行器适配层**负责，均在 `common_msgs` 纯 std 头中：
+  - 转角：`SteeringCalibration`（`vehicle_command` 的 `steering` 字节），
+    `raw = neutral + deg·units_per_degree`，clamp `[min_raw,max_raw]`；默认对齐仿真协议 90/1/±25°。
+  - 纵向：`ActuatorCalibration`（`vehicle_command_codec.h`），加速度↔`pedal_ratio`/`brake_force` 百分比，
+    油门与制动**互斥**；关键安全约束：**clamp-before-narrow + 非有限降级**（对齐 ROS1 #6“负油门→255”
+    缺陷类），非有限/缺失一律降级为“无油门 + 安全制动”。
+  - 指令帧常量与 16 位累加和校验：`kCmdHead1/2`/`kCmdLength`/`checksumRaw`，由 PP/MPC/仿真共用，
+    杜绝协议拼装在校验和/帧头/字节窄化处散落。
+- 标定版本经 `actuator.calibration_version` 参数透传（默认 `sim-default-0`）；真实底盘协议待实车标定后仅改参数/递增版本，
+  禁止在模块内散落硬编码。往返一致性与方向/量化由 `test_steering_calibration`、非有限/限幅安全由
+  `test_vehicle_command_codec` 断言。
 
 ## 5. 车辆状态时间与质量（#12）
 

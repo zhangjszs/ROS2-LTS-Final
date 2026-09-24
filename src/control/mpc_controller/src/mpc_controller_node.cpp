@@ -10,6 +10,21 @@
 
 namespace mpc {
 
+namespace {
+// #15：从已填好的指令消息取校验和（委托共用编解码层，与 PP/仿真同一累加和定义）。
+[[nodiscard]] uint16_t CmdChecksum(const common_msgs::msg::HuatVehicleCmd& cmd) {
+    common_msgs::vehicle::VehicleCommandRaw raw;
+    raw.steering = cmd.steering;
+    raw.brake_force = cmd.brake_force;
+    raw.pedal_ratio = cmd.pedal_ratio;
+    raw.gear_position = cmd.gear_position;
+    raw.working_mode = cmd.working_mode;
+    raw.racing_num = cmd.racing_num;
+    raw.racing_status = cmd.racing_status;
+    return common_msgs::vehicle::checksumRaw(raw);
+}
+}  // namespace
+
 MpcControllerNode::MpcControllerNode(const rclcpp::NodeOptions& options) : Node("mpc_controller_node", options) {
     LoadParameters();
     mpc_model_.SetConfig(config_);
@@ -60,6 +75,10 @@ void MpcControllerNode::LoadParameters() {
     // issue #14：缺失显式 target_speeds 时的默认参考速度（绝不再从 Point.z 取速度）
     declare_parameter<double>("path.reference_speed_default", 0.0);
 
+    // issue #15：纵向执行器标定（满量程从 mpc.* 限幅派生；急停制动 raw 与标定版本可配）
+    declare_parameter<int>("actuator.emergency_brake_raw", 80);
+    declare_parameter<std::string>("actuator.calibration_version", "sim-default-0");
+
     declare_parameter<std::string>("topics.vehicle_state", "/localization/vehicle_state");
     declare_parameter<std::string>("topics.path", "/planning/skidpad_predict_path");
     declare_parameter<std::string>("topics.stop", "/system/stop");
@@ -100,6 +119,15 @@ void MpcControllerNode::LoadParameters() {
     get_parameter("steering.max_raw", steering_calib_.max_raw);
     get_parameter("safety.state_source_age_tolerance_sec", state_source_age_tolerance_sec_);
     get_parameter("path.reference_speed_default", reference_speed_default_);
+
+    // issue #15：纵向执行器标定从 mpc.* 限幅派生（保持既有数值），统一到共用编解码层。
+    int emergency_brake_raw = 80;
+    get_parameter("actuator.emergency_brake_raw", emergency_brake_raw);
+    get_parameter("actuator.calibration_version", actuator_calib_.calibration_version);
+    actuator_calib_.max_accel = config_.limits.max_accel;
+    actuator_calib_.max_decel = std::abs(config_.limits.min_accel);
+    actuator_calib_.pedal_full_scale = 100.0;
+    actuator_calib_.emergency_brake_raw = emergency_brake_raw;
 
     get_parameter("topics.vehicle_state", config_.topics.vehicle_state);
     get_parameter("topics.path", config_.topics.path);
@@ -250,9 +278,9 @@ void MpcControllerNode::ControlLoop() {
 
 void MpcControllerNode::PublishVehicleCommand(double steering_rad, double accel_mps2) {
     common_msgs::msg::HuatVehicleCmd cmd;
-    cmd.head1 = 0xAA;
-    cmd.head2 = 0x55;
-    cmd.length = 10;
+    cmd.head1 = common_msgs::vehicle::kCmdHead1;
+    cmd.head2 = common_msgs::vehicle::kCmdHead2;
+    cmd.length = common_msgs::vehicle::kCmdLength;
     cmd.gear_position = 1;
     cmd.working_mode = 1;
     cmd.racing_num = static_cast<uint8_t>(config_.system.racing_num);
@@ -261,36 +289,28 @@ void MpcControllerNode::PublishVehicleCommand(double steering_rad, double accel_
     // 前轮转角映射统一走 SteeringCalibration（零位/比例/限幅均由 steering.* 参数配置）
     cmd.steering = static_cast<uint8_t>(steering_calib_.encodeRad(steering_rad));
 
-    // 加速度映射为油门 (pedal_ratio) 与制动 (brake_force)
-    if (accel_mps2 >= 0.0) {
-        double throt_ratio = (accel_mps2 / config_.limits.max_accel) * 100.0;
-        cmd.pedal_ratio = static_cast<uint8_t>(std::clamp(static_cast<int>(throt_ratio), 0, 100));
-        cmd.brake_force = 0;
-    } else {
-        double brake_ratio = (-accel_mps2 / std::abs(config_.limits.min_accel)) * 100.0;
-        cmd.pedal_ratio = 0;
-        cmd.brake_force = static_cast<uint8_t>(std::clamp(static_cast<int>(brake_ratio), 0, 100));
-    }
+    // #15：加速度 -> 油门/制动 统一到共用执行器标定层（含非有限降级 + clamp-before-narrow，杜绝负值→255）。
+    const auto tb = actuator_calib_.encode(accel_mps2);
+    cmd.pedal_ratio = tb.pedal;
+    cmd.brake_force = tb.brake;
 
-    cmd.checksum = static_cast<uint16_t>(cmd.steering + cmd.brake_force + cmd.pedal_ratio + cmd.gear_position +
-                                         cmd.working_mode + cmd.racing_num + cmd.racing_status);
+    cmd.checksum = CmdChecksum(cmd);
     cmd_pub_->publish(cmd);
 }
 
 void MpcControllerNode::PublishEmergencyBrake() {
     common_msgs::msg::HuatVehicleCmd cmd;
-    cmd.head1 = 0xAA;
-    cmd.head2 = 0x55;
-    cmd.length = 10;
+    cmd.head1 = common_msgs::vehicle::kCmdHead1;
+    cmd.head2 = common_msgs::vehicle::kCmdHead2;
+    cmd.length = common_msgs::vehicle::kCmdLength;
     cmd.gear_position = 1;
     cmd.working_mode = 1;
     cmd.racing_num = static_cast<uint8_t>(config_.system.racing_num);
     cmd.racing_status = 4;
     cmd.steering = static_cast<uint8_t>(steering_calib_.neutralRaw());
     cmd.pedal_ratio = 0;
-    cmd.brake_force = 80;
-    cmd.checksum = static_cast<uint16_t>(cmd.steering + cmd.brake_force + cmd.pedal_ratio + cmd.gear_position +
-                                         cmd.working_mode + cmd.racing_num + cmd.racing_status);
+    cmd.brake_force = actuator_calib_.emergencyBrakeRaw();
+    cmd.checksum = CmdChecksum(cmd);
     cmd_pub_->publish(cmd);
 }
 
