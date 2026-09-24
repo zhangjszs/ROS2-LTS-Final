@@ -80,3 +80,26 @@ QoS 值即 `interface_contract.h` 中对应 `kQos*` 描述符；消费者据此�
 已升级为**闭环集成冒烟**：无界面拉起 sim→velocity_profiler→pure_pursuit→sim 四节点回路，用 `ros2 topic info -v`
 断言每条契约话题 pub/sub 端点齐备且 QoS 合规（stop=TRANSIENT_LOCAL、state/path/command=RELIABLE），并纳入 CI。
 矩阵全部 ✅ 即具备关闭 #14 的条件。
+
+## 7. 任务与安全状态、最终指令仲裁（#16）
+
+两个新的纯 std 共用层（`common_msgs/include/common_msgs/`，无 ROS context、可单测），与 §2/§4/§5 判定原语衔接、不重复实现：
+
+- **`task_state_machine.h` · `TaskSafetyStateMachine`**：统一“任务态（IDLE/ARMED/RUNNING/FINISHED/FAULT）× 安全态
+  （NORMAL/DEGRADED/STOP）”的显式迁移。**职责边界**：`safety_monitor` 的 `StopStateMachine` 仍负责“看门狗触发时机”（#7/#8），
+  本机只作“系统级编排”。与 #8 锁存一致：`TIMEOUT` 停可被 `onResume()` 清除；`REQUEST`/`FAULT` 停锁存(sticky)，
+  仅 `onReset()` 清除；`FAULT`/`FINISHED` 触发锁存停；停态下 `onArm()/onStart()` 一律拒绝。`canDrive()` 仅在
+  非停且 `RUNNING` 时为真（ARMED=已就绪未起步，仍按安全制动）。
+- **`command_arbitration.h` · `CommandArbitrator`**：多控制源（PP/MPC）→ 唯一最终 `/vehicle_command` 的**单帧纯函数**仲裁。
+  优先级（高→低）：**安全/故障（stopActive）> 任务态约束（非 canDrive）> 正常控制源选择**。可信候选需同时满足
+  `present` + `verifyChecksum`（#15）+ `sourceAgeAcceptable`（#12）；冲突按 `preferred` 选，无任一可信源则安全降级。
+  安全降级输出确定性：`ActuatorCalibration`（#15）的 `emergencyBrakeRaw()` + 零油门 + 零转角，绝不越界/负值→255。
+  滞回/去抖（切换驻留）需跨帧记忆，由接线节点维护；本层保持无状态以便故障注入。
+
+**验收门禁（软件侧）**：`test_task_state_machine`（8）+ `test_command_arbitration`（故障注入矩阵 10：源超时/数据无效/
+checksum 失败/stop 锁存/源冲突/无任一可信源降级 等）纳入 `colcon test` → CI。
+
+**仍卡在硬件/台架/集成（不据此关闭 #16）**：
+- 实车故障注入端到端验收（真实 VCU 断连/掉电/急停按钮）：依赖实车，未标定项保持“未标定”。
+- 独立仲裁节点接线 + 现有 PP/MPC/safety 实际汇入单一出口（跨帧去抖/stale 时钟）：需 e2e 时序验证，未在本次软件侧改动 live 接线（避免扰动 #14 闭环冒烟与 #17 位级回归）。
+- 具体底盘通道/硬件急停优先级属仓库外，按 #15/#23 记录接口与证据归属。

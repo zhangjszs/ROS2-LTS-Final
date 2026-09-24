@@ -48,6 +48,19 @@ if(BUILD_TESTING)
     rclcpp::rclcpp
     std_msgs::std_msgs
   )
+  # #16：统一任务×安全状态机 + 最终指令仲裁器（纯 std 共用层，无 ROS context）
+  ament_add_gtest(test_task_state_machine
+    test/test_task_state_machine.cpp
+  )
+  target_link_libraries(test_task_state_machine
+    common_msgs::common_msgs
+  )
+  ament_add_gtest(test_command_arbitration
+    test/test_command_arbitration.cpp
+  )
+  target_link_libraries(test_command_arbitration
+    common_msgs::common_msgs
+  )
 endif()
 
 ament_export_dependencies(
