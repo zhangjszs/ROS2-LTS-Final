@@ -3,10 +3,13 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <geometry_msgs/msg/point.hpp>
 #include <geometry_msgs/msg/pose_stamped.hpp>
+#include <span>
 
-#include "interface_contract.h"        // #14：统一接口契约（坐标系/有效性判定集中于此）
-#include "interface_contract_qos.hpp"  // #14：stop 锁存 QoS 由契约单一来源构造
+#include "interface_contract.h"                     // #14：统一接口契约（坐标系/有效性判定集中于此）
+#include "interface_contract_qos.hpp"               // #14：stop 锁存 QoS 由契约单一来源构造
+#include "mpc_controller/path_reference_builder.h"  // #22：path→ReferencePoint 纯算法 core（无 ROS context）
 
 namespace mpc {
 
@@ -174,58 +177,27 @@ void MpcControllerNode::OnCarState(const common_msgs::msg::HuatCarstate::ConstSh
 }
 
 void MpcControllerNode::OnPath(const common_msgs::msg::HuatPathLimits::ConstSharedPtr& msg) {
+    // #22：path→ReferencePoint 构建收敛到 mpc_core::BuildReferencePath；节点只保留 ROS 副作用与置位时机。
+    auto result =
+        mpc_core::BuildReferencePath(msg->header.frame_id, std::span<const geometry_msgs::msg::Point>{msg->path},
+                                     std::span<const double>{msg->target_speeds}, reference_speed_default_);
+
     // 坐标系门禁（issue #3/#14）：未知/缺失 frame_id 不得静默当作 map，直接拒绝并进入降级（has_path_=false → 急停）
-    const std::string& frame = msg->header.frame_id;
-    if (!common_msgs::contract::isFrameSupported(frame)) {
+    if (result.status == mpc_core::ReferencePathStatus::RejectedFrame) {
         RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 1000,
                              "[MPC] Unsupported path frame '%s' (expect 'map' or 'base_link'), path rejected!",
-                             frame.c_str());
+                             msg->header.frame_id.c_str());
         has_path_ = false;
         return;
     }
-    path_frame_ = frame;
-    path_in_base_frame_ = (frame == common_msgs::contract::kFrameBaseLink);
+    path_frame_ = msg->header.frame_id;
+    path_in_base_frame_ = result.in_base_frame;
 
-    if (msg->path.size() < 2) {
+    if (result.status == mpc_core::ReferencePathStatus::TooFewPoints) {
         return;
     }
 
-    std::vector<ReferencePoint> pts;
-    pts.reserve(msg->path.size());
-    const bool has_explicit_speeds = common_msgs::contract::targetSpeedsEffective(msg->target_speeds, msg->path.size());
-
-    for (size_t i = 0; i < msg->path.size(); ++i) {
-        ReferencePoint pt;
-        pt.x = msg->path[i].x;
-        pt.y = msg->path[i].y;
-        // #14：速度载体唯一为 target_speeds；缺失时回退到配置的默认参考速度，绝不读 Point.z。
-        const double target_speed = has_explicit_speeds ? msg->target_speeds[i] : 0.0;
-        const auto speed =
-            common_msgs::contract::selectReferenceSpeed(has_explicit_speeds, target_speed, reference_speed_default_);
-        pt.speed = speed.speed;
-        pt.speed_valid = speed.valid;
-
-        // 计算航向角与曲率估计
-        if (i + 1 < msg->path.size()) {
-            double dx = msg->path[i + 1].x - pt.x;
-            double dy = msg->path[i + 1].y - pt.y;
-            pt.theta = std::atan2(dy, dx);
-        } else if (!pts.empty()) {
-            pt.theta = pts.back().theta;
-        }
-
-        if (i > 0 && i + 1 < msg->path.size()) {
-            double dtheta = MpcModel::NormalizeAngle(pt.theta - pts.back().theta);
-            double ds = std::hypot(msg->path[i].x - msg->path[i - 1].x, msg->path[i].y - msg->path[i - 1].y);
-            pt.curvature = (ds > 1e-3) ? (dtheta / ds) : 0.0;
-        } else {
-            pt.curvature = 0.0;
-        }
-
-        pts.push_back(pt);
-    }
-
-    reference_path_ = std::move(pts);
+    reference_path_ = std::move(result.points);
     last_path_time_ = now();
     has_path_ = true;
 }
@@ -254,12 +226,10 @@ void MpcControllerNode::ControlLoop() {
         return;
     }
 
-    // 2. 执行 MPC 优化计算：局部路径契约下车辆位姿变换到路径参考系（原点、航向 0），与 PP 同语义
-    const double ref_x = path_in_base_frame_ ? 0.0 : current_x_;
-    const double ref_y = path_in_base_frame_ ? 0.0 : current_y_;
-    const double ref_theta = path_in_base_frame_ ? 0.0 : current_theta_;
-    auto solution =
-        mpc_model_.Step(ref_x, ref_y, ref_theta, current_speed_, prev_steer_rad_, prev_accel_mps2_, reference_path_);
+    // 2. 执行 MPC 优化计算：局部路径契约下车辆位姿变换到路径参考系（原点、航向 0），与 PP 同语义（#22 收敛到 core）
+    const auto origin = mpc_core::SelectReferenceOrigin(path_in_base_frame_, current_x_, current_y_, current_theta_);
+    auto solution = mpc_model_.Step(origin.x, origin.y, origin.theta, current_speed_, prev_steer_rad_, prev_accel_mps2_,
+                                    reference_path_);
 
     if (solution.success) {
         prev_steer_rad_ = solution.steering_rad;

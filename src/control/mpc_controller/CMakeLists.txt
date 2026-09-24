@@ -93,6 +93,14 @@ if(BUILD_TESTING)
   target_link_libraries(test_mpc_tracking
     mpc_controller_lib
   )
+
+  # #22：mpc_core::BuildReferencePath（path→ReferencePoint 纯算法，header-only core）
+  ament_add_gtest(test_path_reference_builder
+    test/test_path_reference_builder.cpp
+  )
+  target_link_libraries(test_path_reference_builder
+    mpc_controller_lib
+  )
 endif()
 
 ament_export_include_directories(include)

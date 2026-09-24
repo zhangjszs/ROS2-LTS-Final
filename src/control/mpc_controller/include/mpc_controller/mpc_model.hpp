@@ -6,21 +6,10 @@
 #include <vector>
 
 #include "mpc_controller/mpc_params.hpp"
+#include "mpc_controller/mpc_types.hpp"  // #22：ReferencePoint / NormalizeAngle 收敛于此（纯 std，无 Eigen）
 #include "mpc_controller/qp_solver.hpp"
 
 namespace mpc {
-
-/**
- * @brief 轨迹参考航路点
- */
-struct ReferencePoint {
-    double x{0.0};
-    double y{0.0};
-    double theta{0.0};
-    double curvature{0.0};
-    double speed{0.0};
-    bool speed_valid{true};
-};
 
 /**
  * @brief 预测出的未来轨迹点
@@ -69,16 +58,9 @@ class MpcModel {
                                    const std::vector<ReferencePoint>& reference_path);
 
     /**
-     * @brief 角度正规化到 [-pi, pi]
+     * @brief 角度正规化到 [-pi, pi]（唯一实现已收敛于 mpc_types.hpp；此处保留兼容转发）
      */
-    [[nodiscard]] static inline double NormalizeAngle(double angle) noexcept {
-        constexpr double kPi = std::numbers::pi_v<double>;
-        while (angle > kPi)
-            angle -= 2.0 * kPi;
-        while (angle < -kPi)
-            angle += 2.0 * kPi;
-        return angle;
-    }
+    [[nodiscard]] static inline double NormalizeAngle(double angle) noexcept { return mpc::NormalizeAngle(angle); }
 
    private:
     MpcConfig config_;
