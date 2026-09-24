@@ -7,9 +7,10 @@
 #include <geometry_msgs/msg/pose_stamped.hpp>
 #include <span>
 
-#include "interface_contract.h"                     // #14：统一接口契约（坐标系/有效性判定集中于此）
-#include "interface_contract_qos.hpp"               // #14：stop 锁存 QoS 由契约单一来源构造
-#include "mpc_controller/path_reference_builder.h"  // #22：path→ReferencePoint 纯算法 core（无 ROS context）
+#include "interface_contract.h"        // #14：统一接口契约（坐标系/有效性判定集中于此）
+#include "interface_contract_qos.hpp"  // #14：stop 锁存 QoS 由契约单一来源构造
+// #22：path→ReferencePoint 纯算法 core（无 ROS context）
+#include "mpc_controller/path_reference_builder.h"
 
 namespace mpc {
 
