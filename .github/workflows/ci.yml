@@ -109,12 +109,34 @@ jobs:
           source install/setup.bash
           bash scripts/benchmark_regression.sh
 
+      # 容差型集成门禁（#17 闭环 / #16 故障注入）：多节点 DDS+调度天然抖动，
+      # 先以观察期形式入 CI（失败不阻断合入），连续稳定后去掉 continue-on-error 转硬门禁。
+      # 判据与离线位级回归严格分开：后者才是每次 PR 的硬阻断（见上面 Benchmark regression）。
+      - name: Closed-loop simulation smoke (#17, tolerance-based, observing)
+        timeout-minutes: 6
+        continue-on-error: true
+        run: |
+          source "/opt/ros/${ROS_DISTRO}/setup.bash"
+          source install/setup.bash
+          bash scripts/closed_loop_sim_smoke.sh
+
+      - name: Fault injection smoke (#16, software-observable subset, observing)
+        timeout-minutes: 8
+        continue-on-error: true
+        run: |
+          source "/opt/ros/${ROS_DISTRO}/setup.bash"
+          source install/setup.bash
+          bash scripts/fault_injection_smoke.sh
+
       - name: Upload benchmark results
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: benchmark-regression
-          path: build/benchmark_regression/*.json
+          path: |
+            build/benchmark_regression/**/*.json
+            build/closed_loop_smoke/*.json
+            build/fault_injection/*.json
           if-no-files-found: ignore
           retention-days: 14
 

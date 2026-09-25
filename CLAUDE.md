@@ -40,7 +40,12 @@ colcon test && colcon test-result     # enforce gtest results after build
 source /opt/ros/jazzy/setup.bash && source install/setup.bash   # runtime checks need both
 bash scripts/headless_smoke.sh        # #13: nodes actually register on graph (no GUI/hardware)
 bash scripts/qos_contract_check.sh    # #14: live pub/sub endpoints + QoS on stop/state topics
-bash scripts/benchmark_regression.sh  # #17: offline deterministic core via track_benchmark
+bash scripts/benchmark_regression.sh  # #17: offline deterministic core + injected fault negatives + track-source/baseline drift
+
+# Tolerance-based integration gates (multi-node DDS/scheduling jitter → no bit-exact claims;
+# currently continue-on-error in CI while observed). Both auto-exit within a wall-clock budget:
+bash scripts/closed_loop_sim_smoke.sh   # #17: sim→profiler→PP→sim really moves the car, command frames valid, KPI report lands
+bash scripts/fault_injection_smoke.sh   # #16: 10 software fault cases judged from /system/state + /vehicle_command (no RViz/log eyeballing)
 ```
 
 Do NOT write ad-hoc verification when a script above already covers a gate — extend the script instead, so the fix lands in CI too.
@@ -109,7 +114,9 @@ Safety path: `/planning/track/stop_request → safety_monitor → /system/stop �
 
 **Topic naming convention**: `/sensors/<source-or-object>/<stage>`, `/localization/<state>`, `/planning/<event>/<artifact>`, `/control/<command>`, `/system/stop`, `/debug/<node>/<artifact>`, `/fsd/viz/<object>`.
 
-**Interface contract (#14)** (`docs/INTERFACE_CONTRACT.md`): single source of truth for the four contract topics (vehicle_state / pathlimits / vehicle_command / stop) — QoS, frames, units, speed semantics, staleness rules. Machine-checkable primitives live in `common_msgs/include/common_msgs/interface_contract.h`; all pub/sub for contract topics MUST build QoS via `contract::makeQoS(kQos*)` (e.g. `kQosStop` is transient_local latched). When adding or rewiring any of these topics, update the spec + `scripts/qos_contract_check.sh` together.
+**Interface contract (#14)** (`docs/INTERFACE_CONTRACT.md`): single source of truth for the contract topics (vehicle_state / pathlimits / vehicle_command / stop, plus the #16 `/system/state` task×safety + arbitration telemetry) — QoS, frames, units, speed semantics, staleness rules. Machine-checkable primitives live in `common_msgs/include/common_msgs/interface_contract.h`; all pub/sub for contract topics MUST build QoS via `contract::makeQoS(kQos*)` (e.g. `kQosStop` is transient_local latched). When adding or rewiring any of these topics, update the spec + `scripts/qos_contract_check.sh` together. Note: publishing to a latched topic with default (volatile) QoS silently delivers **nothing** — the subscriber just logs `incompatible QoS ... DURABILITY`.
+
+**Chassis semantics & regression evidence**: `docs/INTERFACE_CONTRACT.md` §4 (actuator codec, `#15`) is the wire-format authority, `docs/BENCH_CALIBRATION_TEMPLATE.md` lists every still-**un-calibrated** item, and `docs/DEFECT_DIFFERENTIAL.md` (`#24`) classifies each ROS1→ROS2 semantic difference with the fixture that pins it.
 
 ## CMake Conventions
 
