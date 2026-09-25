@@ -6,7 +6,7 @@
 #   SKIP_BUILD=1 bash scripts/drive_gates.sh # 只跑运行时门禁（已构建过时用）
 #   QUICK=1     bash scripts/drive_gates.sh # lint + 无 ROS 独立检查（秒级，改完就跑）
 #
-# 退出码只反映**硬门禁**；两条容差型集成门禁（闭环 / 故障注入）按 CI 语义记为观察项，
+# 退出码只反映**硬门禁**；三条容差型集成门禁（闭环 / 闭环故障样本 / 故障注入）按 CI 语义记为观察项，
 # 红不翻转退出码，但会打印 [OBSERVE] 并计入 summary，供"观察期转硬门禁"积累证据。
 # 结果同时写成 build/drive_gates/last.json + 追加 build/drive_gates/history.{log,jsonl}，
 # 让任何定时机制（GitHub Actions cron / CI / agent）都读同一份证据而不是各自重述。
@@ -119,6 +119,7 @@ if [ "${QUICK:-0}" != 1 ]; then
     run_gate headless-smoke 1 bash scripts/headless_smoke.sh
     run_gate qos-contract 1 bash scripts/qos_contract_check.sh
     run_gate closed-loop 0 bash scripts/closed_loop_sim_smoke.sh
+    run_gate closed-loop-fault 0 bash scripts/closed_loop_fault_smoke.sh
     run_gate fault-injection 0 bash scripts/fault_injection_smoke.sh
 fi
 

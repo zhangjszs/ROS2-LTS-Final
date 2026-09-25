@@ -91,6 +91,7 @@ jobs:
             build/drive_gates/*.log
             build/benchmark_regression/**/*.json
             build/closed_loop_smoke/*.json
+            build/closed_loop_fault/*.json
             build/fault_injection/*.json
           if-no-files-found: warn
           retention-days: 30

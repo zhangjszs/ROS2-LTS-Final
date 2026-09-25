@@ -103,7 +103,10 @@ void BenchmarkNode::SetupSubscribersAndPublishers() {
         [this](const common_msgs::msg::HuatVehicleCmd::ConstSharedPtr msg) { OnVehicleCommand(msg); });
 
     hud_pub_ = create_publisher<visualization_msgs::msg::Marker>("/benchmark/hud_marker", 10);
-    centerline_pub_ = create_publisher<nav_msgs::msg::Path>("/benchmark/centerline_path", 1);
+    // #17：中心线用锁存(transient_local)发布 —— 只在启动后 1s 发一次，晚加入的订阅者（如闭环
+    // 故障冒烟的参考路径喂入节点）也必须拿到，否则会因漏掉这一次 volatile 样本而静默无路径。
+    centerline_pub_ = create_publisher<nav_msgs::msg::Path>("/benchmark/centerline_path",
+                                                            rclcpp::QoS(rclcpp::KeepLast(1)).transient_local());
 }
 
 void BenchmarkNode::OnVehicleCommand(const common_msgs::msg::HuatVehicleCmd::ConstSharedPtr& msg) {

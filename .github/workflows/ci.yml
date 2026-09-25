@@ -120,6 +120,16 @@ jobs:
           source install/setup.bash
           bash scripts/closed_loop_sim_smoke.sh
 
+      # #17 ④：闭环内真的注入 越界/反向/未完赛/超时，断言 KpiEvaluator 报告命中失败判据
+      # （不只是单测证明判定逻辑）。同样先以观察期入 CI。
+      - name: Closed-loop fault samples (#17, tolerance-based, observing)
+        timeout-minutes: 8
+        continue-on-error: true
+        run: |
+          source "/opt/ros/${ROS_DISTRO}/setup.bash"
+          source install/setup.bash
+          bash scripts/closed_loop_fault_smoke.sh
+
       - name: Fault injection smoke (#16, software-observable subset, observing)
         timeout-minutes: 8
         continue-on-error: true
@@ -136,6 +146,7 @@ jobs:
           path: |
             build/benchmark_regression/**/*.json
             build/closed_loop_smoke/*.json
+            build/closed_loop_fault/*.json
             build/fault_injection/*.json
           if-no-files-found: ignore
           retention-days: 14
