@@ -10,6 +10,7 @@ using common_msgs::vehicle::ActuatorCalibration;
 using common_msgs::vehicle::checksumRaw;
 using common_msgs::vehicle::VehicleCommandRaw;
 using common_msgs::vehicle::verifyChecksum;
+using common_msgs::vehicle::verifyFrame;
 
 namespace {
 constexpr double kNaN = std::numeric_limits<double>::quiet_NaN();
@@ -34,6 +35,15 @@ TEST(VehicleCommandCodec, ChecksumSumsCommandRegion) {
     EXPECT_EQ(checksumRaw(r), static_cast<uint16_t>(90 + 0 + 30 + 1 + 1 + 7 + 1));
     EXPECT_TRUE(verifyChecksum(r, checksumRaw(r)));
     EXPECT_FALSE(verifyChecksum(r, static_cast<uint16_t>(checksumRaw(r) + 1)));
+}
+
+// 帧头/长度有效性：帧头与 length 不参与累加和，故必须与 verifyChecksum 齐用才能排除整帧错位。
+TEST(VehicleCommandCodec, FrameHeadAndLengthValidity) {
+    EXPECT_TRUE(verifyFrame(common_msgs::vehicle::kCmdHead1, common_msgs::vehicle::kCmdHead2,
+                            common_msgs::vehicle::kCmdLength));
+    EXPECT_FALSE(verifyFrame(0x00, common_msgs::vehicle::kCmdHead2, common_msgs::vehicle::kCmdLength));
+    EXPECT_FALSE(verifyFrame(common_msgs::vehicle::kCmdHead1, 0x00, common_msgs::vehicle::kCmdLength));
+    EXPECT_FALSE(verifyFrame(common_msgs::vehicle::kCmdHead1, common_msgs::vehicle::kCmdHead2, 0x00));
 }
 
 TEST(VehicleCommandCodec, AccelerationMapsMutuallyExclusiveThrottleOrBrake) {
@@ -88,6 +98,24 @@ TEST(VehicleCommandCodec, RoundTripEncodeDecode) {
         const double tol = cal.max_accel / cal.pedal_full_scale + 1e-9;
         EXPECT_NEAR(back, a, std::max(tol, cal.max_decel / cal.pedal_full_scale));
     }
+}
+
+// 急停与软停两档分开（PP 路径末端减速不等于急停），且同样走 clamp-before-narrow。
+TEST(VehicleCommandCodec, EmergencyAndSoftBrakeAreSeparateAndClamped) {
+    ActuatorCalibration cal;
+    EXPECT_EQ(cal.emergencyBrakeRaw(), 80);
+    EXPECT_EQ(cal.softBrakeRaw(), 40);
+
+    ActuatorCalibration narrow;
+    narrow.pedal_full_scale = 30.0;  // 小满量程底盘：两档均被 clamp 到 30，不越界
+    EXPECT_EQ(narrow.emergencyBrakeRaw(), 30);
+    EXPECT_EQ(narrow.softBrakeRaw(), 30);
+
+    ActuatorCalibration bogus;
+    bogus.emergency_brake_raw = 99999;  // 配置错误也不得环绕成任意字节
+    bogus.soft_brake_raw = -5;
+    EXPECT_LE(bogus.emergencyBrakeRaw(), 100);  // clamp 到 pedal_full_scale
+    EXPECT_EQ(bogus.softBrakeRaw(), 0);
 }
 
 TEST(VehicleCommandCodec, CalibrationVersionDefaultsAndOverridable) {

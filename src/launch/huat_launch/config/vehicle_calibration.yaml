@@ -1,0 +1,49 @@
+# =============================================================================
+# issue #15：车辆执行器标定的单一来源（纵向 / actuator.* 段）。
+#
+# 适用节点：pure_pursuit_controller、mpc_controller、vehicle_simulator_node、
+#           command_arbiter_node —— 四者都用同一组 `actuator.*` 参数名，
+#           底层语义共用 common_msgs/vehicle_command_codec.h 的 ActuatorCalibration。
+#
+# 用法：作为 launch 里 parameters=[...] 的**第一项**传入，包内 yaml 与显式
+#       overrides 仍按 ROS 2 语义覆盖本文件（本文件是基线，不是最终裁定）。
+#
+# 类型必须与节点 declare_parameter 一致：double 一律写小数点，int 一律不带小数点，
+# 否则 rclcpp 会以“wrong type”拒收整条参数。
+#
+# -----------------------------------------------------------------------------
+# 未标定项（截至本提交，全部为仿真默认值，不代表实车事实 —— #15 验收第 1/4 条）：
+#   [未标定] max_accel / max_decel      —— 需台架实测满量程加速度
+#   [未标定] pedal_full_scale           —— 需确认 VCU 油门/制动量化域（0-100 还是 0-255）
+#   [未标定] emergency_brake_raw        —— 需实测“制动建立”后的有效急停指令
+#   [未标定] soft_brake_raw             —— 需实车确认末端减速档位
+#   [未标定] 转向零位/方向/比例/限幅     —— 见下方 steering 段说明
+#   [未标定] 指令超时与底盘侧接管行为     —— 需实车验证（本文件不含该参数）
+# 标定完成后：把 calibration_version 递增（例如 vcu-2026-xx-xx），并同步
+# docs/INTERFACE_CONTRACT.md §4 与 docs/BENCH_CALIBRATION_TEMPLATE.md 的记录表。
+# =============================================================================
+"/**":
+  ros__parameters:
+    actuator:
+      # 正向满量程加速度 (m/s^2)
+      max_accel: 5.0
+      # 制动满量程加速度幅值 (m/s^2)，取正数
+      max_decel: 8.0
+      # 满油门/满制动对应的 raw 指令值
+      pedal_full_scale: 100.0
+      # 急停/非有限输入时锁定的制动指令（低于 pedal_full_scale 才安全）
+      emergency_brake_raw: 80
+      # 软停车档制动指令（路径末端减速 / 路径缺失；与急停分开标定）
+      soft_brake_raw: 40
+      # 标定版本：实车/台架确认后必须递增，禁止隐式漂移
+      calibration_version: "sim-default-0"
+
+    # ---------------------------------------------------------------------
+    # 转向标定本文件暂不提供：三个消费者用的是三套参数名——
+    #   mpc_controller / vehicle_simulator_node : steering.{neutral,units_per_degree,min_raw,max_raw}
+    #   pure_pursuit_controller               : algorithm.steering.mapping.{...}
+    #   command_arbiter_node                  : actuator.neutral_steering
+    # 统一到一组名字前，写在 /** 下会给不相关的节点产生
+    # “parameter not declared” 噪声，且容易只改其中一处。该命名统一列为 #15 待办，
+    # 完成后把 steering 段补到上方。当前各节点的转向值仍以其包内 yaml 为准。
+    # ---------------------------------------------------------------------

@@ -44,6 +44,12 @@ struct VehicleCommandRaw {
     return static_cast<uint16_t>(sum & 0xFFFFu);
 }
 
+// 帧头/长度合法性：单靠校验和不足以排除「整帧错位/帧头被截断」（帧头与 length 不参与累加和），
+// 因此 #15 的帧有效性判定 = verifyFrame(...) && verifyChecksum(...)，由消费者（#16 仲裁）两者齐用。
+[[nodiscard]] inline bool verifyFrame(std::uint8_t head1, std::uint8_t head2, std::uint8_t length) noexcept {
+    return head1 == kCmdHead1 && head2 == kCmdHead2 && length == kCmdLength;
+}
+
 [[nodiscard]] inline bool verifyChecksum(const VehicleCommandRaw& r, uint16_t expected_checksum) noexcept {
     return checksumRaw(r) == expected_checksum;
 }
@@ -59,6 +65,9 @@ struct ActuatorCalibration {
     double pedal_full_scale{100.0};
     // 急停/非有限输入时的锁定制动指令
     int emergency_brake_raw{80};
+    // 软停车档制动指令（路径末端减速/路径缺失）：低于急停，与急停分开标定，
+    // 不得共用 emergency_brake_raw（会改变现有减速行为）。
+    int soft_brake_raw{40};
     // 标定版本；实车确认后递增，禁止隐式漂移
     std::string calibration_version{"sim-default-0"};
 
@@ -95,6 +104,9 @@ struct ActuatorCalibration {
 
     // 急停锁定制动指令（clamp 后窄化，保证合法字节）。
     [[nodiscard]] uint8_t emergencyBrakeRaw() const { return clampByte(static_cast<double>(emergency_brake_raw)); }
+
+    // 软停车制动指令（同走 clamp-before-narrow）。
+    [[nodiscard]] uint8_t softBrakeRaw() const { return clampByte(static_cast<double>(soft_brake_raw)); }
 
    private:
     static double positiveOr(double v, double fallback) noexcept {

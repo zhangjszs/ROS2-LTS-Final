@@ -25,7 +25,8 @@
 #include "pure_pursuit/vehicle_command_encoder.h"
 #include "std_msgs/msg/float64_multi_array.hpp"
 #include "std_msgs/msg/u_int64.hpp"
-#include "steering_calibration.h"  // 仓库约定：common_msgs 手写头不带前缀（同 cone_types.h）
+#include "steering_calibration.h"   // 仓库约定：common_msgs 手写头不带前缀（同 cone_types.h）
+#include "vehicle_command_codec.h"  // #15：ActuatorCalibration（制动指令字节单一来源）
 
 class PurePursuitController {
    public:
@@ -62,6 +63,9 @@ class PurePursuitController {
     VehicleCommandEncoder encoder_;
     PurePursuitParams params_;
     common_msgs::vehicle::SteeringCalibration steering_calib_;
+    // #15：纵向执行器标定（急停/软停制动字节的单一来源）；声明必须早于 input_guard_，
+    // 以便构造函数的成员初始化列表能按声明顺序用它初始化守卫层。
+    common_msgs::vehicle::ActuatorCalibration actuator_calib_;
     InputGuard input_guard_;
     Eigen::Affine3d localTf_;
     bool localTfValid_ = false;

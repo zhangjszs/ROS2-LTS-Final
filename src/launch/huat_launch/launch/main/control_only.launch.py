@@ -25,8 +25,9 @@ import os
 
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
+from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import LaunchConfiguration
+from launch.substitutions import LaunchConfiguration, PythonExpression
 from launch_ros.actions import Node
 from ament_index_python.packages import get_package_share_directory
 
@@ -58,8 +59,26 @@ def generate_launch_description():
         default_value='/control/vehicle_command',
         description='Vehicle command topic',
     )
+    # #16：单一权威指令出口。true 时 PP 只作仲裁器的源 A，最终出口固定为契约话题 /vehicle_command。
+    use_arbiter_arg = DeclareLaunchArgument(
+        'use_arbiter',
+        default_value='false',
+        description='Route the final command through command_arbiter_node (#16 single authority)',
+    )
+    # 行驶许可默认不授予：需任务层发 arm+start 事件（#16 验收第 1 条）。
+    arbiter_autostart_arg = DeclareLaunchArgument(
+        'arbiter_autostart',
+        default_value='false',
+        description='Let the arbiter arm+start itself at startup (bench/simulation only)',
+    )
 
     # Pure pursuit controller
+    # #15：车辆执行器标定基线——放在 parameters 首项，包内 yaml 与显式 override 仍可覆盖。
+    vehicle_calibration_config = os.path.join(
+        get_package_share_directory('huat_launch'),
+        'config',
+        'vehicle_calibration.yaml',
+    )
     pure_pursuit_config = os.path.join(
         get_package_share_directory('pure_pursuit'),
         'config',
@@ -71,12 +90,40 @@ def generate_launch_description():
         name='pure_pursuit_controller',
         output='screen',
         parameters=[
+            vehicle_calibration_config,
             pure_pursuit_config,
             {
                 'topics.path': LaunchConfiguration('path_topic'),
                 'topics.vehicle_state': LaunchConfiguration('vehicle_state_topic'),
                 'topics.stop': LaunchConfiguration('stop_topic'),
-                'topics.vehicle_command': LaunchConfiguration('vehicle_command_topic'),
+                # use_arbiter 时 PP 只作仲裁器的源 A，不得直接驱动底盘
+                'topics.vehicle_command': PythonExpression([
+                    "'/control/vehicle_command' if '", LaunchConfiguration('use_arbiter'),
+                    "' == 'true' else '", LaunchConfiguration('vehicle_command_topic'), "'",
+                ]),
+            },
+        ],
+    )
+
+    # #16：最终指令仲裁器（use_arbiter=true 时拉起）：两路源 + 锁存 stop → 唯一 /vehicle_command，
+    # 并产出 /system/state 遥测供故障注入验收对账。
+    command_arbiter_node = Node(
+        package='safety_monitor',
+        executable='command_arbiter_node',
+        name='command_arbiter_node',
+        output='screen',
+        condition=IfCondition(LaunchConfiguration('use_arbiter')),
+        parameters=[
+            vehicle_calibration_config,
+            {
+                'topics.source_a': '/control/vehicle_command',
+                'topics.source_b': '/mpc/vehicle_command',
+                'topics.output': '/vehicle_command',
+                'topics.stop': LaunchConfiguration('stop_topic'),
+                'arbitration.preferred': 'pure_pursuit',
+                'task.autostart': PythonExpression([
+                    "'", LaunchConfiguration('arbiter_autostart'), "' == 'true'",
+                ]),
             },
         ],
     )
@@ -106,8 +153,11 @@ def generate_launch_description():
         vehicle_state_topic_arg,
         stop_topic_arg,
         vehicle_command_topic_arg,
+        use_arbiter_arg,
+        arbiter_autostart_arg,
 
         # Nodes
         pure_pursuit_node,
+        command_arbiter_node,
         safety_monitor_launch,
     ])

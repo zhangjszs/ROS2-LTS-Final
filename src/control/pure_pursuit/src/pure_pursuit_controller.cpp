@@ -15,8 +15,31 @@
 using std::vector;
 constexpr double kPi = std::numbers::pi_v<double>;
 
+namespace {
+// #15：由参数构造纵向标定层。PP 统一的是**制动指令字节**（急停/软停）与标定版本；
+// 油门侧仍用 algorithm.throttle 的电流/百分比表（不经加速度域），待台架标定后再接。
+common_msgs::vehicle::ActuatorCalibration makeActuatorCalibration(const PurePursuitParams& p) {
+    common_msgs::vehicle::ActuatorCalibration cal;
+    cal.max_accel = p.actuator.max_accel;
+    cal.max_decel = p.actuator.max_decel;
+    cal.pedal_full_scale = p.actuator.pedal_full_scale;
+    cal.emergency_brake_raw = p.actuator.emergency_brake_raw;
+    cal.soft_brake_raw = p.actuator.soft_brake_raw;
+    cal.calibration_version = p.actuator.calibration_version;
+    return cal;
+}
+}  // namespace
+
 PurePursuitController::PurePursuitController(rclcpp::Node::SharedPtr node)
-    : node_(node), params_(node), input_guard_(params_.safety.state_timeout, params_.safety.path_timeout) {
+    : node_(node),
+      params_(node),
+      // 声明顺序保证 actuator_calib_ 先于 input_guard_ 初始化，守卫层直接拿到已 clamp 的字节。
+      actuator_calib_(makeActuatorCalibration(params_)),
+      input_guard_(params_.safety.state_timeout, params_.safety.path_timeout, actuator_calib_.emergencyBrakeRaw(),
+                   actuator_calib_.softBrakeRaw()) {
+    RCLCPP_INFO(node_->get_logger(), "[pure_pursuit] actuator calibration=%s (emergency_brake=%u, soft_brake=%u)",
+                actuator_calib_.calibration_version.c_str(), static_cast<unsigned>(actuator_calib_.emergencyBrakeRaw()),
+                static_cast<unsigned>(actuator_calib_.softBrakeRaw()));
     // 转向编码统一走 common_msgs::vehicle::SteeringCalibration（issue #2），不再硬编码零位/比例
     steering_calib_ = common_msgs::vehicle::SteeringCalibration{
         .neutral = static_cast<double>(params_.algorithm.steering.mapping.neutral),
@@ -243,7 +266,7 @@ void PurePursuitController::ComputeControlCommand(common_msgs::msg::HuatControlC
                              "[pure_pursuit] No valid goal index, hard braking");
         throttle_ctrl_.reset();
         filtered_angle_ = 0.0;
-        finall_cmd = encoder_.encodeBrake(racing_num_, 80);
+        finall_cmd = encoder_.encodeBrake(racing_num_, actuator_calib_.emergencyBrakeRaw());
         pub_finall_cmd_->publish(finall_cmd);
         return;
     }
@@ -252,7 +275,7 @@ void PurePursuitController::ComputeControlCommand(common_msgs::msg::HuatControlC
                              "[pure_pursuit] Approaching path end (%d/%d), braking", goal_idx, path_len);
         throttle_ctrl_.reset();
         filtered_angle_ = 0.0;
-        finall_cmd = encoder_.encodeBrake(racing_num_, 40);
+        finall_cmd = encoder_.encodeBrake(racing_num_, actuator_calib_.softBrakeRaw());
         pub_finall_cmd_->publish(finall_cmd);
         return;
     }
@@ -310,7 +333,7 @@ double PurePursuitController::startupDelay() const {
 }
 
 void PurePursuitController::PublishShutdownBrake() {
-    common_msgs::msg::HuatVehicleCmd cmd = encoder_.encodeBrake(racing_num_, 80);
+    common_msgs::msg::HuatVehicleCmd cmd = encoder_.encodeBrake(racing_num_, actuator_calib_.emergencyBrakeRaw());
     pub_finall_cmd_->publish(cmd);
     RCLCPP_WARN(node_->get_logger(), "[pure_pursuit] Shutdown brake published");
 }

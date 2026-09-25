@@ -35,6 +35,14 @@ PurePursuitParams::PurePursuitParams(rclcpp::Node::SharedPtr node) {
                     .state_source_age_tolerance_sec = get("safety.state_source_age_tolerance_sec", -1.0),
                     .path_replay_stamp_gap_sec = get("safety.path_replay_stamp_gap_sec", 10.0)};
 
+    // 纵向执行器标定（#15）：制动指令字节集中在此，不再由各模块自带协议字面量。
+    actuator = Actuator{.max_accel = get("actuator.max_accel", 5.0),
+                        .max_decel = get("actuator.max_decel", 8.0),
+                        .pedal_full_scale = get("actuator.pedal_full_scale", 100.0),
+                        .emergency_brake_raw = get("actuator.emergency_brake_raw", 80),
+                        .soft_brake_raw = get("actuator.soft_brake_raw", 40),
+                        .calibration_version = get("actuator.calibration_version", std::string("sim-default-0"))};
+
     // 算法配置 (C++20 嵌套指定初始化器)
     double lookahead_min = get("algorithm.steering.lookahead_min", 1.0);
     if (lookahead_min < 0.1) {

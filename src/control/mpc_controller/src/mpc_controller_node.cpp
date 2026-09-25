@@ -79,8 +79,9 @@ void MpcControllerNode::LoadParameters() {
     // issue #14：缺失显式 target_speeds 时的默认参考速度（绝不再从 Point.z 取速度）
     declare_parameter<double>("path.reference_speed_default", 0.0);
 
-    // issue #15：纵向执行器标定（满量程从 mpc.* 限幅派生；急停制动 raw 与标定版本可配）
+    // issue #15：纵向执行器标定（满量程加速度从 mpc.* 限幅派生；制动 raw、油门满量程与标定版本可配）
     declare_parameter<int>("actuator.emergency_brake_raw", 80);
+    declare_parameter<double>("actuator.pedal_full_scale", 100.0);
     declare_parameter<std::string>("actuator.calibration_version", "sim-default-0");
 
     declare_parameter<std::string>("topics.vehicle_state", "/localization/vehicle_state");
@@ -124,13 +125,14 @@ void MpcControllerNode::LoadParameters() {
     get_parameter("safety.state_source_age_tolerance_sec", state_source_age_tolerance_sec_);
     get_parameter("path.reference_speed_default", reference_speed_default_);
 
-    // issue #15：纵向执行器标定从 mpc.* 限幅派生（保持既有数值），统一到共用编解码层。
+    // issue #15：纵向执行器标定从 mpc.* 限幅派生（保持既有数值），其余字段一律参数化：
+    // 0–255 满量程底盘只改参数即可接入，不需改代码。
     int emergency_brake_raw = 80;
     get_parameter("actuator.emergency_brake_raw", emergency_brake_raw);
     get_parameter("actuator.calibration_version", actuator_calib_.calibration_version);
     actuator_calib_.max_accel = config_.limits.max_accel;
     actuator_calib_.max_decel = std::abs(config_.limits.min_accel);
-    actuator_calib_.pedal_full_scale = 100.0;
+    get_parameter("actuator.pedal_full_scale", actuator_calib_.pedal_full_scale);
     actuator_calib_.emergency_brake_raw = emergency_brake_raw;
 
     get_parameter("topics.vehicle_state", config_.topics.vehicle_state);

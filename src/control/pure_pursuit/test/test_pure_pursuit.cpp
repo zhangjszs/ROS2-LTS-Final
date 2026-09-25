@@ -9,6 +9,13 @@
 #include "pure_pursuit/pp_math.h"
 #include "pure_pursuit/vehicle_command_encoder.h"
 
+namespace {
+// #15：制动指令字节由标定层注入，守卫层不再自带协议常量。用例特意取与 sim 默认（80/40）
+// 不同的值，以证明“注入生效”而非巧合。
+constexpr std::uint8_t kHardBrakeRaw = 200;
+constexpr std::uint8_t kSoftBrakeRaw = 70;
+}  // namespace
+
 // ── pp_math::estimateCurvature ─────────────────────────────────────────────
 
 TEST(PpMath, StraightLineZeroCurvature) {
@@ -203,7 +210,7 @@ TEST(ClampKappaIdxTest, MinimumSize) {
 // ── InputGuard ─────────────────────────────────────────────────────────────
 
 TEST(InputGuard, ProceedWhenAllOk) {
-    InputGuard g(0.3, 0.5);
+    InputGuard g(0.3, 0.5, kHardBrakeRaw, kSoftBrakeRaw);
     rclcpp::Time now(100, 0);
     rclcpp::Time state(99, 900000000);  // 0.1s 前
     rclcpp::Time path(99, 800000000);   // 0.2s 前
@@ -212,16 +219,16 @@ TEST(InputGuard, ProceedWhenAllOk) {
 }
 
 TEST(InputGuard, HardBrakeOnNoState) {
-    InputGuard g(0.3, 0.5);
+    InputGuard g(0.3, 0.5, kHardBrakeRaw, kSoftBrakeRaw);
     rclcpp::Time now(100, 0);
     rclcpp::Time zero(0, 0);
     auto r = g.check(now, zero, rclcpp::Time(99, 900000000), false, false, false, true);
     EXPECT_EQ(r.decision, GuardDecision::HARD_BRAKE);
-    EXPECT_EQ(r.brake_force, 80);
+    EXPECT_EQ(r.brake_force, kHardBrakeRaw);
 }
 
 TEST(InputGuard, HardBrakeOnStateTimeout) {
-    InputGuard g(0.3, 0.5);
+    InputGuard g(0.3, 0.5, kHardBrakeRaw, kSoftBrakeRaw);
     rclcpp::Time now(100, 0);
     rclcpp::Time old_state(99, 500000000);  // 0.5s > 0.3s timeout
     auto r = g.check(now, old_state, rclcpp::Time(99, 900000000), false, false, true, true);
@@ -229,15 +236,15 @@ TEST(InputGuard, HardBrakeOnStateTimeout) {
 }
 
 TEST(InputGuard, SoftBrakeOnEmptyPath) {
-    InputGuard g(0.3, 0.5);
+    InputGuard g(0.3, 0.5, kHardBrakeRaw, kSoftBrakeRaw);
     rclcpp::Time now(100, 0);
     auto r = g.check(now, rclcpp::Time(99, 900000000), rclcpp::Time(99, 900000000), true, false, true, true);
     EXPECT_EQ(r.decision, GuardDecision::SOFT_BRAKE);
-    EXPECT_EQ(r.brake_force, 40);
+    EXPECT_EQ(r.brake_force, kSoftBrakeRaw);
 }
 
 TEST(InputGuard, SoftBrakeOnPathTimeout) {
-    InputGuard g(0.3, 0.5);
+    InputGuard g(0.3, 0.5, kHardBrakeRaw, kSoftBrakeRaw);
     rclcpp::Time now(100, 0);
     rclcpp::Time old_path(99, 400000000);  // 0.6s > 0.5s timeout
     auto r = g.check(now, rclcpp::Time(99, 900000000), old_path, false, false, true, true);
@@ -245,54 +252,54 @@ TEST(InputGuard, SoftBrakeOnPathTimeout) {
 }
 
 TEST(InputGuard, HardBrakeOnStopSignal) {
-    InputGuard g(0.3, 0.5);
+    InputGuard g(0.3, 0.5, kHardBrakeRaw, kSoftBrakeRaw);
     rclcpp::Time now(100, 0);
     auto r = g.check(now, rclcpp::Time(99, 900000000), rclcpp::Time(99, 900000000), false, true, true, true);
     EXPECT_EQ(r.decision, GuardDecision::HARD_BRAKE);
-    EXPECT_EQ(r.brake_force, 80);
+    EXPECT_EQ(r.brake_force, kHardBrakeRaw);
 }
 
 TEST(InputGuard, StopBeatsEmptyPath) {
-    InputGuard g(0.3, 0.5);
+    InputGuard g(0.3, 0.5, kHardBrakeRaw, kSoftBrakeRaw);
     rclcpp::Time now(100, 0);
     auto r = g.check(now, rclcpp::Time(99, 900000000), rclcpp::Time(99, 900000000), true, true, true, true);
     EXPECT_EQ(r.decision, GuardDecision::HARD_BRAKE);
-    EXPECT_EQ(r.brake_force, 80);
+    EXPECT_EQ(r.brake_force, kHardBrakeRaw);
 }
 
 TEST(InputGuard, StopBeatsPathTimeout) {
-    InputGuard g(0.3, 0.5);
+    InputGuard g(0.3, 0.5, kHardBrakeRaw, kSoftBrakeRaw);
     rclcpp::Time now(100, 0);
     auto r = g.check(now, rclcpp::Time(99, 900000000), rclcpp::Time(99, 0), false, true, true, true);
     EXPECT_EQ(r.decision, GuardDecision::HARD_BRAKE);
-    EXPECT_EQ(r.brake_force, 80);
+    EXPECT_EQ(r.brake_force, kHardBrakeRaw);
 }
 
 TEST(InputGuard, StopBeatsMissingState) {
-    InputGuard g(0.3, 0.5);
+    InputGuard g(0.3, 0.5, kHardBrakeRaw, kSoftBrakeRaw);
     rclcpp::Time now(100, 0);
     auto r = g.check(now, rclcpp::Time(0, 0), rclcpp::Time(0, 0), true, true, false, false);
     EXPECT_EQ(r.decision, GuardDecision::HARD_BRAKE);
-    EXPECT_EQ(r.brake_force, 80);
+    EXPECT_EQ(r.brake_force, kHardBrakeRaw);
 }
 
 TEST(InputGuard, NeverReceivedPathIsSoftBrake) {
-    InputGuard g(0.3, 0.5);
+    InputGuard g(0.3, 0.5, kHardBrakeRaw, kSoftBrakeRaw);
     rclcpp::Time now(100, 0);
     auto r = g.check(now, rclcpp::Time(99, 900000000), rclcpp::Time(0, 0), false, false, true, false);
     EXPECT_EQ(r.decision, GuardDecision::SOFT_BRAKE);
-    EXPECT_EQ(r.brake_force, 40);
+    EXPECT_EQ(r.brake_force, kSoftBrakeRaw);
 }
 
 TEST(InputGuard, NeverReceivedStateAtSimTimeZero) {
-    InputGuard g(0.3, 0.5);
+    InputGuard g(0.3, 0.5, kHardBrakeRaw, kSoftBrakeRaw);
     rclcpp::Time now(0, 0);
     auto r = g.check(now, rclcpp::Time(0, 0), rclcpp::Time(0, 0), false, false, false, false);
     EXPECT_EQ(r.decision, GuardDecision::HARD_BRAKE);
 }
 
 TEST(InputGuard, SimTimeZeroIsValidOnceReceived) {
-    InputGuard g(0.3, 0.5);
+    InputGuard g(0.3, 0.5, kHardBrakeRaw, kSoftBrakeRaw);
     rclcpp::Time now(0, 50000000);
     auto r = g.check(now, rclcpp::Time(0, 0), rclcpp::Time(0, 0), false, false, true, true);
     EXPECT_EQ(r.decision, GuardDecision::PROCEED);
@@ -400,7 +407,7 @@ TEST(SpanAdoption, FindNearestIndexWithStdArrayAndSubspan) {
 }
 
 TEST(SpanAdoption, InputGuardSpanOverload) {
-    InputGuard guard(0.5, 0.5);
+    InputGuard guard(0.5, 0.5, kHardBrakeRaw, kSoftBrakeRaw);
     rclcpp::Time now(10, 0);
     rclcpp::Time last_state(10, 0);
     rclcpp::Time last_path(10, 0);

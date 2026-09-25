@@ -128,6 +128,12 @@ def generate_launch_description():
     )
 
     # Pure pursuit controller
+    # #15：车辆执行器标定基线——放在 parameters 首项，包内 yaml 与显式 override 仍可覆盖。
+    vehicle_calibration_config = os.path.join(
+        get_package_share_directory('huat_launch'),
+        'config',
+        'vehicle_calibration.yaml',
+    )
     pure_pursuit_config = os.path.join(
         get_package_share_directory('pure_pursuit'),
         'config',
@@ -139,6 +145,7 @@ def generate_launch_description():
         name='pure_pursuit_controller',
         output='screen',
         parameters=[
+            vehicle_calibration_config,
             pure_pursuit_config,
             {
                 'road_type': 1,

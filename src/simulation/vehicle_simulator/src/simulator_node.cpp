@@ -72,8 +72,9 @@ void SimulatorNode::LoadParameters() {
     declare_parameter<double>("max_decel", 9.0);
     declare_parameter<double>("max_speed", 25.0);
 
-    // #15：纵向执行器解码标定版本（与控制器侧 actuator.* 保持同一标定源）
+    // #15：纵向执行器解码标定版本与满量程（与控制器侧 actuator.* 保持同一标定源）
     declare_parameter<std::string>("actuator.calibration_version", "sim-default-0");
+    declare_parameter<double>("actuator.pedal_full_scale", 100.0);
 
     // 转向指令解码标定（issue #2），与控制器侧 steering.* 保持同一协议
     declare_parameter<double>("steering.neutral", 90.0);
@@ -109,10 +110,11 @@ void SimulatorNode::LoadParameters() {
     bicycle_model_.Reset(init_x, init_y, init_theta, init_v);
 
     // #15：解码侧纵向标定与物理模型满量程保持一致（既有数值不变，仅集中到共用编解码层）。
+    // pedal_full_scale 参数化：0–255 满量程底盘替身只需改参数，不需改代码。
     get_parameter("actuator.calibration_version", actuator_calib_.calibration_version);
     actuator_calib_.max_accel = p.max_accel;
     actuator_calib_.max_decel = p.max_decel;
-    actuator_calib_.pedal_full_scale = 100.0;
+    get_parameter("actuator.pedal_full_scale", actuator_calib_.pedal_full_scale);
 }
 
 void SimulatorNode::SetupPublishersAndSubscribers() {

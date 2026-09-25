@@ -31,6 +31,19 @@ struct PurePursuitParams {
         double path_replay_stamp_gap_sec;
     } safety;
 
+    // issue #15：纵向执行器标定入口（与 MPC / 仿真器共用 ActuatorCalibration 语义）。
+    // PP 的油门控制律仍输出“电流/百分比”表（algorithm.throttle），不经加速度域：
+    // 本段统一的是**制动指令字节**（急停/软停两档）与标定版本；
+    // max_accel/max_decel/pedal_full_scale 待台架标定后才有实车含义（当前为 sim 默认值）。
+    struct Actuator {
+        double max_accel;
+        double max_decel;
+        double pedal_full_scale;
+        int emergency_brake_raw;
+        int soft_brake_raw;
+        std::string calibration_version;
+    } actuator;
+
     struct Algorithm {
         struct Steering {
             double delta_max;
