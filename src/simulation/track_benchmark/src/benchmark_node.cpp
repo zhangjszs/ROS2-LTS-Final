@@ -46,6 +46,9 @@ BenchmarkNode::~BenchmarkNode() {
     auto summary = evaluator_.GetSummary();
     summary.track_name = current_track_.name;
     summary.controller_name = controller_name_;
+    // #17：把累计结果落成终态（finished/timed_out/run_status），使闭环报告与离线 runner 同口径，
+    // 而不是永远停在默认的 "running"。
+    ApplyTerminalStatus(summary, timed_out_, require_laps_);
 
     std::string report = KpiEvaluator::GenerateMarkdownReport(summary);
     std::cout << "\n=======================================================\n";
@@ -79,10 +82,15 @@ void BenchmarkNode::LoadParameters() {
     declare_parameter<std::string>("track_type", "skidpad");
     declare_parameter<std::string>("controller_name", "PurePursuit");
     declare_parameter<std::string>("report_file", "benchmark_report.md");
+    // #17：闭环终态判定（见 kpi_evaluator.hpp::ApplyTerminalStatus 的语义）。
+    declare_parameter<double>("max_runtime_s", 0.0);
+    declare_parameter<int>("require_laps", 0);
 
     get_parameter("track_type", track_type_);
     get_parameter("controller_name", controller_name_);
     get_parameter("report_file", report_file_);
+    get_parameter("max_runtime_s", max_runtime_s_);
+    get_parameter("require_laps", require_laps_);
 }
 
 void BenchmarkNode::SetupSubscribersAndPublishers() {
@@ -106,6 +114,11 @@ void BenchmarkNode::OnVehicleCommand(const common_msgs::msg::HuatVehicleCmd::Con
 
 void BenchmarkNode::OnVehicleState(const common_msgs::msg::HuatCarstate::ConstSharedPtr& msg) {
     double t = static_cast<double>(msg->header.stamp.sec) + static_cast<double>(msg->header.stamp.nanosec) * 1e-9;
+    // #17：超过最大运行时长后冻结评测 —— 报告反映超时时刻的累计结果，超时之后的样本不再改变判据。
+    if (max_runtime_s_ > 0.0 && t > max_runtime_s_) {
+        timed_out_ = true;
+        return;
+    }
     auto step_data =
         evaluator_.Update(msg->car_state.x, msg->car_state.y, msg->car_state.theta, msg->v, current_steer_rad_, t);
     auto summary = evaluator_.GetSummary();

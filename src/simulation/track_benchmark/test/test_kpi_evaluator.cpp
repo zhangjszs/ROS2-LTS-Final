@@ -242,6 +242,46 @@ TEST(KpiEvaluatorTest, LateralAccelSourceLabelledAsReference) {
     EXPECT_EQ(eval.GetSummary().lat_accel_source, "reference_curvature");
 }
 
+// —— #17 终态判定（闭环节点/离线 runner 共用）：把累计 KPI 落成 finished/timed_out/run_status ——
+
+TEST(KpiTerminalStatusTest, TimeoutOverridesEverything) {
+    KpiSummary s{};
+    s.valid_laps = 3;  // 即便已有有效圈，超时也优先判 timeout（不得因有圈记成 finished）
+    ApplyTerminalStatus(s, /*timed_out=*/true, /*require_laps=*/1);
+    EXPECT_TRUE(s.timed_out);
+    EXPECT_FALSE(s.finished);
+    EXPECT_EQ(s.run_status, "timeout");
+}
+
+TEST(KpiTerminalStatusTest, ValidLapFinishesZeroLapIncomplete) {
+    KpiSummary finished{};
+    finished.valid_laps = 1;
+    ApplyTerminalStatus(finished, false, 0);
+    EXPECT_TRUE(finished.finished);
+    EXPECT_FALSE(finished.timed_out);
+    EXPECT_EQ(finished.run_status, "finished");
+
+    KpiSummary dnf{};  // 未完赛：valid_laps=0 且不得产出最佳圈速
+    ApplyTerminalStatus(dnf, false, 0);
+    EXPECT_FALSE(dnf.finished);
+    EXPECT_EQ(dnf.run_status, "incomplete");
+    EXPECT_DOUBLE_EQ(dnf.best_valid_lap_time_s, 0.0);
+}
+
+TEST(KpiTerminalStatusTest, RequireLapsThresholdIsEnforced) {
+    KpiSummary one{};
+    one.valid_laps = 1;
+    ApplyTerminalStatus(one, false, /*require_laps=*/2);  // 要求 2 圈但只跑 1 圈 -> 未完赛
+    EXPECT_FALSE(one.finished);
+    EXPECT_EQ(one.run_status, "incomplete");
+
+    KpiSummary two{};
+    two.valid_laps = 2;
+    ApplyTerminalStatus(two, false, /*require_laps=*/2);
+    EXPECT_TRUE(two.finished);
+    EXPECT_EQ(two.run_status, "finished");
+}
+
 TEST(KpiEvaluatorTest, JsonReportMachineReadableFields) {
     CircleEval ce;
     auto eval = ce.make(true);

@@ -38,6 +38,13 @@ class BenchmarkNode : public rclcpp::Node {
     std::string controller_name_{"PurePursuit"};
     std::string report_file_{""};
 
+    // #17：闭环终态判定参数（与离线 runner 的 run_status 语义对齐，使闭环冒烟也能读到
+    // 终态而非恒 running）。max_runtime_s<=0 表示不限时；require_laps<=0 表示“至少 1 个
+    // 有效圈”即完赛。
+    double max_runtime_s_{0.0};
+    int require_laps_{0};
+    bool timed_out_{false};
+
     rclcpp::Subscription<common_msgs::msg::HuatCarstate>::SharedPtr state_sub_;
     rclcpp::Subscription<common_msgs::msg::HuatVehicleCmd>::SharedPtr cmd_sub_;
     rclcpp::Subscription<common_msgs::msg::HuatMap>::SharedPtr map_sub_;

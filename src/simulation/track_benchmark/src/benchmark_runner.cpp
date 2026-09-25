@@ -221,6 +221,8 @@ RunResult run(const RunnerConfig& cfg) {
         summary.finished = reached_end && rmse_ok;
         summary.run_status = summary.finished ? "finished" : (t >= cfg.timeout_s ? "timeout" : "incomplete");
     }
+    // 让 timed_out 与 run_status 保持一致（此前恒为 false，与 run_status="timeout" 自相矛盾）。
+    summary.timed_out = (summary.run_status == "timeout");
     res.summary = summary;
     res.elapsed = t;
     res.run_status = summary.run_status;

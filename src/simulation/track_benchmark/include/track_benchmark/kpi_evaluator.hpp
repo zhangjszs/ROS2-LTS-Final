@@ -75,6 +75,26 @@ struct KpiSummary {
 };
 
 /**
+ * @brief #17 终态判定（闭环节点与离线 runner 共用同一判据，避免两处各写一套）。
+ *
+ * 超时优先；否则按有效圈数判完赛（require_laps<=0 时以“至少 1 个有效圈”为准）。
+ * 该函数只把累计结果落成 finished/timed_out/run_status 三个终态字段，不改变任何累计量。
+ * 说明：闭合赛道由 valid_laps 判定；直线赛不计圈，其“到终点完赛”语义由离线 runner 的
+ * reached_end 负责 —— ROS 节点无法观测终点线，故直线赛在闭环里只会是 timeout/incomplete。
+ */
+inline void ApplyTerminalStatus(KpiSummary& s, bool timed_out, int require_laps) {
+    if (timed_out) {
+        s.timed_out = true;
+        s.finished = false;
+        s.run_status = "timeout";
+        return;
+    }
+    const bool laps_ok = (require_laps > 0) ? (s.valid_laps >= require_laps) : (s.valid_laps > 0);
+    s.finished = laps_ok;
+    s.run_status = laps_ok ? "finished" : "incomplete";
+}
+
+/**
  * @brief 离线性能 KPI 评估引擎
  */
 class KpiEvaluator {
