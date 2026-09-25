@@ -93,6 +93,22 @@ if(BUILD_TESTING)
   target_link_libraries(test_vehicle_command_codec
     common_msgs::common_msgs
   )
+  # #15：跨消息边界（物理量 → HuatVehicleCmd → 解码）的指令往返一致性
+  ament_add_gtest(test_command_roundtrip
+    test/test_command_roundtrip.cpp
+    src/control/vehicle_command_encoder.cpp
+  )
+  target_link_libraries(test_command_roundtrip
+    common_msgs::common_msgs
+    rclcpp::rclcpp
+  )
+  # #24：ROS1→ROS2 语义差分合成夹具（纯 std 共用层；分类表见 docs/DEFECT_DIFFERENTIAL.md）
+  ament_add_gtest(test_defect_differential
+    test/test_defect_differential.cpp
+  )
+  target_link_libraries(test_defect_differential
+    common_msgs::common_msgs
+  )
   # #22：pp_core::ThrottleController（纯 std core，仅 gtest + 包内 include）
   ament_add_gtest(test_throttle_controller
     test/test_throttle_controller.cpp

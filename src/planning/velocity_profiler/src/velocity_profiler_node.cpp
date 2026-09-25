@@ -96,7 +96,23 @@ void VelocityProfilerNode::OnCarState(const common_msgs::msg::HuatCarstate::Cons
 }
 
 void VelocityProfilerNode::OnPathLimits(const common_msgs::msg::HuatPathLimits::ConstSharedPtr& msg) {
-    if (msg->path.empty()) {
+    // 几何不合法（<2 点或 x/y 非有限）时不得臆造速度：原样透传，由消费者按 #14 契约
+    // （target_speeds 长度不符 = 缺失 → 回退/降级）处理。旧行为仅挡 path.empty()，
+    // 1 点路径会拿到 min_velocity 的“可行驶”剖面（#24 矩阵第 2/7 行缺陷）。
+    std::vector<double> xs, ys;
+    xs.reserve(msg->path.size());
+    ys.reserve(msg->path.size());
+    for (const auto& pt : msg->path) {
+        xs.push_back(pt.x);
+        ys.push_back(pt.y);
+    }
+    if (!common_msgs::contract::geometryValid(xs, ys)) {
+        if (!msg->path.empty()) {
+            RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 1000,
+                                 "[VelocityProfiler] Invalid path geometry (%zu pts), passing through without "
+                                 "inventing speeds",
+                                 msg->path.size());
+        }
         pub_path_->publish(*msg);
         return;
     }

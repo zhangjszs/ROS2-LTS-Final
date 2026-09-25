@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <cmath>
+#include <limits>
 #include <numbers>
 #include <vector>
 
@@ -126,6 +127,32 @@ TEST(VelocityProfilerTest, EmptyAndDegeneratePath) {
     ASSERT_EQ(p1.size(), 1u);
     EXPECT_DOUBLE_EQ(p1[0].x, 10.0);
     EXPECT_DOUBLE_EQ(p1[0].y, 20.0);
+}
+
+// #24 必测矩阵第 2 行（畸形轨迹）/ 第 7 行（最低速度与物理约束冲突）的差分夹具。
+// ROS1-LTS-Final #9（空/短路径仍刷新心跳）与 #13（最低速度覆盖横向约束）在 ROS2 的具体形态：
+// 几何退化为 0/1 点时，速度权威不得发一个“可行驶”速度（旧实现发 min_velocity）。
+// 分类：缺陷修复差异（ROS1 行为=给巡航速度；ROS2 期望=明确不可行/停车）。
+TEST(DefectDifferential, DegenerateGeometryMustNotYieldDrivableSpeed) {
+    ProfilerLimits limits;
+    limits.min_velocity = 2.0;
+    limits.max_velocity = 20.0;
+    VelocityProfiler profiler(limits);
+
+    for (std::vector<std::pair<double, double>> bad : {std::vector<std::pair<double, double>>{},
+                                                       {{10.0, 20.0}},
+                                                       {{10.0, std::numeric_limits<double>::quiet_NaN()}}}) {
+        const auto profile = profiler.ComputeProfile(bad, /*current_speed=*/0.0);
+        for (const auto& point : profile) {
+            // 0.0 = #11 语义下的合法“停车目标”；任何 >0 的速度都等于对畸形几何臆判可行驶
+            EXPECT_DOUBLE_EQ(point.target_speed, 0.0) << "input points=" << bad.size();
+        }
+    }
+
+    // 与契约层一致：1 点几何本身即不合法，消费者不得把它当可用轨迹（#14 §2）。
+    const std::vector<double> xs{10.0};
+    const std::vector<double> ys{20.0};
+    EXPECT_FALSE(common_msgs::contract::geometryValid(xs, ys));
 }
 
 // #14 项②：作为速度权威，velocity_profiler 输出的 target_speeds 必须是下游

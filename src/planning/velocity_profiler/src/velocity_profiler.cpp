@@ -30,12 +30,16 @@ double VelocityProfiler::NormalizeAngle(double angle) noexcept {
 std::vector<ProfilePoint> VelocityProfiler::ComputeProfile(const std::vector<std::pair<double, double>>& raw_points,
                                                            double current_speed) const {
     if (raw_points.size() < 2) {
+        // 几何退化为 0/1 点时无法估计弧长/曲率，不存在“可行驶剖面”。
+        // 旧行为给 min_velocity（一个可行驶速度）属 ROS1 #13/#9 缺陷类：“最低速度覆盖横向约束”/
+        // “畸形路径仍发可行驶速度”。按 #24 验收矩阵：冲突时必须“约束优先或给出明确不可行状态”，
+        // 这里用 0.0（#11 语义下的合法“停车目标”）而非臆造巡航速度。
         std::vector<ProfilePoint> result;
         for (const auto& [x, y] : raw_points) {
             ProfilePoint pt;
             pt.x = x;
             pt.y = y;
-            pt.target_speed = limits_.min_velocity;
+            pt.target_speed = 0.0;
             result.push_back(pt);
         }
         return result;

@@ -32,6 +32,7 @@ set(CORE_INCLUDE_DIRS
     "${REPO_ROOT}/src/control/pure_pursuit/include"
     "${REPO_ROOT}/src/control/mpc_controller/include"
     "${REPO_ROOT}/src/planning/straight_line_planner/include"
+    "${REPO_ROOT}/src/planning/velocity_profiler/include"
     "${REPO_ROOT}/src/simulation/track_benchmark/include"
 )
 
@@ -77,3 +78,10 @@ add_core_test(test_kpi_evaluator
         "${REPO_ROOT}/src/simulation/track_benchmark/test/test_kpi_evaluator.cpp"
         "${REPO_ROOT}/src/simulation/track_benchmark/src/kpi_evaluator.cpp"
         "${REPO_ROOT}/src/simulation/track_benchmark/src/track_generator.cpp")
+
+# #24：ROS1→ROS2 语义差分合成夹具（跨包纯 std 共用层 + 速度规划核；分类表见 docs/DEFECT_DIFFERENTIAL.md）
+add_core_test(test_defect_differential
+    SOURCES
+        "${REPO_ROOT}/src/control/pure_pursuit/test/test_defect_differential.cpp"
+        "${REPO_ROOT}/src/planning/velocity_profiler/test/test_velocity_profiler.cpp"
+        "${REPO_ROOT}/src/planning/velocity_profiler/src/velocity_profiler.cpp")
