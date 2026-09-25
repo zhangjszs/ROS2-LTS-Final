@@ -73,7 +73,7 @@ ros2 run safety_monitor command_arbiter_node --ros-args -p topics.output:="$TOPI
 # 等五节点上节点图（最多 ~25s；单次查询限时，避免 CLI/daemon 异常时无限阻塞）
 ready=0
 for _ in $(seq 1 25); do
-    nodes="$(timeout 8 ros2 node list 2>/dev/null)"
+    nodes="$(timeout 15 ros2 node list --no-daemon 2>/dev/null)"
     if grep -q vehicle_simulator <<<"$nodes" && grep -q safety_monitor <<<"$nodes" &&
         grep -q velocity_profiler <<<"$nodes" && grep -q pure_pursuit <<<"$nodes" &&
         grep -q command_arbiter <<<"$nodes"; then
@@ -84,7 +84,7 @@ for _ in $(seq 1 25); do
 done
 if [ "$ready" -ne 1 ]; then
     echo "FAIL: nodes did not register; sim/safety/profiler/pp/arbiter logs:"
-    tail -5 build/qcc_*.log
+    tail -n 5 build/qcc_*.log
     exit 1
 fi
 # 记录真实节点进程 PID（wrapper 的直接子进程）：退出清理按 PID 精确执行，
@@ -98,7 +98,9 @@ sleep 3
 fail=0
 
 # count_field <topic> <regex> -> 输出匹配数（单次查询限时）
-info_of() { timeout 10 ros2 topic info "$1" -v 2>/dev/null; }
+# --no-daemon：ros2cli daemon 的 socket 在 /tmp，环境不可写或有残留 daemon 时会返回空/旧数据
+# （本地与 CI 均观察到过）。直接查图与 daemon 状态解耦，代价是单次查询多几秒。
+info_of() { timeout 15 ros2 topic info --no-daemon "$1" -v 2>/dev/null; }
 
 # check_endpoints <topic> [need_pub=1] [need_sub=1]
 # 闭环上除外部输入 raw_pathlimits（其发布者是规划器，本冒烟不拉起）外，均需 pub 与 sub 各 >=1。

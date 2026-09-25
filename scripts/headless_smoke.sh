@@ -50,7 +50,9 @@ for entry in "${SMOKES[@]}"; do
     if ! kill -0 "${launcher}" 2>/dev/null; then
       break  # launcher died early
     fi
-    if timeout 8 ros2 node list 2>/dev/null | grep -qx "${node}"; then
+    # --no-daemon：ros2cli daemon 的 socket 在 /tmp（不可写环境下根本起不来），且残留 daemon
+    # 会返回空节点表（两类情均已在本地与 CI 观察到）。直接查图确定、与 daemon 状态解耦。
+    if timeout 15 ros2 node list --no-daemon 2>/dev/null | grep -qx "${node}"; then
       found=1
       break
     fi
