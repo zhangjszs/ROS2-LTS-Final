@@ -9,9 +9,10 @@
 #      （退出码非 0 且对应判据字段命中）——即“评测器本身也被评测”（#17 验收第 2 条）
 #   5) 单一赛道来源：生成器导出的 CSV 必须与仓内已提交（仿真器就读它）逐字节一致
 #      ——防止“名字相同、几何不同”的赛道两处各自演变（#17 交付物第 1 条）
-#   6) 基线对账：与 benchmarks/baseline/ 里的历史结果比口径（赛道版本/终态/有效圈/越界
-#      必须一致，rmse 与圈速允许 RMSE_TOL / LAP_TOL 比例容差）——评价口径发生变化时
-#      必须显式重新录制基线，不得静默漂到另一个基线（#17 验收最后一条）
+#   6) 基线对账：与 benchmarks/baseline/ 里**同一 track_version** 的基线比口径（赛道版本/
+#      终态/有效圈/越界必须一致，rmse 与圈速允许 RMSE_TOL / LAP_TOL 比例容差）。基线按
+#      <name>.<track_version>.json 版本化命名：口径变化须显式重录（RECORD_BASELINE=1），
+#      旧版本文件保留为历史基线，不会被覆盖或静默漂移（#17 验收最后一条）。
 #   7) 速度口径对比（#19 A 前置）：同赛道、同控制器、同种子下分别跑“曲率限速”与
 #      “固定限速”两种参照。两者都必须完赛，且圈速必须可区分——否则“控制器变快”
 #      可能只是速度策略不同的假象。
@@ -142,29 +143,66 @@ fi
 
 echo "=== 6) 基线对账（口径不得静默漂移） ==="
 BASE_DIR="${BASE_DIR:-benchmarks/baseline}"
-RMSE_TOL="${RMSE_TOL:-0.25}"   # rmse 允许的比例变化（当前实测精度仍有抖位空间）
-LAP_TOL="${LAP_TOL:-0.25}"     # 圈速允许的比例变化
-if [ ! -d "$BASE_DIR" ]; then
-    echo "SKIP 无基线目录 $BASE_DIR（首次建立：cp ${OUT_DIR}/{acceleration,skidpad,trackdrive}.json $BASE_DIR/）"
+# 收紧后的比例容差（0.25 → 0.01，25× 收紧）：离线核心为纯定步长计算，实测 Jazzy CI 与本地
+# 输出**逐字节一致**（见 CI artifact 与提交基线），故 1% 只用于吸收未来工具链的浮点平台差异，
+# 不再给"控制器/口径静默走样"留出 25% 的掩蔽空间。
+RMSE_TOL="${RMSE_TOL:-0.01}"
+LAP_TOL="${LAP_TOL:-0.01}"
+if [ "${RECORD_BASELINE:-0}" = "1" ]; then
+    # 显式重新录制：按 <name>.<track_version>.json 落盘。口径变化（赛道版本/评测版本）时生成
+    # 新文件，旧版本文件原样保留为历史基线，不会被覆盖 —— 这是"保留基线结果"的唯一入口。
+    mkdir -p "$BASE_DIR"
+    python3 - "$BASE_DIR" "$OUT_DIR" <<'PY'
+import json, os, sys
+
+base_dir, out_dir = sys.argv[1], sys.argv[2]
+for name in ("acceleration", "skidpad", "trackdrive"):
+    src = os.path.join(out_dir, name + ".json")
+    if not os.path.isfile(src):
+        print(f"FAIL {name}: 缺本轮输出 {src}，无法录制")
+        sys.exit(1)
+    d = json.load(open(src))
+    slug = str(d.get("track_version", "unversioned")).replace("/", ".")
+    dst = os.path.join(base_dir, f"{name}.{slug}.json")
+    new_text = json.dumps(d, ensure_ascii=False, indent=2) + "\n"
+    if os.path.isfile(dst) and open(dst).read() == new_text:
+        print(f"OK   {name}: 基线未变 {os.path.basename(dst)}")
+        continue
+    with open(dst, "w") as f:
+        f.write(new_text)
+    print(f"REC  {name}: 已录制 {os.path.basename(dst)}（旧版本文件保留为历史基线）")
+PY
+    [ $? -eq 0 ] || fail=1
+elif [ ! -d "$BASE_DIR" ]; then
+    echo "SKIP 无基线目录 $BASE_DIR（首次建立：RECORD_BASELINE=1 bash scripts/benchmark_regression.sh）"
 else
     python3 - "$BASE_DIR" "$OUT_DIR" "$RMSE_TOL" "$LAP_TOL" <<'PY'
 import json, os, sys
+
 base_dir, out_dir, rmse_tol, lap_tol = sys.argv[1:5]
 rmse_tol, lap_tol = float(rmse_tol), float(lap_tol)
-fails = []
+fails, records = [], []
 for name in ("acceleration", "skidpad", "trackdrive"):
-    bp, op = os.path.join(base_dir, name + ".json"), os.path.join(out_dir, name + ".json")
-    if not os.path.isfile(bp):
-        fails.append(f"{name}: 基线缺失 {bp}")
-        continue
+    op = os.path.join(out_dir, name + ".json")
     if not os.path.isfile(op):
         fails.append(f"{name}: 本轮无输出 {op}")
         continue
-    b, o = json.load(open(bp)), json.load(open(op))
+    o = json.load(open(op))
+    ver = str(o.get("track_version", "unversioned"))
+    # 只与**同一 track_version** 的基线比；口径变了必须显式重录，不得拿来跟旧口径比。
+    cand = os.path.join(base_dir, f"{name}.{ver.replace('/', '.')}.json")
+    if not os.path.isfile(cand):
+        existing = sorted(fn for fn in os.listdir(base_dir)
+                          if fn.startswith(name + ".") and fn.endswith(".json"))
+        fails.append(f"{name}: 无 track_version={ver} 的基线（现有: {', '.join(existing) or '无'}）"
+                     " —— 口径变化须显式重录：RECORD_BASELINE=1 bash scripts/benchmark_regression.sh")
+        continue
+    b = json.load(open(cand))
+    name_fails = []
     # 硬口径：赛道版本、终态、有效圈数、越界/碰撞事件数必须一致
-    for k in ("track_version", "run_status", "valid_laps", "out_of_bounds_events"):
+    for k in ("track_version", "run_status", "valid_laps", "out_of_bounds_events", "collision_events"):
         if b.get(k) != o.get(k):
-            fails.append(f"{name}: {k} 从 {b.get(k)!r} 变到 {o.get(k)!r}")
+            name_fails.append(f"{k} 从 {b.get(k)!r} 变到 {o.get(k)!r}")
     # 软口径：rmse / 圈速 在比例容差内
     for k, tol in (("rmse_lateral_m", rmse_tol), ("best_valid_lap_time_s", lap_tol)):
         bv, ov = float(b.get(k) or 0), float(o.get(k) or 0)
@@ -172,16 +210,19 @@ for name in ("acceleration", "skidpad", "trackdrive"):
             continue
         ref = bv if bv else 1.0
         if abs(ov - bv) / ref > tol:
-            fails.append(f"{name}: {k} {bv} -> {ov} 超出比例容差 {tol}")
-        else:
-            print(f"OK   {name}: {k} {bv} -> {ov}")
-    if not fails:
-        print(f"OK   {name}: 口径与基线一致 (track_version={o.get('track_version')})")
+            name_fails.append(f"{k} {bv} -> {ov} 超出比例容差 {tol}")
+    if name_fails:
+        fails.append(f"{name}（基线 {os.path.basename(cand)}）: " + "; ".join(name_fails))
+    else:
+        records.append(f"OK   {name}: 口径与 {os.path.basename(cand)} 一致 (track_version={ver})")
+for r in records:
+    print(r)
 if fails:
     print("FAIL 基线对账不通过：")
     for f in fails:
         print("       -", f)
-    print("       如果是有意改进口径/提升控制器：先重新录制基线并在 PR 里说明。")
+    print("       若确为有意改进口径/控制器：RECORD_BASELINE=1 bash scripts/benchmark_regression.sh")
+    print("       （旧版本基线文件会保留为历史，供后续追溯，不得删改）。")
     sys.exit(1)
 PY
     [ $? -eq 0 ] || fail=1
