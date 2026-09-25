@@ -23,6 +23,43 @@ TEST(TrackGeneratorTest, TrackdriveLoopGeneration) {
     EXPECT_GT(track.total_length, 100.0);
 }
 
+// —— #17 单一赛道来源：赛道身份与几何校验和不得悄悄漂移 ——
+
+TEST(TrackRegistry, EachTrackHasStableIdVersionAndClosedFlag) {
+    const auto accel = TrackGenerator::GenerateAcceleration();
+    const auto skid = TrackGenerator::GenerateSkidpad();
+    const auto loop = TrackGenerator::GenerateTrackdriveLoop();
+
+    EXPECT_EQ(accel.id, "acceleration-75m");
+    EXPECT_EQ(skid.id, "skidpad-figure8");
+    EXPECT_EQ(loop.id, "trackdrive-loop");
+    // 直线赛不得被当作闭合赛道（计圈/越界判据依赖它，消费者不得再靠名字猜）。
+    EXPECT_FALSE(accel.closed_circuit);
+    EXPECT_TRUE(skid.closed_circuit);
+    EXPECT_TRUE(loop.closed_circuit);
+    for (const auto& t : {accel, skid, loop}) {
+        EXPECT_EQ(t.version, "v1");
+        EXPECT_EQ(t.versionedId(), t.id + "/" + t.version);
+        EXPECT_FALSE(t.name.empty());
+    }
+}
+
+// 几何校验和锁定：改动生成器几何而不递增 version 会在这里失败（而不是产出一堆难以归因的基线飘移）。
+TEST(TrackRegistry, GeometryChecksumIsFixedForCommittedVersion) {
+    EXPECT_EQ(TrackGenerator::geometryChecksum(TrackGenerator::GenerateAcceleration().cones), 0x64291c72658ad63fULL);
+    EXPECT_EQ(TrackGenerator::geometryChecksum(TrackGenerator::GenerateSkidpad().cones), 0x3b098a8899d93303ULL);
+    EXPECT_EQ(TrackGenerator::geometryChecksum(TrackGenerator::GenerateTrackdriveLoop().cones), 0x5549f6279f3b456bULL);
+}
+
+// 同一几何两次求和一致，不同赛道则不一致：校验和可当“同一赛道”的等同判据。
+TEST(TrackRegistry, ChecksumDistinguishesTracksAndIsDeterministic) {
+    const auto a = TrackGenerator::GenerateAcceleration();
+    const auto b = TrackGenerator::GenerateAcceleration();
+    const auto c = TrackGenerator::GenerateSkidpad();
+    EXPECT_EQ(TrackGenerator::geometryChecksum(a.cones), TrackGenerator::geometryChecksum(b.cones));
+    EXPECT_NE(TrackGenerator::geometryChecksum(a.cones), TrackGenerator::geometryChecksum(c.cones));
+}
+
 TEST(KpiEvaluatorTest, StraightLineTrackingError) {
     std::vector<CenterlinePoint> centerline;
     for (double x = 0.0; x <= 50.0; x += 1.0) {
@@ -122,6 +159,8 @@ TEST(KpiEvaluatorTest, ClosedLoopForwardCountsOneValidLap) {
     EXPECT_GE(s.valid_laps, 1);
     EXPECT_GT(s.best_valid_lap_time_s, 0.0);
     EXPECT_DOUBLE_EQ(s.best_lap_time_s, s.best_valid_lap_time_s);
+    // 正向：净弧长进度为一个正的全圈长（#17：方向作为可正值识别的判据）
+    EXPECT_GT(s.net_arc_progress_m, 0.5 * ce.total);
 }
 
 TEST(KpiEvaluatorTest, ReverseTraversalCountsNoLap) {
@@ -135,6 +174,8 @@ TEST(KpiEvaluatorTest, ReverseTraversalCountsNoLap) {
     auto s = eval.GetSummary();
     EXPECT_EQ(s.valid_laps, 0);
     EXPECT_DOUBLE_EQ(s.best_lap_time_s, 0.0);  // 未完赛不产出最佳圈速
+    // 反向经过起点：不仅“不计圈”，净进度必须为负（评测能正面识别跑错方向）
+    EXPECT_LT(s.net_arc_progress_m, -0.5 * ce.total);
 }
 
 TEST(KpiEvaluatorTest, UnfinishedNoBestLap) {
@@ -218,6 +259,7 @@ TEST(KpiEvaluatorTest, JsonReportMachineReadableFields) {
     EXPECT_NE(json.find("\"valid_laps\":"), std::string::npos);
     EXPECT_NE(json.find("\"best_valid_lap_time_s\":"), std::string::npos);
     EXPECT_NE(json.find("\"lat_accel_source\": \"reference_curvature\""), std::string::npos);
+    EXPECT_NE(json.find("\"net_arc_progress_m\":"), std::string::npos);  // #17 方向判据可机读
     // 括号平衡（基本结构校验）
     size_t open = 0, close = 0;
     for (char ch : json) {

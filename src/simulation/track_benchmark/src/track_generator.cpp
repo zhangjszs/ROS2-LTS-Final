@@ -1,6 +1,7 @@
 #include "track_benchmark/track_generator.hpp"
 
 #include <fstream>
+#include <iomanip>
 #include <iostream>
 #include <numbers>
 #include <sstream>
@@ -16,6 +17,7 @@ constexpr double kPi = std::numbers::pi_v<double>;
 TrackDefinition TrackGenerator::GenerateSkidpad() {
     TrackDefinition track;
     track.name = "Skidpad";
+    track.id = "skidpad-figure8";  // #17：全仓唯一赛道标识
     track.track_width = 3.0;
 
     // FSAC 规则: 右圆中心 (0, 9.125), 左圆中心 (0, -9.125)
@@ -83,6 +85,8 @@ TrackDefinition TrackGenerator::GenerateSkidpad() {
 TrackDefinition TrackGenerator::GenerateAcceleration(double length, double track_width) {
     TrackDefinition track;
     track.name = "Acceleration";
+    track.id = "acceleration-75m";
+    track.closed_circuit = false;  // 直线赛：到终点即完赛，不计圈
     track.track_width = track_width;
     const double half_w = track_width * 0.5;
     uint32_t cone_id = 1;
@@ -114,6 +118,7 @@ TrackDefinition TrackGenerator::GenerateAcceleration(double length, double track
 TrackDefinition TrackGenerator::GenerateTrackdriveLoop(double rx, double ry, double track_width, size_t num_points) {
     TrackDefinition track;
     track.name = "Trackdrive_Loop";
+    track.id = "trackdrive-loop";
     track.track_width = track_width;
     const double half_w = track_width * 0.5;
     uint32_t cone_id = 1;
@@ -164,15 +169,59 @@ TrackDefinition TrackGenerator::GenerateTrackdriveLoop(double rx, double ry, dou
     return track;
 }
 
-bool TrackGenerator::SaveConesToCSV(const std::vector<BenchmarkCone>& cones, const std::string& path) {
+bool TrackGenerator::SaveConesToCSV(const TrackDefinition& track, const std::string& path) {
     std::ofstream f(path);
     if (!f.is_open())
         return false;
+    // 固定 3 位小数 + 确定行序：输出位级确定，才能与仓内已提交的 CSV 逐字节 diff（#17 单一赛道来源）。
+    // 身份写在注释行里（两个读取方都跳过 '#' 行），使每份几何自带 id/version/校验和。
     f << "# x,y,type\n";
-    for (const auto& c : cones) {
+    f << "# id=" << track.id << " version=" << track.version << " cones=" << track.cones.size()
+      << " geometry_fnv1a64=" << std::hex << geometryChecksum(track.cones) << std::dec << "\n";
+    f << std::fixed << std::setprecision(3);
+    for (const auto& c : track.cones) {
         f << c.x << "," << c.y << "," << c.type << "\n";
     }
     return true;
+}
+
+std::uint64_t TrackGenerator::geometryChecksum(const std::vector<BenchmarkCone>& cones) noexcept {
+    // 对“量化到导出精度后的字节流”取 FNV-1a：校验和衡量的是导出几何，不是内存里的 double 尾数。
+    std::ostringstream os;
+    os << std::fixed << std::setprecision(3);
+    for (const auto& c : cones)
+        os << c.x << "," << c.y << "," << c.type << "\n";
+    const std::string bytes = os.str();
+    std::uint64_t h = 1469598103934665603ULL;  // FNV-1a 64bit offset basis
+    for (unsigned char b : bytes) {
+        h ^= b;
+        h *= 1099511628211ULL;
+    }
+    return h;
+}
+
+bool TrackGenerator::SaveTrackManifest(const std::vector<TrackDefinition>& tracks, const std::string& dir,
+                                       const std::vector<std::string>& filenames) {
+    if (tracks.size() != filenames.size())
+        return false;
+    std::ofstream f(dir + "/tracks.json");
+    if (!f.is_open())
+        return false;
+    // schema fsac.tracks/v1：仿真器与评测共用同一份清单（id/version/文件名/锥桶数/几何校验和）。
+    f << "{\n  \"schema\": \"fsac.tracks/v1\",\n  \"tracks\": [\n";
+    for (size_t i = 0; i < tracks.size(); ++i) {
+        const auto& t = tracks[i];
+        // 校验和先转成十六进制字符串再拼接：在流里直接切 std::hex/std::dec 容易把后续字段带成十六进制。
+        std::ostringstream sum;
+        sum << std::hex << geometryChecksum(t.cones);
+        f << "    {\"id\": \"" << t.id << "\", \"version\": \"" << t.version << "\", \"name\": \"" << t.name
+          << "\", \"file\": \"" << filenames[i] << "\", \"cones\": " << t.cones.size()
+          << ", \"closed\": " << (t.closed_circuit ? "true" : "false") << ", \"total_length_m\": " << std::fixed
+          << std::setprecision(3) << t.total_length << ", \"geometry_fnv1a64\": \"" << sum.str() << "\"}"
+          << (i + 1 == tracks.size() ? "" : ",") << "\n";
+    }
+    f << "  ]\n}\n";
+    return f.good();
 }
 
 bool TrackGenerator::SaveCenterlineToCSV(const std::vector<CenterlinePoint>& centerline, const std::string& path) {

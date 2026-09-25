@@ -25,11 +25,11 @@ BenchmarkNode::BenchmarkNode(const rclcpp::NodeOptions& options) : Node("track_b
 
     evaluator_.SetCenterline(current_track_.centerline);
     evaluator_.SetTrackCones(current_track_.cones);
-    // #17 A/C：告知评估器赛道几何（闭合性/单圈长/合法走廊）与版本标识，供有效圈/越界/回归使用
-    const bool track_closed = (track_type_ != "acceleration");
+    // #17 A/C：告知评估器赛道几何（闭合性/单圈长/合法走廊）与版本标识，供有效圈/越界/回归使用。
+    // 闭合性与 track_version 均取自赛道定义（与 runner / 仿真器同源，不再各自决定）。
     const double corridor_half = (current_track_.track_width > 0.0) ? current_track_.track_width * 0.5 : 1.5;
-    evaluator_.SetCircuitGeometry(current_track_.total_length, corridor_half, track_closed);
-    evaluator_.SetTrackVersion(current_track_.name + "/v1");
+    evaluator_.SetCircuitGeometry(current_track_.total_length, corridor_half, current_track_.closed_circuit);
+    evaluator_.SetTrackVersion(current_track_.versionedId());
 
     // 延迟 1 秒后发布中心线可视化
     path_timer_ = create_wall_timer(std::chrono::seconds(1), [this]() {

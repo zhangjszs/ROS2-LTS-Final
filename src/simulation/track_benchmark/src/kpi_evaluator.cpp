@@ -75,6 +75,7 @@ void KpiEvaluator::Reset() {
     cone_hit_.assign(cones_.size(), false);
     collision_events_ = 0;
     lap_progress_ = 0.0;
+    net_progress_ = 0.0;
     prev_s_ = 0.0;
     have_prev_s_ = false;
     last_lap_time_ = 0.0;
@@ -193,6 +194,7 @@ KpiStepData KpiEvaluator::Update(double x, double y, double theta, double v, dou
         }
         if (d > 0.0)
             lap_progress_ += d;
+        net_progress_ += d;  // 带符号：反向跑会累成负值
         prev_s_ = s;
         double lap_time = timestamp - lap_start_time_;
         if (total_length_ > 0.0 && lap_progress_ >= kLapCoverageFraction * total_length_ &&
@@ -279,6 +281,7 @@ KpiSummary KpiEvaluator::GetSummary() const {
     summary.max_abs_cross_track_m = max_abs_cte_;
     summary.peak_measured_lat_accel_g = peak_measured_lat_g_;
     summary.total_length_m = total_length_;
+    summary.net_arc_progress_m = net_progress_;
     summary.lat_accel_source = "reference_curvature";
 
     return summary;
@@ -343,6 +346,7 @@ std::string KpiEvaluator::GenerateJsonReport(const KpiSummary& s) {
     j += std::format("  \"avg_speed_mps\": {:.6},\n", s.avg_speed_mps);
     j += std::format("  \"steering_jerk\": {:.6},\n", s.steering_jerk);
     j += std::format("  \"total_length_m\": {:.6},\n", s.total_length_m);
+    j += std::format("  \"net_arc_progress_m\": {:.6},\n", s.net_arc_progress_m);
     j += "  \"collision_events\": " + std::to_string(s.collision_events) + ",\n";
     j += "  \"collision_cones\": " + std::to_string(s.collision_cones) + ",\n";
     j += "  \"cone_collisions\": " + std::to_string(s.cone_collisions) + ",\n";

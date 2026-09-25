@@ -69,6 +69,9 @@ struct KpiSummary {
     double total_length_m{0.0};
     std::string lat_accel_source{"reference_curvature"};
     std::string run_status{"running"};
+    // 沿参考线的**净带符号弧长进度** (m)：正向为正、反向为负。使“反向跑”不再只是
+    // “有效圈=0”的缺失型证据，而是可正值识别的判据（#17 验收：反向经过起点需被识别）。
+    double net_arc_progress_m{0.0};
 };
 
 /**
@@ -174,6 +177,8 @@ class KpiEvaluator {
 
     // 进度计圈：沿参考线弧长的累计正向进度 + 方向校验
     double lap_progress_{0.0};  // 本圈累计正向弧长进度
+    // 全程净带符号弧长进度（反向为负），仅供诊断/判据，不参与计圈
+    double net_progress_{0.0};
     double prev_s_{0.0};
     bool have_prev_s_{false};
     double last_lap_time_{0.0};
