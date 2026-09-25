@@ -4,14 +4,14 @@
 // 仲裁出**唯一**最终底盘指令（单一事实来源），并保证安全降级输出确定性。
 // 纯 std 依赖（无 ROS context，可单测）；复用既有契约层，不重复实现判定原语：
 //   - common_msgs::contract::sourceAgeAcceptable（#12 输入陈旧/超时检测）
-//   - common_msgs::vehicle::verifyChecksum / checksumRaw（#15 指令有效性）
+//   - common_msgs::vehicle::verifyChecksum / checksumRaw / verifyFrame（#15 指令帧有效性）
 //   - common_msgs::vehicle::ActuatorCalibration（#15 clamp-before-narrow / 非有限降级）
 //   - common_msgs::vehicle::SafetyState / TaskSafetyStateMachine（#16 状态）
 //
 // 优先级与抢占语义（高→低）：
 //   1) 安全/故障态（stopActive 或状态机 STOP）：强制“无油门 + 安全制动 + 零转角”，最高，不可被控制源覆盖；
 //   2) 任务态约束：非 canDrive（IDLE/未武装 或 已停）→ 输出安全制动而非行驶指令；
-//   3) 正常控制源选择：仅在 present + 新鲜 + checksum 有效的候选中，按 preferred 选；冲突按 preferred，
+//   3) 正常控制源选择：仅在 present + 帧头合法 + 线上 checksum 有效 + 新鲜的候选中，按 preferred 选；冲突按 preferred，
 //      无任一可信候选 → 安全降级（NO_TRUSTED_SOURCE）。
 //
 // 说明：滞回/防抖（切换驻留时间 dwell）需要跨帧记忆，decide() 为**纯函数**（不持时间），
@@ -170,16 +170,49 @@ class CommandArbiterFilter {
    public:
     explicit CommandArbiterFilter(CommandArbitrator arb) : arb_(arb) { reset(); }
 
-    // 一帧观测：last_rx_sec = 该源最近一次收到有效指令的单调时刻（<0 = 从未收到）。
+    // 一帧观测：last_rx_sec = 该源最近一次收到指令的单调时刻（<0 = 从未收到）。
+    // checksum 必须是**线上帧自带值**（在接线层原样透传）：若在本层重算，verifyChecksum 将永真，
+    // “篡改/截断帧不可信”这道门事实上失效（#16 已发生过的接线缺陷，由单测锁定）。
     struct SourceObs {
         ControlSource source = ControlSource::NONE;
         VehicleCommandRaw cmd{};
         std::uint16_t checksum = 0;
         double last_rx_sec = -1.0;
         bool present = false;
+        // 帧头/长度合法性（verifyFrame，#15）。默认 false = 安全侧失效：忘了显式判定的接线
+        // 只会得到安全降级，不会静默接受一个来历不明的指令帧。
+        bool frame_valid = false;
     };
 
     ControlSource winner() const noexcept { return winner_; }
+
+    // 单源不可信的具体原因（#16 遥测/计数用）。与 update() 内的 trusted 判定**同一实现**，
+    // 保证接线层的拒收统计与实际门不会漂移。
+    // 枚举项尾注一律改为独立注释行：规避 clang-format v18(CI)/v21(本地) 对齐差异。
+    enum class Untrusted : std::uint8_t {
+        // 可信
+        kNone = 0,
+        // 从未收到
+        kAbsent,
+        // 帧头/长度不合法（#15 verifyFrame）
+        kBadFrame,
+        // 线上校验和与指令区不一致（篡改/截断）
+        kBadChecksum,
+        // 超过 source_timeout_sec（#12 新鲜度）
+        kStale,
+    };
+
+    static Untrusted classify(const SourceObs& o, double now_sec, const ArbitrationConfig& cfg) {
+        if (!o.present || o.source == ControlSource::NONE || o.last_rx_sec < 0.0)
+            return Untrusted::kAbsent;
+        if (!o.frame_valid)
+            return Untrusted::kBadFrame;
+        if (!verifyChecksum(o.cmd, o.checksum))
+            return Untrusted::kBadChecksum;
+        if (!trustedAge(now_sec - o.last_rx_sec, cfg.source_timeout_sec))
+            return Untrusted::kStale;
+        return Untrusted::kNone;
+    }
 
     // 确定性安全降级指令（供节点启动/预热时直接发布，使最终出口一开始就有合法生产者）。
     ArbitrationResult safeStop(ArbitrationReason reason) const { return arb_.safeStopResult(reason); }
@@ -201,9 +234,7 @@ class CommandArbiterFilter {
             const std::size_t idx = index(o.source);
             if (idx >= kMaxSources)
                 continue;
-            const double age = (o.last_rx_sec < 0.0) ? -1.0 : (now_sec - o.last_rx_sec);
-            const bool trusted = o.present && (o.source != ControlSource::NONE) && verifyChecksum(o.cmd, o.checksum) &&
-                                 trustedAge(age, cfg.source_timeout_sec);
+            const bool trusted = classify(o, now_sec, cfg) == Untrusted::kNone;
             if (trusted) {
                 if (std::isnan(valid_since_[idx]))
                     valid_since_[idx] = now_sec;
@@ -290,6 +321,51 @@ class CommandArbiterFilter {
     double valid_since_[kMaxSources]{};
     SourceObs last_valid_[kMaxSources]{};
 };
+
+// 接线层唯一合法的 SourceObs 构造入口：把**线上帧字段**（帧头/长度/校验和）原样带入，
+// 由本工厂统一完成 verifyFrame 与 present 判定。调用方不得自行重算 checksum（见 SourceObs 注）。
+[[nodiscard]] inline CommandArbiterFilter::SourceObs makeWireSourceObs(ControlSource source,
+                                                                       const VehicleCommandRaw& raw, std::uint8_t head1,
+                                                                       std::uint8_t head2, std::uint8_t length,
+                                                                       std::uint16_t wire_checksum, double rx_sec) {
+    CommandArbiterFilter::SourceObs o;
+    o.source = source;
+    o.cmd = raw;
+    o.checksum = wire_checksum;
+    o.last_rx_sec = rx_sec;
+    o.present = (rx_sec >= 0.0);
+    o.frame_valid = verifyFrame(head1, head2, length);
+    return o;
+}
+
+inline const char* to_string(CommandArbiterFilter::Untrusted u) noexcept {
+    using U = CommandArbiterFilter::Untrusted;
+    switch (u) {
+        case U::kNone:
+            return "trusted";
+        case U::kAbsent:
+            return "absent";
+        case U::kBadFrame:
+            return "bad_frame";
+        case U::kBadChecksum:
+            return "bad_checksum";
+        case U::kStale:
+            return "stale";
+    }
+    return "unknown";
+}
+
+inline const char* to_string(ControlSource s) noexcept {
+    switch (s) {
+        case ControlSource::NONE:
+            return "none";
+        case ControlSource::PURE_PURSUIT:
+            return "pure_pursuit";
+        case ControlSource::MPC:
+            return "mpc";
+    }
+    return "unknown";
+}
 
 }  // namespace vehicle
 }  // namespace common_msgs

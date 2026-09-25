@@ -31,7 +31,7 @@ target_link_libraries(safety_monitor
   std_msgs::std_msgs
 )
 
-# #16：最终指令仲裁节点（订阅 PP/MPC 源 + 锁存 stop -> 单一 /vehicle_command）
+# #16：最终指令仲裁节点（订阅 PP/MPC 源 + 锁存 stop + 任务事件 -> 单一 /vehicle_command 与 /system/state）
 add_executable(command_arbiter_node
   src/command_arbiter_node.cpp
 )
@@ -39,6 +39,7 @@ add_executable(command_arbiter_node
 target_link_libraries(command_arbiter_node
   common_msgs::common_msgs
   rclcpp::rclcpp
+  std_msgs::std_msgs
 )
 
 install(TARGETS

@@ -16,6 +16,7 @@ QoS、源时间、有效期、非法数据处理。目标是接入时**显式解
 | `/planning/pathlimits` | `HuatPathLimits` | 规划器 / velocity_profiler | MPC、PP | `map` 或 `base_link` | x,y[m]；速度[m/s] | 事件 | (1,true,false) `kQosPath` |
 | `/vehicle_command` | `HuatVehicleCmd` | 控制器（经适配层编码） | 底盘 / 仿真器 | — | 见 §4（raw 字节） | 控制率 | (10,true,false) `kQosCommand` |
 | `/system/stop` | `HuatStop` | safety_monitor | MPC、PP、各执行 | — | bool stop | 事件 | (1,true,**true**) `kQosStop`（锁存，见 #8） |
+| `/system/state` | `HuatSystemState` | command_arbiter_node (#16) | 故障注入验收 / 展示与录包 | `base_link` | 任务×安全态、仲裁理由、各源信任状态、出口指令字节 | 控制率 | (10,true,false) `kQosState` |
 
 QoS 值即 `interface_contract.h` 中对应 `kQos*` 描述符；消费者据此构造 `rclcpp::QoS`。
 
@@ -47,10 +48,20 @@ QoS 值即 `interface_contract.h` 中对应 `kQos*` 描述符；消费者据此�
     油门与制动**互斥**；关键安全约束：**clamp-before-narrow + 非有限降级**（对齐 ROS1 #6“负油门→255”
     缺陷类），非有限/缺失一律降级为“无油门 + 安全制动”。
   - 指令帧常量与 16 位累加和校验：`kCmdHead1/2`/`kCmdLength`/`checksumRaw`，由 PP/MPC/仿真共用，
-    杜绝协议拼装在校验和/帧头/字节窄化处散落。
+    杜绝协议拼装在校验和/帧头/字节窄化处散落。帧头与 `length` **不参与**累加和，故消费者必须
+    `verifyFrame(head1, head2, length) && verifyChecksum(raw, checksum)` 两者齐用才能排除整帧错位。
+  - 制动分两档且各自标定：`emergency_brake_raw`（急停/非有限输入，默认 80）与
+    `soft_brake_raw`（路径末端减速/路径缺失，默认 40）；PP 的 `InputGuard` 不再自带协议字面量，
+    改为构造时由标定层注入。
+- 标定参数一律走 `actuator.*`（PP / MPC / 仿真器 / 仲裁节点同名）：`max_accel`、`max_decel`、
+  `pedal_full_scale`、`emergency_brake_raw`、`soft_brake_raw`、`calibration_version`；
+  部署基线集中在 `src/launch/huat_launch/config/vehicle_calibration.yaml`（作为 launch `parameters` 首项，
+  值与代码默认一致，接入 0–255 满量程底盘只改参数不改代码）。
 - 标定版本经 `actuator.calibration_version` 参数透传（默认 `sim-default-0`）；真实底盘协议待实车标定后仅改参数/递增版本，
-  禁止在模块内散落硬编码。往返一致性与方向/量化由 `test_steering_calibration`、非有限/限幅安全由
-  `test_vehicle_command_codec` 断言。
+  禁止在模块内散落硬编码。往返一致性与方向/量化由 `test_steering_calibration`，非有限/限幅安全由
+  `test_vehicle_command_codec`，**跨消息边界（物理量 → `HuatVehicleCmd` → 解码）整链由 `test_command_roundtrip`** 断言。
+- 标定状态与待测项：见 [BENCH_CALIBRATION_TEMPLATE.md](BENCH_CALIBRATION_TEMPLATE.md)；截至本提交，
+  零位/方向/比例/满量程/制动建立/指令超时仍全部**未标定**，软件适配完成不代表实车适配完成。
 
 ## 5. 车辆状态时间与质量（#12）
 
@@ -92,7 +103,11 @@ QoS 值即 `interface_contract.h` 中对应 `kQos*` 描述符；消费者据此�
   非停且 `RUNNING` 时为真（ARMED=已就绪未起步，仍按安全制动）。
 - **`command_arbitration.h` · `CommandArbitrator`**：多控制源（PP/MPC）→ 唯一最终 `/vehicle_command` 的**单帧纯函数**仲裁。
   优先级（高→低）：**安全/故障（stopActive）> 任务态约束（非 canDrive）> 正常控制源选择**。可信候选需同时满足
-  `present` + `verifyChecksum`（#15）+ `sourceAgeAcceptable`（#12）；冲突按 `preferred` 选，无任一可信源则安全降级。
+  `present` + `verifyFrame`（#15 帧头/长度）+ `verifyChecksum`（#15）+ `sourceAgeAcceptable`（#12）；冲突按 `preferred` 选，
+  无任一可信源则安全降级。
+  **接线层约束**：`SourceObs.checksum` 必须是**线上帧自带值**，绝不得在接收处重算 —— 重算后
+  `verifyChecksum` 永真，篡改/截断帧会被当作可信源接管（已发生过的接线缺陷，由
+  `ArbiterWiringGate.*` 单测锁定）；接线只能用 `makeWireSourceObs(...)` 这一唯一入口。
   安全降级输出确定性：`ActuatorCalibration`（#15）的 `emergencyBrakeRaw()` + 零油门 + 零转角，绝不越界/负值→255。
 - **`command_arbitration.h` · `CommandArbiterFilter`**（跨帧有状态）：在单帧仲裁器外加一层去抖/切换驻留（`switch_dwell_sec`）
   与 stale 老化，时钟由调用方（节点用 ROS clock / 单测用虚拟时钟）逐帧传入。**语义**：已 committed 且当前可信→保持（sticky）；
@@ -100,15 +115,31 @@ QoS 值即 `interface_contract.h` 中对应 `kQos*` 描述符；消费者据此�
 
 **接线节点 `safety_monitor/command_arbiter_node`**（#16 独立出口）：订阅两路控制源（`topics.source_a` 默认
 `/control/vehicle_command`、`topics.source_b` 默认 `/mpc/vehicle_command`）+ 锁存 `stop`（`makeQoS(kQosStop)`），
-经 `CommandArbiterFilter` 在 `topics.output`（默认 `/vehicle_command`）产出**单一**最终指令；启动即发安全制动，
-源话题/输出/超时/去抖/急停字节均参数化，无散落硬编码。
+经**节点内 `TaskSafetyStateMachine`** + `CommandArbiterFilter` 在 `topics.output`（默认 `/vehicle_command`）产出
+**单一**最终指令；源话题/输出/超时/去抖/急停字节均参数化，无散落硬编码。
+
+- **行驶许可由状态机授予（安全默认）**：节点启动后 `task=IDLE` → `canDrive()=false` → 输出安全制动；
+  需 `arm` → `start` 事件才进入 `RUNNING`。`task.autostart:=true` 仅为开发/仿真便捷开关（启动时自动 arm+start，
+  日志以 WARN 标明）。对应 #16 验收第 1 条：启动顺序/重启不会意外授予行驶许可。
+- **任务事件入口** `topics.task_event`（`std_msgs/String`，默认 `/system/task_event`）：
+  `arm` / `start` / `finish` / `abort`(=`fault`) / `reset`。`finish` 与 `abort` 产生**锁存**停，
+  只能由 `reset` 解除（验收第 3 条）。
+- **`/system/stop` 映射（`HuatStop` 只有 `bool stop`，不带 reason）**：`stop=true` → `onTimeoutStop()`（可恢复类）；
+  `stop=false` → `onResume()`，**仅**解除 TIMEOUT 停。任务级锁存（`abort` → FAULT、`finish` → REQUEST）
+  只能由 `reset` 事件解除 —— 监控“恢复”不会把急停类锁存带出来（验收第 3 条）。
+  真·硬件急停不走该话题，属仓库外（#16/#15 未标定项）。
+- **遥测出口** `topics.state`（默认 `/system/state`，`HuatSystemState`，按控制率发布）：任务态/安全态/停车来源、
+  `can_drive`、`winner_source`/`committed_source`/`reason`/`safe_fallback`、两路源各自的信任状态
+  （trusted / absent / bad_frame / bad_checksum / stale）、年龄、累计拒收次数、本帧出口字节与 `calibration_version`。
+  消息里的数值常量与纯 std 枚举顺序由 `command_arbiter_node.cpp` 的 `static_assert` 在**编译期**锁定。
+  故障注入验收以该话题为机读判据来源（不靠 RViz 或日志目视）。
 
 **验收门禁（软件侧）**：`test_task_state_machine`（8）+ `test_command_arbitration`（单帧矩阵 10：源超时/数据无效/
-checksum 失败/stop 锁存/源冲突/无任一可信源降级）+ `test_command_arbiter_filter`（跨帧 6：去抖/sticky/stale 回退/
-stop 复位后重接管 等）纳入 `colcon test` → CI。`headless_smoke.sh` 断言 `command_arbiter_node` 无界面启动；
-`qos_contract_check.sh` 新增仲裁器接线断言（两路源 sub + 单一输出 pub），与 #14 闭环共存且不扰动其 `/vehicle_command` 不变量。
+checksum 失败/stop 锁存/源冲突/无任一可信源降级）+ `test_command_arbiter_filter`（跨帧 6 + 接线信任门 5：去抖/sticky/
+stale 回退/stop 复位后重接管/篡改帧被拒/帧头不合法被拒）纳入 `colcon test` → CI。`headless_smoke.sh` 断言 `command_arbiter_node` 无界面启动；
+`qos_contract_check.sh` 断言仲裁器接线（两路源 sub + 单一输出 pub + `/system/state` pub 且 RELIABLE），与 #14 闭环共存且不扰动其 `/vehicle_command` 不变量。
 
 **仍卡在硬件/台架/集成（不据此关闭 #16）**：
 - 实车故障注入端到端验收（真实 VCU 断连/掉电/急停按钮优先级）：依赖实车，未标定项保持“未标定”。
-- 把仲裁器接入 `fsac.launch` 作为权威单出口（控制器改发源话题）：需 e2e 时序验证；本次仅新增节点+单测+冒烟，未改现有 launch（避免扰动 #14/#17）。
+- 把仲裁器接入 `fsac.launch` 作为权威单出口（控制器改发源话题）：需 e2e 时序验证，见 #16 接线开关。
 - 具体底盘通道/硬件急停优先级属仓库外，按 #15/#23 记录接口与证据归属。

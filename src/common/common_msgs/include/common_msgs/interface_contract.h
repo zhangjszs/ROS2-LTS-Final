@@ -24,6 +24,9 @@ inline constexpr std::string_view kTopicVehicleState = "/localization/vehicle_st
 inline constexpr std::string_view kTopicPathLimits = "/planning/pathlimits";
 inline constexpr std::string_view kTopicVehicleCommand = "/vehicle_command";
 inline constexpr std::string_view kTopicStop = "/system/stop";
+// #16：任务×安全状态 + 仲裁遥测出口（由 command_arbiter_node 按控制率发布）；
+// 非控制链路必需，但故障注入验收的机读证据必须带单一来源。
+inline constexpr std::string_view kTopicSystemState = "/system/state";
 
 // —— 坐标系唯一约定（issue #3）——
 //   map：全局/世界系（赛道、全局规划）；base_link：车体系（原点即车辆，航向 0）。

@@ -14,6 +14,11 @@ using common_msgs::vehicle::checksumRaw;
 using common_msgs::vehicle::CommandArbiterFilter;
 using common_msgs::vehicle::CommandArbitrator;
 using common_msgs::vehicle::ControlSource;
+using common_msgs::vehicle::kCmdHead1;
+using common_msgs::vehicle::kCmdHead2;
+using common_msgs::vehicle::kCmdLength;
+using common_msgs::vehicle::makeWireSourceObs;
+using common_msgs::vehicle::VehicleCommandRaw;
 
 namespace {
 constexpr std::uint8_t kNeutral = 90;
@@ -22,18 +27,25 @@ CommandArbiterFilter makeFilter() {
     return CommandArbiterFilter(CommandArbitrator(ActuatorCalibration{}, kNeutral));
 }
 
+VehicleCommandRaw makeRaw(std::uint8_t pedal) {
+    VehicleCommandRaw raw;
+    raw.steering = kNeutral;
+    raw.pedal_ratio = pedal;
+    raw.brake_force = 0;
+    raw.gear_position = 1;
+    raw.working_mode = 1;
+    raw.racing_num = 7;
+    return raw;
+}
+
 CommandArbiterFilter::SourceObs makeObs(ControlSource src, std::uint8_t pedal, double last_rx, bool present = true) {
     CommandArbiterFilter::SourceObs o;
     o.source = src;
-    o.cmd.steering = kNeutral;
-    o.cmd.pedal_ratio = pedal;
-    o.cmd.brake_force = 0;
-    o.cmd.gear_position = 1;
-    o.cmd.working_mode = 1;
-    o.cmd.racing_num = 7;
+    o.cmd = makeRaw(pedal);
     o.checksum = checksumRaw(o.cmd);
     o.last_rx_sec = last_rx;
     o.present = present;
+    o.frame_valid = true;
     return o;
 }
 }  // namespace
@@ -128,4 +140,74 @@ TEST(ArbiterFilter, CorruptedSourceDegrades) {
     auto r = f.update(3.0, false, true, std::span{obs}, ArbitrationConfig{});
     EXPECT_TRUE(r.safe_fallback);
     EXPECT_EQ(r.reason, ArbitrationReason::NO_TRUSTED_SOURCE);
+}
+
+// —— 接线层信任门回归（#16）：接线节点必须透传**线上** checksum/帧头，不得重算。
+// 下列用例把“重算即永真”的缺陷类直接固化为可执行断言。
+
+// 诚实的线上帧（自带正确 checksum）→ 可信并接管。
+TEST(ArbiterWiringGate, HonestWireFrameIsTrusted) {
+    const auto raw = makeRaw(20);
+    auto o =
+        makeWireSourceObs(ControlSource::PURE_PURSUIT, raw, kCmdHead1, kCmdHead2, kCmdLength, checksumRaw(raw), 5.0);
+    EXPECT_TRUE(o.present);
+    EXPECT_TRUE(o.frame_valid);
+    EXPECT_EQ(CommandArbiterFilter::classify(o, 5.0, ArbitrationConfig{}), CommandArbiterFilter::Untrusted::kNone);
+
+    auto f = makeFilter();
+    auto obs = std::array{o};
+    auto r = f.update(5.0, false, true, std::span{obs}, ArbitrationConfig{});
+    EXPECT_FALSE(r.safe_fallback);
+    EXPECT_EQ(r.winner, ControlSource::PURE_PURSUIT);
+}
+
+// 载荷被改但 checksum 仍为原线上值 → 重算会“通过”，透传则必被拒（#16 接线缺陷类）。
+TEST(ArbiterWiringGate, TamperedPayloadWithOriginalWireChecksumIsRejected) {
+    const auto honest = makeRaw(20);
+    const std::uint16_t wire = checksumRaw(honest);
+    auto tampered = honest;
+    tampered.pedal_ratio = 100;  // 例：截断/位翻转导致油门变化
+    auto o = makeWireSourceObs(ControlSource::PURE_PURSUIT, tampered, kCmdHead1, kCmdHead2, kCmdLength, wire, 5.0);
+    // 关键断言：若接线层像旧实现那样“以共用层重算”，此处将是 kNone（门失效）。
+    EXPECT_EQ(CommandArbiterFilter::classify(o, 5.0, ArbitrationConfig{}),
+              CommandArbiterFilter::Untrusted::kBadChecksum);
+
+    auto f = makeFilter();
+    auto obs = std::array{o};
+    auto r = f.update(5.0, false, true, std::span{obs}, ArbitrationConfig{});
+    EXPECT_TRUE(r.safe_fallback);
+    EXPECT_EQ(r.cmd.pedal_ratio, 0);
+    EXPECT_EQ(r.cmd.brake_force, ActuatorCalibration{}.emergencyBrakeRaw());
+}
+
+// 帧头/长度不合法（整帧错位）→ 即便 checksum 自洽也不可信。
+TEST(ArbiterWiringGate, BadFrameHeadIsRejected) {
+    const auto raw = makeRaw(20);
+    const auto good = checksumRaw(raw);
+    auto wrong_head = makeWireSourceObs(ControlSource::MPC, raw, 0x00, kCmdHead2, kCmdLength, good, 6.0);
+    EXPECT_FALSE(wrong_head.frame_valid);
+    EXPECT_EQ(CommandArbiterFilter::classify(wrong_head, 6.0, ArbitrationConfig{}),
+              CommandArbiterFilter::Untrusted::kBadFrame);
+    auto wrong_len = makeWireSourceObs(ControlSource::MPC, raw, kCmdHead1, kCmdHead2, 0x01, good, 6.0);
+    EXPECT_FALSE(wrong_len.frame_valid);
+}
+
+// 安全侧失效：忘置 frame_valid 的 SourceObs 不得静默通过。
+TEST(ArbiterWiringGate, MissingFrameValidityFlagFailsSafe) {
+    auto o = makeObs(ControlSource::PURE_PURSUIT, 40, 1.0);
+    o.frame_valid = false;
+    auto f = makeFilter();
+    auto obs = std::array{o};
+    auto r = f.update(1.0, false, true, std::span{obs}, ArbitrationConfig{});
+    EXPECT_TRUE(r.safe_fallback);
+    EXPECT_EQ(r.reason, ArbitrationReason::NO_TRUSTED_SOURCE);
+}
+
+// classify 与实际门一致：静默（present 但超龄）→ kStale，不刷新 winner。
+TEST(ArbiterWiringGate, SilentSourceClassifiedStale) {
+    auto o = makeObs(ControlSource::PURE_PURSUIT, 40, 10.0);
+    ArbitrationConfig cfg;
+    cfg.source_timeout_sec = 0.5;
+    EXPECT_EQ(CommandArbiterFilter::classify(o, 10.2, cfg), CommandArbiterFilter::Untrusted::kNone);
+    EXPECT_EQ(CommandArbiterFilter::classify(o, 11.0, cfg), CommandArbiterFilter::Untrusted::kStale);
 }

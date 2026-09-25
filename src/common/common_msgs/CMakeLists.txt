@@ -29,6 +29,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/HuatControlCommand.msg"
   "msg/HuatVehicleCmd.msg"
   "msg/HuatStop.msg"
+  "msg/HuatSystemState.msg"
   DEPENDENCIES std_msgs geometry_msgs
 )
 

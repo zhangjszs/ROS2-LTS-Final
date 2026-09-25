@@ -56,6 +56,8 @@ TOPIC_STOP="/system/stop"
 TOPIC_SRC_A="/control/vehicle_command"
 TOPIC_SRC_B="/mpc/vehicle_command"
 TOPIC_ARB_OUT="/vehicle_command_arb"
+# #16：任务×安全状态 + 仲裁遥测出口（contract::kTopicSystemState）。
+TOPIC_SYS_STATE="/system/state"
 
 ros2 run vehicle_simulator vehicle_simulator_node --ros-args -p use_sim_time:=true -p publish_clock:=true >build/qcc_sim.log 2>&1 & PIDS+=($!)
 ros2 run safety_monitor safety_monitor >build/qcc_safety.log 2>&1 & PIDS+=($!)
@@ -149,10 +151,19 @@ for t in "$TOPIC_STATE" "$TOPIC_PATH" "$TOPIC_COMMAND"; do
     fi
 done
 
-echo "=== 指令仲裁器接线（#16：源入 + 单一最终输出） ==="
+echo "=== 指令仲裁器接线（#16：源入 + 单一最终输出 + 状态遥测） ==="
 check_endpoints "$TOPIC_SRC_A" 0 1 || fail=1       # 仲裁器订阅 PP 源（本冒烟无发布者）
 check_endpoints "$TOPIC_SRC_B" 0 1 || fail=1       # 仲裁器订阅 MPC 源
 check_endpoints "$TOPIC_ARB_OUT" 1 0 || fail=1     # 仲裁器最终输出（启动即发布安全指令；本冒烟无订阅者）
+# 遥测出口：仲裁节点按控制率发布，当前无消费者（故障注入脚本订阅它作自动判据）。
+check_endpoints "$TOPIC_SYS_STATE" 1 0 || fail=1
+STATE_QOS="$(info_of "$TOPIC_SYS_STATE" | grep -oE 'Reliability: [A-Z_]+' | sort -u)"
+if grep -q RELIABLE <<<"$STATE_QOS"; then
+    echo "OK   $TOPIC_SYS_STATE RELIABLE"
+else
+    echo "FAIL $TOPIC_SYS_STATE 应为 RELIABLE，实际: ${STATE_QOS:-none}"
+    fail=1
+fi
 
 if [ "$fail" -ne 0 ]; then
     echo "Closed-loop contract/QoS integration smoke: FAILED"
