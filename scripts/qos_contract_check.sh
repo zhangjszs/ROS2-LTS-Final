@@ -73,7 +73,7 @@ ros2 run safety_monitor command_arbiter_node --ros-args -p topics.output:="$TOPI
 # 等五节点上节点图（最多 ~25s；单次查询限时，避免 CLI/daemon 异常时无限阻塞）
 ready=0
 for _ in $(seq 1 25); do
-    nodes="$(timeout 15 ros2 node list --no-daemon 2>/dev/null)"
+    nodes="$(timeout 8 ros2 node list 2>/dev/null)"
     if grep -q vehicle_simulator <<<"$nodes" && grep -q safety_monitor <<<"$nodes" &&
         grep -q velocity_profiler <<<"$nodes" && grep -q pure_pursuit <<<"$nodes" &&
         grep -q command_arbiter <<<"$nodes"; then
@@ -98,9 +98,11 @@ sleep 3
 fail=0
 
 # count_field <topic> <regex> -> 输出匹配数（单次查询限时）
-# --no-daemon：ros2cli daemon 的 socket 在 /tmp，环境不可写或有残留 daemon 时会返回空/旧数据
-# （本地与 CI 均观察到过）。直接查图与 daemon 状态解耦，代价是单次查询多几秒。
-info_of() { timeout 15 ros2 topic info --no-daemon "$1" -v 2>/dev/null; }
+# 用 daemon（默认）而**不是** --no-daemon：`ros2 topic info --no-daemon` 每次都在新进程里
+# 从零做一遍发现、端点尚未收敛就返回，把 pub/sub 数误报成 0（Jazzy CI 实测红）。
+# daemon 持续维护的缓存图才是这类断言可靠的前提。daemon socket 落在
+# tempfile.gettempdir()，故沙箱/只读 /tmp 环境请把 TMPDIR 指到可写目录（见 drive_gates.sh）。
+info_of() { timeout 10 ros2 topic info "$1" -v 2>/dev/null; }
 
 # check_endpoints <topic> [need_pub=1] [need_sub=1]
 # 闭环上除外部输入 raw_pathlimits（其发布者是规划器，本冒烟不拉起）外，均需 pub 与 sub 各 >=1。

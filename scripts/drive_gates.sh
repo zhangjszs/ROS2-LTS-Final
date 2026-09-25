@@ -22,6 +22,18 @@ mkdir -p "${OUT}"
 : "${ROS_HOME:=${ROOT}/build/.ros}"
 export ROS_HOME
 mkdir -p "${ROS_HOME}"
+# ros2cli daemon 的 socket 落在 tempfile.gettempdir()（默认 /tmp）。只读 /tmp 的环境里
+# daemon 根本起不来，`ros2 node list` 会返回空表、把全部节点误判为"未注册"。
+# 指到工作区内可写目录，而不是让各门禁脚本去绕 daemon。
+: "${TMPDIR:=${ROOT}/build/tmp}"
+export TMPDIR
+mkdir -p "${TMPDIR}"
+
+# 运行时门禁靠 ros2cli daemon 持续维护的图（`ros2 topic info --no-daemon` 会从零发现、
+# 端点未收敛就返回 0 —— 已在 Jazzy CI 实测导致误报，故不得改走 --no-daemon）。
+# 残留/空转的 daemon 会让 `ros2 node list` 返回空表、把全部节点误判为未注册；
+# 这里先停一次，后续调用会自动按当前 TMPDIR/ROS_HOME 重建（CI 上无旧 daemon，等于空操作）。
+timeout 20 ros2 daemon stop >/dev/null 2>&1 || true
 
 started_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 t0=$(date +%s)
@@ -50,6 +62,10 @@ fi
 if [ "${SKIP_SOURCE_WS:-0}" != 1 ]; then
     source_sh install/setup.bash
 fi
+
+# 全新 checkout 上构建前 install/ 还不存在，上面那次 source 会静默跳过；
+# 因此构建完成后必须再 source 一次，否则后续 `ros2 run <pkg>` 全部报"Package not found"。
+source_workspace() { source_sh install/setup.bash; }
 
 HARD_FAIL=0
 declare -a ROWS=()
@@ -91,6 +107,7 @@ if [ "${QUICK:-0}" != 1 ]; then
             -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DBUILD_TESTING=ON
         run_gate test-run 1 colcon test --packages-ignore ${IGNORE_PKGS}
         run_gate test-enforce 1 colcon test-result --verbose
+        source_workspace
     fi
 fi
 
