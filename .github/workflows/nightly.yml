@@ -1,0 +1,96 @@
+name: Nightly
+
+# 每晚跑**同一套**门禁入口 scripts/drive_gates.sh（与本地完全同一个脚本，不另写一份判据），
+# 目的有两个：
+#   1) 时间驱动的回归哨兵 —— 依赖/工具链漂移（ROS 发行版更新、rosdep 包变化）能在第二天暴露；
+#   2) 给 #16/#17 两条容差型集成门禁积累"连续绿"证据，攒够就把它们在 ci.yml 里的
+#      continue-on-error 摘掉转硬门禁（判据来自上传的 history.jsonl，而不是记忆或口头保证）。
+# workflow_dispatch 保留：可立即手动验证，不必等 cron。
+on:
+  schedule:
+    - cron: '0 18 * * *'   # 18:00 UTC ≈ 北京时间次日 02:00
+  workflow_dispatch: {}
+
+jobs:
+  drive-gates:
+    runs-on: ubuntu-24.04
+    # 兜底护栏：防任何步骤挂起拖到 GitHub 默认 6h（曾发生，见 #14 QoS 检查）
+    timeout-minutes: 60
+    env:
+      ROS_DISTRO: jazzy
+      CCACHE_DIR: ${{ github.workspace }}/.ccache
+      CI_IGNORE_PKGS: hello_world huat_launch
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install build tools (ccache, mold, clang-format, cppcheck, libgtest-dev)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ccache mold clang-format cppcheck libgtest-dev
+
+      - name: Prepare ROS 2 ${{ env.ROS_DISTRO }}
+        uses: ros-tooling/setup-ros@v0.7
+        with:
+          required-ros-distributions: ${{ env.ROS_DISTRO }}
+
+      - name: Restore ccache
+        uses: actions/cache@v4
+        with:
+          path: ${{ github.workspace }}/.ccache
+          key: ccache-${{ runner.os }}-${{ env.ROS_DISTRO }}-${{ hashFiles('colcon_defaults.yaml', 'src/**/CMakeLists.txt') }}
+          restore-keys: |
+            ccache-${{ runner.os }}-${{ env.ROS_DISTRO }}-
+
+      - name: Install dependencies (rosdep)
+        run: |
+          source "/opt/ros/${ROS_DISTRO}/setup.bash"
+          sudo rosdep init 2>/dev/null || true
+          rosdep update
+          rosdep install --from-paths src --ignore-src -r -y
+
+      # 单一入口：脚本内部自行 source ROS/工作区（set -u 下必须临时关 nounset 才能 source
+      # colcon 生成的 setup.sh —— 已在本地踩过），并跑全部硬门禁 + 两条容差观察门禁。
+      - name: Drive all gates (scripts/drive_gates.sh)
+        timeout-minutes: 50
+        run: bash scripts/drive_gates.sh
+
+      - name: Summarize gate results
+        if: always()
+        run: |
+          python3 - <<'PY' >>"$GITHUB_STEP_SUMMARY"
+          import json, os
+          path = "build/drive_gates/last.json"
+          if not os.path.isfile(path):
+              print("## drive_gates: 未产出 `last.json`（脚本提前失败）")
+              raise SystemExit(0)
+          d = json.load(open(path))
+          print(f"## drive_gates — {d['elapsed_s']}s, hard_fail={d['hard_fail']}")
+          print()
+          print("| gate | 类型 | 结果 | 秒 |")
+          print("| --- | --- | --- | --- |")
+          for g in d["gates"]:
+              kind = "hard" if g["hard"] else "observe"
+              print(f"| `{g['name']}` | {kind} | {g['status']} | {g['seconds']} |")
+          obs = [g for g in d["gates"] if not g["hard"]]
+          print()
+          print("观察项（转硬门禁前需连续绿）：" + ", ".join(
+              f"`{g['name']}`={g['status']}" for g in obs))
+          PY
+
+      - name: Upload gate evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          # 名字带 run 序号：把各次 nightly 的 history.jsonl 并起来就能数"连续几晚绿"
+          name: drive-gates-${{ github.run_number }}
+          path: |
+            build/drive_gates/last.json
+            build/drive_gates/history.jsonl
+            build/drive_gates/history.log
+            build/drive_gates/*.log
+            build/benchmark_regression/**/*.json
+            build/closed_loop_smoke/*.json
+            build/fault_injection/*.json
+          if-no-files-found: warn
+          retention-days: 30
