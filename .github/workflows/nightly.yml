@@ -73,9 +73,10 @@ jobs:
               kind = "hard" if g["hard"] else "observe"
               print(f"| `{g['name']}` | {kind} | {g['status']} | {g['seconds']} |")
           obs = [g for g in d["gates"] if not g["hard"]]
-          print()
-          print("观察项（转硬门禁前需连续绿）：" + ", ".join(
-              f"`{g['name']}`={g['status']}" for g in obs))
+          if obs:
+              print()
+              print("观察项（转硬门禁前需连续绿）：" + ", ".join(
+                  f"`{g['name']}`={g['status']}" for g in obs))
           PY
 
       - name: Upload gate evidence
