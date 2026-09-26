@@ -46,7 +46,7 @@ bash scripts/benchmark_regression.sh  # #17: offline deterministic core + inject
 # promoted from observing to hard CI gates after accumulating consecutive greens, see #17).
 # Both auto-exit within a wall-clock budget:
 bash scripts/closed_loop_sim_smoke.sh   # #17: sim→profiler→PP→sim really moves the car, command frames valid, KPI report lands
-bash scripts/closed_loop_fault_smoke.sh # #17: 闭环内注入 越界/反向/未完赛/超时，断言 KpiEvaluator 报告命中失败判据
+bash scripts/closed_loop_fault_smoke.sh # #17: 闭环内注入 越界/持续碰撞/反向/未完赛/超时，断言 KpiEvaluator 报告命中失败判据
 bash scripts/fault_injection_smoke.sh   # #16: 10 software fault cases judged from /system/state + /vehicle_command (no RViz/log eyeballing)
 ```
 

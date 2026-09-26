@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# #17：闭环故障样本冒烟 —— 在真实 ROS 多节点回路里注入 越界/反向/未完赛/超时，
+# #17：闭环故障样本冒烟 —— 在真实 ROS 多节点回路里注入 越界/持续碰撞/反向/未完赛/超时，
 # 断言闭环内的 track_benchmark(KpiEvaluator) 报告**真的命中对应失败判据**，而不是只在
 # 单测里证明判定逻辑（对齐 #17 验收：“人工构造…评测均能正确识别”）。
 #
 # 与 closed_loop_sim_smoke.sh 分工：那个证“回路是否闭合/数据在流动”（只跑正常相）；本脚本
-# 证“失败可被识别”（正常相作阳性对照 + 四类故障相）。
+# 证“失败可被识别”（正常相作阳性对照 + 五类故障相）。
 #
 # 回路：vehicle_simulator(物理 + /clock)
 #         → 参考路径喂入 /planning/raw_pathlimits
@@ -19,6 +19,7 @@
 # 场景与判据（读 $OUT_DIR/<name>.json）：
 #   nominal  正向跟完 1 圈   → run_status=finished 且 valid_laps>=1 且 out_of_bounds_events=0
 #   offroute 横向渐变偏置路径 → out_of_bounds_events>0
+#   collision 偏置落到锥桶线持续擦行 → collision_events>=5 且 cone_collisions>=5（缺口 #4）
 #   reverse  反向路径顺序     → net_arc_progress_m<0 且 valid_laps=0 且 best_valid_lap_time_s=0
 #   dnf      只喂最前一段路径 → run_status=incomplete 且 valid_laps=0 且 best_valid_lap_time_s=0
 #   timeout  限时 5s 跑全圈   → run_status=timeout 且 timed_out=true
@@ -51,6 +52,7 @@ REV_THETA="$(python3 -c 'import math; print(0.224453 + math.pi)')"  # 反向相�
 SCENARIOS=(
     "nominal|55|150|${START_THETA}|0.0|0|1"
     "offroute|30|100|${START_THETA}|0.0|4.0|1"
+    "collision|20|90|${START_THETA}|0.0|1.3|1"
     "reverse|30|100|${REV_THETA}|0.0|0|1"
     "dnf|30|100|${START_THETA}|0.0|0|1"
     "timeout|15|60|${START_THETA}|5.0|0|1"
@@ -137,6 +139,20 @@ class Feeder(Node):
             pts = [pts[0]] + list(reversed(pts[1:]))
         elif scenario == "dnf":
             pts = pts[: max(2, len(pts) // 5)]
+        elif scenario == "collision" and 0.9 <= offset_m <= 2.1:
+            # 缺口 #4：偏置快速落到锥桶线（位于 ±half_w=1.5m、沿程 ~0.64m 一排）后保持，
+            # 车沿桶线持续擦行 → 去重后的 collision_events 随行程不断增长（非单发事件）。
+            # 1.3m 在接触区间 [0.9,2.1] 居中且 |cte|<1.5 不越界，与 offroute 相互证不重叠。
+            out = []
+            n = len(pts)
+            ramp = max(1, n // 25)
+            for i, (x, y) in enumerate(pts):
+                a, b = pts[(i - 1) % n], pts[(i + 1) % n]
+                tx, ty = b[0] - a[0], b[1] - a[1]
+                norm = math.hypot(tx, ty) or 1.0
+                k = offset_m * min(1.0, i / ramp)
+                out.append((x - ty / norm * k, y + tx / norm * k))
+            pts = out
         elif scenario == "offroute" and offset_m != 0.0:
             # 恒定位移会被 PP 当飞点拒跟（车原地不动）；沿路径把位移从 0 渐变到 offset_m，
             # 车先对齐再被逐步带出合法走廊。
@@ -204,7 +220,7 @@ source_sh install/setup.bash
 
 required_nodes=(vehicle_simulator safety_monitor velocity_profiler pure_pursuit track_benchmark_node)
 
-echo "=== 闭环故障冒烟：${#SCENARIOS[@]} 个场景（正常对照 + 越界/反向/未完赛/超时） ==="
+echo "=== 闭环故障冒烟：${#SCENARIOS[@]} 个场景（正常对照 + 越界/持续碰撞/反向/未完赛/超时） ==="
 for spec in "${SCENARIOS[@]}"; do
     IFS='|' read -r name sim_dur wall_cap theta maxrt offset require_laps <<<"$spec"
     echo "--- 场景 $name（仿真 ${sim_dur}s / 墙钟上限 ${wall_cap}s，max_runtime=${maxrt}s，横向偏置 ${offset}m） ---"
@@ -285,6 +301,13 @@ def offroute(d):
     return ok, f"out_of_bounds_events={d['out_of_bounds_events']} samples={d['out_of_bounds_samples']}"
 
 
+def collision(d):
+    # 持续碰撞：去重后撞到的锥桶数随行程不断增长；阈值 5 远小于 20s 行程的理论撞桶数（~百），
+    # 对 DDS/调度抖动容差足够，又能把"只擦到 1-2 个"的单发事件判为不合格。
+    ok = d["collision_events"] >= 5 and d["cone_collisions"] >= 5
+    return ok, f"collision_events={d['collision_events']} cone_collisions={d['cone_collisions']}"
+
+
 def reverse(d):
     ok = d["net_arc_progress_m"] < 0 and d["valid_laps"] == 0 and d["best_valid_lap_time_s"] == 0
     return ok, f"net_arc_progress_m={d['net_arc_progress_m']} valid_laps={d['valid_laps']}"
@@ -300,7 +323,7 @@ def timeout(d):
     return ok, f"run_status={d['run_status']} timed_out={d['timed_out']}"
 
 
-checks = [("nominal", nominal), ("offroute", offroute), ("reverse", reverse), ("dnf", dnf), ("timeout", timeout)]
+checks = [("nominal", nominal), ("offroute", offroute), ("collision", collision), ("reverse", reverse), ("dnf", dnf), ("timeout", timeout)]
 fails = []
 for name, fn in checks:
     d, err = check(load(name))
@@ -316,7 +339,7 @@ for name, fn in checks:
 if fails:
     print("闭环故障冒烟 FAILED:", ", ".join(fails))
     sys.exit(1)
-print("闭环故障冒烟 PASS ✔  （越界/反向/未完赛/超时 均在闭环内被 KpiEvaluator 识别）")
+print("闭环故障冒烟 PASS ✔  （越界/持续碰撞/反向/未完赛/超时 均在闭环内被 KpiEvaluator 识别）")
 PY
 rc=$?
 if [ "$rc" -ne 0 ]; then
