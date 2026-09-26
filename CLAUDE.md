@@ -43,7 +43,8 @@ bash scripts/qos_contract_check.sh    # #14: live pub/sub endpoints + QoS on sto
 bash scripts/benchmark_regression.sh  # #17: offline deterministic core + injected fault negatives + track-source/baseline drift
 
 # Tolerance-based integration gates (multi-node DDS/scheduling jitter → no bit-exact claims;
-# currently continue-on-error in CI while observed). Both auto-exit within a wall-clock budget:
+# promoted from observing to hard CI gates after accumulating consecutive greens, see #17).
+# Both auto-exit within a wall-clock budget:
 bash scripts/closed_loop_sim_smoke.sh   # #17: sim→profiler→PP→sim really moves the car, command frames valid, KPI report lands
 bash scripts/closed_loop_fault_smoke.sh # #17: 闭环内注入 越界/反向/未完赛/超时，断言 KpiEvaluator 报告命中失败判据
 bash scripts/fault_injection_smoke.sh   # #16: 10 software fault cases judged from /system/state + /vehicle_command (no RViz/log eyeballing)
@@ -55,8 +56,8 @@ Do NOT write ad-hoc verification when a script above already covers a gate — e
 (same script the Nightly workflow uses), printing per-gate PASS/FAIL and writing machine-readable
 evidence to `build/drive_gates/{last.json,history.jsonl}`. `QUICK=1` = lint + no-ROS core only;
 `SKIP_BUILD=1` = skip build/test. Exit code reflects **hard** gates only; the tolerance-based
-integration gates (closed-loop / closed-loop-fault / fault-injection) are recorded as observations
-(they are `continue-on-error` in CI while observed).
+integration gates (closed-loop / closed-loop-fault / fault-injection) are hard gates too
+(their observing period ended via the evidence ledger in #17 — history.jsonl stays the source of truth).
 
 A fast commit-time gate (clang-format on staged C++ files only) ships in `scripts/git-hooks/pre-commit`. Install per clone: `cp scripts/git-hooks/pre-commit .git/hooks/ && chmod +x .git/hooks/pre-commit`.
 

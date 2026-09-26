@@ -109,30 +109,28 @@ jobs:
           source install/setup.bash
           bash scripts/benchmark_regression.sh
 
-      # 容差型集成门禁（#17 闭环 / #16 故障注入）：多节点 DDS+调度天然抖动，
-      # 先以观察期形式入 CI（失败不阻断合入），连续稳定后去掉 continue-on-error 转硬门禁。
-      # 判据与离线位级回归严格分开：后者才是每次 PR 的硬阻断（见上面 Benchmark regression）。
-      - name: Closed-loop simulation smoke (#17, tolerance-based, observing)
+      # 容差型集成门禁（#17 闭环 / #17 闭环故障样本 / #16 故障注入）：多节点 DDS+调度天然抖动，
+      # 不要求位级一致；观察期已在 main 69aec5b 前攒够连续绿（CI 步骤记录 + nightly
+      # drive_gates history.jsonl，判据与台账见 issue #17），自此转正为硬阻断，失败即挡合入。
+      # 与离线位级回归严格分开：后者要求逐字节一致（见上面 Benchmark regression）。
+      - name: Closed-loop simulation smoke (#17, tolerance-based)
         timeout-minutes: 6
-        continue-on-error: true
         run: |
           source "/opt/ros/${ROS_DISTRO}/setup.bash"
           source install/setup.bash
           bash scripts/closed_loop_sim_smoke.sh
 
       # #17 ④：闭环内真的注入 越界/反向/未完赛/超时，断言 KpiEvaluator 报告命中失败判据
-      # （不只是单测证明判定逻辑）。同样先以观察期入 CI。
-      - name: Closed-loop fault samples (#17, tolerance-based, observing)
+      # （不只是单测证明判定逻辑）。同为硬阻断。
+      - name: Closed-loop fault samples (#17, tolerance-based)
         timeout-minutes: 8
-        continue-on-error: true
         run: |
           source "/opt/ros/${ROS_DISTRO}/setup.bash"
           source install/setup.bash
           bash scripts/closed_loop_fault_smoke.sh
 
-      - name: Fault injection smoke (#16, software-observable subset, observing)
+      - name: Fault injection smoke (#16, software-observable subset)
         timeout-minutes: 8
-        continue-on-error: true
         run: |
           source "/opt/ros/${ROS_DISTRO}/setup.bash"
           source install/setup.bash

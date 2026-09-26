@@ -6,8 +6,8 @@
 #   SKIP_BUILD=1 bash scripts/drive_gates.sh # 只跑运行时门禁（已构建过时用）
 #   QUICK=1     bash scripts/drive_gates.sh # lint + 无 ROS 独立检查（秒级，改完就跑）
 #
-# 退出码只反映**硬门禁**；三条容差型集成门禁（闭环 / 闭环故障样本 / 故障注入）按 CI 语义记为观察项，
-# 红不翻转退出码，但会打印 [OBSERVE] 并计入 summary，供"观察期转硬门禁"积累证据。
+# 退出码只反映**硬门禁**；三条容差型集成门禁（闭环 / 闭环故障样本 / 故障注入）观察期已攒够
+# 连续绿（CI 步骤记录 + 本脚本 history.jsonl，台账见 #17），已随 ci.yml 转正为硬门禁。
 # 结果同时写成 build/drive_gates/last.json + 追加 build/drive_gates/history.{log,jsonl}，
 # 让任何定时机制（GitHub Actions cron / CI / agent）都读同一份证据而不是各自重述。
 # ==============================================================================
@@ -118,9 +118,9 @@ run_gate benchmark 1 bash scripts/benchmark_regression.sh
 if [ "${QUICK:-0}" != 1 ]; then
     run_gate headless-smoke 1 bash scripts/headless_smoke.sh
     run_gate qos-contract 1 bash scripts/qos_contract_check.sh
-    run_gate closed-loop 0 bash scripts/closed_loop_sim_smoke.sh
-    run_gate closed-loop-fault 0 bash scripts/closed_loop_fault_smoke.sh
-    run_gate fault-injection 0 bash scripts/fault_injection_smoke.sh
+    run_gate closed-loop 1 bash scripts/closed_loop_sim_smoke.sh
+    run_gate closed-loop-fault 1 bash scripts/closed_loop_fault_smoke.sh
+    run_gate fault-injection 1 bash scripts/fault_injection_smoke.sh
 fi
 
 elapsed=$(( $(date +%s) - t0 ))
@@ -157,7 +157,7 @@ elapsed=$(( $(date +%s) - t0 ))
 } >>"${OUT}/history.jsonl"
 
 if [ "${HARD_FAIL}" -eq 0 ]; then
-    echo "drive_gates: 硬门禁全部通过（${elapsed}s）；观察项见 ${OUT}/last.json"
+    echo "drive_gates: 全部硬门禁通过（${elapsed}s）；逐门结果见 ${OUT}/last.json"
 else
     echo "drive_gates: 有硬门禁失败（${elapsed}s）——见 ${OUT}/*.log"
 fi
