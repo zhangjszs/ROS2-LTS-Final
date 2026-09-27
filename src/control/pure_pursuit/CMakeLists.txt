@@ -109,9 +109,12 @@ if(BUILD_TESTING)
   target_link_libraries(test_defect_differential
     common_msgs::common_msgs
   )
-  # #22：pp_core::ThrottleController（纯 std core，仅 gtest + 包内 include）
+  # #22：pp_core::ThrottleController（纯 std core，仅 gtest + 包内 include + common_msgs 手写头）
   ament_add_gtest(test_throttle_controller
     test/test_throttle_controller.cpp
+  )
+  target_link_libraries(test_throttle_controller
+    common_msgs::common_msgs
   )
 endif()
 

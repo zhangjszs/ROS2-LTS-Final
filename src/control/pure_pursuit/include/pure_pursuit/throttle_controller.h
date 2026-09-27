@@ -11,6 +11,9 @@
 // ============================================================================
 #include <algorithm>
 #include <concepts>
+#include <span>
+
+#include "interface_contract.h"  // #29：显式剖面有效性 + 参考速度选择集中判定
 
 namespace pp_core {
 
@@ -30,6 +33,19 @@ concept ThrottleParamsLike = requires(const P& p) {
     { p.pedal_max } -> std::convertible_to<double>;
     { p.speed_blend_zone } -> std::convertible_to<double>;
 };
+
+// #29：油门目标选择——速度权威收敛点。显式剖面有效时取 idx 点速度
+// （与 MPC 同一 selectReferenceSpeed 口径，0=合法停车目标）；无效或越界
+// 时回退参数表（降级回退，不改变既有行为）。
+[[nodiscard]] inline double SelectThrottleTarget(bool has_explicit_speeds, std::span<const double> speeds,
+                                                 std::size_t idx, double fallback_target) {
+    if (has_explicit_speeds && idx < speeds.size()) {
+        const auto sel = common_msgs::contract::selectReferenceSpeed(true, speeds[idx], fallback_target);
+        if (sel.valid)
+            return sel.speed;
+    }
+    return fallback_target;
+}
 
 // 单输入（速度误差）PID + 速度边界 blend 的纵向油门控制器。
 class ThrottleController {

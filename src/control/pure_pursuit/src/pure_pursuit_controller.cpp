@@ -8,6 +8,7 @@
 #include <utility>
 #include <vector>
 
+#include "interface_contract.h"        // #14/#29：target_speeds 有效性 + 参考速度选择集中判定
 #include "interface_contract_qos.hpp"  // #14：stop 锁存 QoS 由契约单一来源构造
 #include "pure_pursuit/pp_math.h"
 #include "pure_pursuit/throttle_controller.h"  // #22：纵向油门控制律 core
@@ -106,6 +107,8 @@ void PurePursuitController::OnPathLimitsMessage(const common_msgs::msg::HuatPath
                              "[pure_pursuit] Received empty path, clearing reference");
         refx_.clear();
         refy_.clear();
+        ref_speeds_.clear();
+        has_explicit_speeds_ = false;
         last_goal_idx_ = -1;
         return;
     }
@@ -113,12 +116,20 @@ void PurePursuitController::OnPathLimitsMessage(const common_msgs::msg::HuatPath
     has_received_path_ = true;
     refx_.clear();
     refy_.clear();
+    ref_speeds_.clear();
     refx_.reserve(msgs->path.size());
     refy_.reserve(msgs->path.size());
+    ref_speeds_.reserve(msgs->target_speeds.size());
     last_goal_idx_ = -1;
     for (const auto& pt : msgs->path) {
         refx_.push_back(pt.x);
         refy_.push_back(pt.y);
+    }
+    // #29：速度权威收敛——显式剖面有效时油门目标走 profiler，参数表仅作降级回退。
+    has_explicit_speeds_ =
+        common_msgs::contract::targetSpeedsEffective(std::span<const double>{msgs->target_speeds}, msgs->path.size());
+    for (double s : msgs->target_speeds) {
+        ref_speeds_.push_back(s);
     }
     path_mode_++;
     RCLCPP_DEBUG(node_->get_logger(), "[pure_pursuit] Received path with %zu points", msgs->path.size());
@@ -258,6 +269,7 @@ void PurePursuitController::ComputeControlCommand(common_msgs::msg::HuatControlC
     RCLCPP_DEBUG(node_->get_logger(), "[pure_pursuit] Current path mode: %d", path_mode_);
     const auto& steer = params_.algorithm.steering;
     const auto& throt = params_.algorithm.throttle;
+
     float delta_max = steer.delta_max;
     int goal_idx = GetGoalIndex();
     const int path_len = static_cast<int>(refx_.size());
@@ -307,7 +319,12 @@ void PurePursuitController::ComputeControlCommand(common_msgs::msg::HuatControlC
                      steering_, current_speed_);
         steering_ = steering_calib_.encodeRad(cmd.steering_angle.data);
         // #22：纵向油门控制律抽到 pp_core::ThrottleController（P+I + 抗饱和 + 低/高速 blend + 限幅）。
-        pedal_ratio_ = throttle_ctrl_.update(current_speed_, throt);
+        // #29：显式剖面有效时油门目标取 goal 点速度（与 MPC 同一口径），无效时回退参数表。
+        auto throttle_params = throt;
+        throttle_params.target_speed = pp_core::SelectThrottleTarget(
+            has_explicit_speeds_, std::span<const double>{ref_speeds_.data(), ref_speeds_.size()},
+            static_cast<std::size_t>(std::max(goal_idx, 0)), throt.target_speed);
+        pedal_ratio_ = throttle_ctrl_.update(current_speed_, throttle_params);
         cmd.throttle.data = static_cast<float>(static_cast<int>(throttle_ctrl_.lastCurrent()));
         RCLCPP_DEBUG(node_->get_logger(), "[pure_pursuit] Throttle: %f, pedal ratio: %d", cmd.throttle.data,
                      pedal_ratio_);

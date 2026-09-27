@@ -2,6 +2,8 @@
 // 纯 std（无 ROS），验证与原节点内联实现逐条件等价：积分冻结/抗饱和/低高速定值/中段钳制/限幅/reset。
 #include <gtest/gtest.h>
 
+#include <vector>
+
 #include "pure_pursuit/throttle_controller.h"
 
 using pp_core::ThrottleController;
@@ -104,4 +106,25 @@ TEST(ThrottleController, ResetClearsIntegral) {
     EXPECT_GT(ctrl.integral(), 0.0);
     ctrl.reset();
     EXPECT_DOUBLE_EQ(ctrl.integral(), 0.0);
+}
+
+// #29：油门目标选择——显式剖面有效时取点速度，否则回退参数表。
+TEST(SelectThrottleTarget, ExplicitSpeedWins) {
+    const std::vector<double> speeds{5.0, 4.0, 0.0};
+    EXPECT_DOUBLE_EQ(pp_core::SelectThrottleTarget(true, speeds, 1, 10.0), 4.0);
+}
+
+TEST(SelectThrottleTarget, ZeroIsValidStopTarget) {
+    const std::vector<double> speeds{5.0, 0.0};
+    EXPECT_DOUBLE_EQ(pp_core::SelectThrottleTarget(true, speeds, 1, 10.0), 0.0);
+}
+
+TEST(SelectThrottleTarget, FallsBackWhenIneffective) {
+    const std::vector<double> speeds{5.0, 4.0};
+    EXPECT_DOUBLE_EQ(pp_core::SelectThrottleTarget(false, speeds, 1, 10.0), 10.0);
+}
+
+TEST(SelectThrottleTarget, FallsBackWhenOutOfRange) {
+    const std::vector<double> speeds{5.0};
+    EXPECT_DOUBLE_EQ(pp_core::SelectThrottleTarget(true, speeds, 7, 10.0), 10.0);
 }

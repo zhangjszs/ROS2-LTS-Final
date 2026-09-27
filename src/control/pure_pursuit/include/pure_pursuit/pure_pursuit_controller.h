@@ -84,4 +84,8 @@ class PurePursuitController {
     pp_core::ThrottleController throttle_ctrl_;  // #22：持有积分/抗饱和状态，替代散落的 sum_error_/long_current_
     std::vector<double> refx_;
     std::vector<double> refy_;
+    // #29：与 refx_/refy_ 同下标的逐点显式目标速度；有效（等长且逐点有限非负）时
+    // 油门目标走 profiler 剖面，无效时回退参数表（降级回退，见 ComputeControlCommand）。
+    std::vector<double> ref_speeds_;
+    bool has_explicit_speeds_{false};
 };
