@@ -152,8 +152,13 @@ void MpcControllerNode::SetupSubscribersAndPublishers() {
 void MpcControllerNode::OnCarState(const common_msgs::msg::HuatCarstate::ConstSharedPtr& msg) {
     // issue #12：来源年龄验证叠加在接收活性（last_state_time_）之外，防持续到达的延迟/旧戳状态刷新看门狗
     if (state_source_age_tolerance_sec_ >= 0.0) {
-        const double source_age = (now() - msg->header.stamp).seconds();
-        if (source_age > state_source_age_tolerance_sec_ || source_age < -state_source_age_tolerance_sec_) {
+        // #30：年龄判定委托租约（Stale=超龄，FromFuture=未来戳超容限；与原双边比较同语义）。
+        common_msgs::vehicle::FreshnessLease source_gate(
+            common_msgs::vehicle::LeaseConfig{state_source_age_tolerance_sec_, state_source_age_tolerance_sec_});
+        source_gate.observe(rclcpp::Time(msg->header.stamp).seconds());
+        const double now_sec = now().seconds();
+        if (source_gate.check(now_sec) != common_msgs::vehicle::Freshness::kFresh) {
+            const double source_age = now_sec - rclcpp::Time(msg->header.stamp).seconds();
             RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 1000,
                                  "[MPC] Stale/invalid vehicle_state (source age %.3fs, tol %.3fs), ignored", source_age,
                                  state_source_age_tolerance_sec_);
@@ -165,6 +170,7 @@ void MpcControllerNode::OnCarState(const common_msgs::msg::HuatCarstate::ConstSh
     current_theta_ = msg->car_state.theta;
     current_speed_ = msg->v;
     last_state_time_ = now();
+    state_arrival_.observe(last_state_time_.seconds());
     has_state_ = true;
 }
 
@@ -191,6 +197,7 @@ void MpcControllerNode::OnPath(const common_msgs::msg::HuatPathLimits::ConstShar
 
     reference_path_ = std::move(result.points);
     last_path_time_ = now();
+    path_arrival_.observe(last_path_time_.seconds());
     has_path_ = true;
 }
 
@@ -201,13 +208,17 @@ void MpcControllerNode::OnStop(const common_msgs::msg::HuatStop::ConstSharedPtr&
 void MpcControllerNode::ControlLoop() {
     rclcpp::Time current_time = now();
 
-    // 1. 安全看门狗检查
-    if (!has_state_ || !has_path_) {
+    // 1. 安全看门狗检查（#30：到达活性走租约；Absent=没来过，Stale=0.5s/1.0s 超时，与原判定同语义）
+    // has_* 保留：RejectedFrame 会清 has_path_，租约只管到达活性不管内容拒收。
+    using common_msgs::vehicle::Freshness;
+    const double now_sec = current_time.seconds();
+    if (!has_state_ || !has_path_ || state_arrival_.check(now_sec) == Freshness::kAbsent ||
+        path_arrival_.check(now_sec) == Freshness::kAbsent) {
         PublishEmergencyBrake();
         return;
     }
 
-    if ((current_time - last_state_time_).seconds() > 0.5 || (current_time - last_path_time_).seconds() > 1.0) {
+    if (state_arrival_.check(now_sec) == Freshness::kStale || path_arrival_.check(now_sec) == Freshness::kStale) {
         RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 1000, "[MPC] Timeout on state or path, braking!");
         PublishEmergencyBrake();
         return;

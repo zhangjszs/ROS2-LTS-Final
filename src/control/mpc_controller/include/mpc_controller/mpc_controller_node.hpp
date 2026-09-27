@@ -8,6 +8,7 @@
 #include "common_msgs/msg/huat_path_limits.hpp"
 #include "common_msgs/msg/huat_stop.hpp"
 #include "common_msgs/msg/huat_vehicle_cmd.hpp"
+#include "freshness_lease.h"  // #30：到达活性租约（来源年龄门 + 控制循环看门狗统一语义）
 #include "mpc_controller/mpc_model.hpp"
 #include "mpc_controller/mpc_params.hpp"
 #include "steering_calibration.h"   // 仓库约定：common_msgs 手写头不带前缀（同 cone_types.h）
@@ -56,6 +57,9 @@ class MpcControllerNode : public rclcpp::Node {
     rclcpp::Time last_state_time_;
     rclcpp::Time last_path_time_;
     double last_solve_time_ms_{0.0};
+    // #30：到达活性租约（与 last_*/has_* 双轨：租约做判定，老成员保留供遥测/诊断读取）。
+    common_msgs::vehicle::FreshnessLease state_arrival_{common_msgs::vehicle::LeaseConfig{0.5, 0.0}};
+    common_msgs::vehicle::FreshnessLease path_arrival_{common_msgs::vehicle::LeaseConfig{1.0, 0.0}};
 
     std::vector<ReferencePoint> reference_path_;
 

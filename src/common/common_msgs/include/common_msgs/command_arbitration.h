@@ -23,6 +23,7 @@
 #include <limits>
 #include <span>
 
+#include "freshness_lease.h"        // #30：到达年龄租约（classify stale 分支）
 #include "interface_contract.h"     // #14：sourceAgeAcceptable 等判定原语
 #include "task_state_machine.h"     // #16：SafetyState / TaskSafetyStateMachine
 #include "vehicle_command_codec.h"  // #15：VehicleCommandRaw / checksum / ActuatorCalibration
@@ -209,7 +210,10 @@ class CommandArbiterFilter {
             return Untrusted::kBadFrame;
         if (!verifyChecksum(o.cmd, o.checksum))
             return Untrusted::kBadChecksum;
-        if (!trustedAge(now_sec - o.last_rx_sec, cfg.source_timeout_sec))
+        // #30：到达年龄走租约（与 trustedAge 同语义：超时/未来戳均不可信；容差<0 即禁用）。
+        FreshnessLease age_gate(LeaseConfig{cfg.source_timeout_sec, 0.0});
+        age_gate.observe(o.last_rx_sec);
+        if (age_gate.check(now_sec) != Freshness::kFresh)
             return Untrusted::kStale;
         return Untrusted::kNone;
     }

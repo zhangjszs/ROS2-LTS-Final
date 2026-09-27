@@ -91,3 +91,7 @@ add_core_test(test_cone_tracker_differential
     SOURCES
         "${REPO_ROOT}/src/sensors/cone_tracker/test/test_cone_tracker_differential.cpp"
         "${REPO_ROOT}/src/sensors/cone_tracker/src/cone_dedup_algo.cpp")
+# #30：新鲜度租约语义（纯 std 头）
+add_core_test(test_freshness_lease
+    SOURCES
+        "${REPO_ROOT}/src/safety/safety_monitor/test/test_freshness_lease.cpp")

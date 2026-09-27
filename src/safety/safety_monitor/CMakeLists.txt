@@ -80,6 +80,13 @@ if(BUILD_TESTING)
   target_link_libraries(test_command_arbiter_filter
     common_msgs::common_msgs
   )
+  # #30：新鲜度租约语义（纯 std 头，只链 common_msgs）
+  ament_add_gtest(test_freshness_lease
+    test/test_freshness_lease.cpp
+  )
+  target_link_libraries(test_freshness_lease
+    common_msgs::common_msgs
+  )
 endif()
 
 ament_export_dependencies(

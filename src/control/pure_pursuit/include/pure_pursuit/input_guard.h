@@ -5,6 +5,8 @@
 #include <rclcpp/time.hpp>
 #include <span>
 
+#include "freshness_lease.h"  // #30：新鲜度/超时语义单一来源
+
 enum class GuardDecision { PROCEED, HARD_BRAKE, SOFT_BRAKE };
 
 struct GuardResult {
@@ -33,6 +35,9 @@ class InputGuard {
    private:
     double state_timeout_;  // 状态超时时间
     double path_timeout_;   // 路径超时时间
+    // #30：到达活性委托租约判定（mutable：check() 语义仍是只读判定）。
+    mutable common_msgs::vehicle::FreshnessLease state_lease_;
+    mutable common_msgs::vehicle::FreshnessLease path_lease_;
     std::uint8_t hard_brake_raw_;
     std::uint8_t soft_brake_raw_;
 };

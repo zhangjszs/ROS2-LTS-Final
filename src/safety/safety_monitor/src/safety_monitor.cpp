@@ -9,6 +9,7 @@
 #include "common_msgs/msg/huat_carstate.hpp"
 #include "common_msgs/msg/huat_path_limits.hpp"
 #include "common_msgs/msg/huat_stop.hpp"
+#include "freshness_lease.h"           // #30：planner 心跳租约
 #include "interface_contract_qos.hpp"  // #14：stop 锁存 QoS 由契约单一来源构造
 #include "safety_monitor/stop_state_machine.h"
 
@@ -36,6 +37,9 @@ class SafetyMonitor {
         node_->get_parameter("reset_stop_topic", reset_stop_topic);
 
         planner_timeout_ = rclcpp::Duration::from_seconds(planner_timeout);
+        // #30：看门狗心跳走租约（与 planner_timeout_ 同值；last_pathlimits_time_ 保留供遥测读取）。
+        planner_lease_ =
+            common_msgs::vehicle::FreshnessLease(common_msgs::vehicle::LeaseConfig{planner_timeout_.seconds(), 0.0});
 
         sub_pathlimits_ = node_->create_subscription<common_msgs::msg::HuatPathLimits>(
             pathlimits_topic, 10,
@@ -159,6 +163,7 @@ class SafetyMonitor {
             return;
         }
         last_pathlimits_time_ = node_->now();
+        planner_lease_.observe(last_pathlimits_time_.seconds());
         has_nonempty_pathlimits_ = true;
         auto result = state_machine_.onPathReceived();
         if (result.action == StopAction::CLEAR_STOP) {
@@ -174,6 +179,7 @@ class SafetyMonitor {
         std::scoped_lock lock(state_mutex_);
         if (!has_vehicle_state_) {
             last_pathlimits_time_ = node_->now();
+            planner_lease_.observe(last_pathlimits_time_.seconds());
         }
         has_vehicle_state_ = true;
         current_speed_ = msg->v;
@@ -215,8 +221,12 @@ class SafetyMonitor {
         if (!has_vehicle_state_)
             return;  // 先等待车辆状态
 
-        rclcpp::Duration elapsed = node_->now() - last_pathlimits_time_;
-        if (elapsed > planner_timeout_) {
+        // #30：心跳超时走租约判定（Stale=自上次非空 pathlimits 超时；Absent 不可能至此，仅防御）。
+        const double now_sec = node_->now().seconds();
+        if (planner_lease_.check(now_sec) != common_msgs::vehicle::Freshness::kStale)
+            return;
+        {
+            rclcpp::Duration elapsed = node_->now() - last_pathlimits_time_;
             auto result = state_machine_.onTimeoutExpired();
             if (result.action == StopAction::PUBLISH_STOP) {
                 const std::string warn_msg = std::format(
@@ -248,6 +258,8 @@ class SafetyMonitor {
 
     rclcpp::Time last_pathlimits_time_;
     rclcpp::Duration planner_timeout_ = rclcpp::Duration(0, 0);
+    // #30：planner 心跳租约（observe=非空 pathlimits 到达；check=看门狗判定）。
+    common_msgs::vehicle::FreshnessLease planner_lease_;
     bool has_vehicle_state_;
     bool has_nonempty_pathlimits_;
     StopStateMachine state_machine_;
