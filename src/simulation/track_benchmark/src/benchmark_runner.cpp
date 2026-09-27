@@ -12,6 +12,8 @@
 #include <string>
 #include <vector>
 
+// #19 B1：MPC 数学核（mpc_controller_lib，无 rclcpp 依赖）离线接入
+#include "mpc_controller/mpc_model.hpp"
 #include "track_benchmark/kpi_evaluator.hpp"
 #include "track_benchmark/track_generator.hpp"
 #include "vehicle_simulator/bicycle_model.hpp"
@@ -54,6 +56,10 @@ struct RunnerConfig {
     //   constant  全程固定限速，不看曲率
     std::string speed_source = "curvature";
     double const_speed_mps = 5.0;  // constant 口径的固定限速
+    // #19 B1：控制器选择。pure_pursuit（默认）走既有内联控制律，输出与 v1 基线
+    // 逐字节一致；mpc 复用同一被控对象/赛道/KpiEvaluator，只换控制律。
+    std::string controller = "pure_pursuit";
+    double mpc_update_period_s = 0.02;  // MPC 解算节拍，= ROS 节点 control_rate 50Hz
 };
 
 // 开环固定舵角 (rad)：取单一侧的小角度，使车辆持续向走廊外推进。
@@ -67,6 +73,33 @@ constexpr double kConeBiasRad = 0.05;
 
 [[nodiscard]] bool known_speed_source(const std::string& s) {
     return s == "curvature" || s == "constant";
+}
+
+[[nodiscard]] bool known_controller(const std::string& s) {
+    return s == "pure_pursuit" || s == "mpc";
+}
+
+// #19 B1：中心线 → MPC 参考路径（逐点显式速度按 --speed-source 口径，与 PP 同一剖面；
+// speed_valid=true 确保 MpcModel 不回填 target_speed，两种口径真正可区分）。
+[[nodiscard]] std::vector<mpc::ReferencePoint> build_mpc_reference(const std::vector<CenterlinePoint>& cl,
+                                                                   const std::string& speed_source, double const_speed,
+                                                                   double lat_accel_max, double v_max) {
+    std::vector<mpc::ReferencePoint> ref;
+    ref.reserve(cl.size());
+    for (const auto& p : cl) {
+        const double k = std::abs(p.curvature);  // 限速看幅值（与 PP 同一式）
+        const double v_curve =
+            (speed_source == "constant") ? const_speed : std::sqrt(lat_accel_max / std::max(k, 1e-3));
+        // .curvature 传带符号值：MPC 前馈项 d(1) = -v·κ·Ts 依赖转向方向；skidpad/trackdrive 生成器
+        // 已给出符号（track_generator.cpp:145），而 PP 基线口径只取幅值限速，两者不互相影响。
+        ref.push_back({.x = p.x,
+                       .y = p.y,
+                       .theta = p.theta,
+                       .curvature = p.curvature,
+                       .speed = std::min(v_max, v_curve),
+                       .speed_valid = true});
+    }
+    return ref;
 }
 
 [[nodiscard]] std::optional<TrackDefinition> make_track(const std::string& name) {
@@ -113,6 +146,10 @@ RunResult run(const RunnerConfig& cfg) {
         res.run_status = "bad_speed_source";
         return res;
     }
+    if (!known_controller(cfg.controller)) {
+        res.run_status = "bad_controller";
+        return res;
+    }
     const bool reverse = (cfg.inject == "reverse");
     auto track = make_track(cfg.track);
     if (!track) {
@@ -150,6 +187,34 @@ RunResult run(const RunnerConfig& cfg) {
     size_t guard = 0;
     const size_t max_steps = static_cast<size_t>(cfg.timeout_s / cfg.dt) + 10;
 
+    // #19 B1：MPC 分支 —— 同一被控对象/赛道/KpiEvaluator，只换控制律。
+    // 解算节拍 = mpc_update_period_s（50Hz，与 ROS 节点 control_rate 一致），
+    // 节拍之间 ZOH 保持上一次解；求解失败保持上次指令（失败降级统计属 B2）。
+    const bool use_mpc = (cfg.controller == "mpc");
+    const size_t solve_every = std::max<size_t>(1, static_cast<size_t>(cfg.mpc_update_period_s / cfg.dt + 0.5));
+    mpc::MpcConfig mpc_cfg{};
+    mpc_cfg.system.wheelbase = vp.wheelbase;  // 被控对象真值轴距 (#19 B0 同源)
+    mpc_cfg.horizon.Ts = cfg.mpc_update_period_s;
+    mpc_cfg.horizon.Np = static_cast<size_t>(0.76 / cfg.mpc_update_period_s + 0.5);  // 物理时长 0.76s (D9)
+    mpc_cfg.horizon.Nc = static_cast<size_t>(0.50 / cfg.mpc_update_period_s + 0.5);  // 物理时长 0.50s (D9)
+    mpc_cfg.limits.max_steer_rad = vp.max_steer_angle;
+    mpc_cfg.limits.max_steer_rate = vp.max_steer_rate;
+    mpc_cfg.limits.min_accel = -vp.max_decel;
+    mpc_cfg.limits.max_accel = vp.max_accel;
+    mpc::MpcModel mpc_model(mpc_cfg);
+    std::vector<mpc::ReferencePoint> mpc_ref =
+        build_mpc_reference(cl, cfg.speed_source, cfg.const_speed_mps, cfg.lat_accel_max, vp.max_speed);
+    if (closed) {
+        // 闭环回绕：MpcModel::Step 取 best_idx 后 Np 点、无回绕语义（与 ROS 节点开路径一致，
+        // 不动共享核）；离线侧把头部再拼一段，使末端时域看到的仍是真实弯道而非切线外推。
+        mpc_ref.reserve(mpc_ref.size() + mpc_cfg.horizon.Np);
+        for (size_t k = 0; k < mpc_cfg.horizon.Np; ++k)
+            mpc_ref.push_back(mpc_ref[k]);
+    }
+    bool mpc_has_cmd = false;  // 首次成功求解前保持零指令
+    double mpc_steer = 0.0;
+    double mpc_accel = 0.0;
+
     while (t <= cfg.timeout_s && guard++ < max_steps) {
         const VehicleState s = model.state();
         if (!std::isfinite(s.x) || !std::isfinite(s.y) || !std::isfinite(s.theta)) {
@@ -161,25 +226,47 @@ RunResult run(const RunnerConfig& cfg) {
 
         size_t idx = 0;
         eval.ComputeCrossTrackError(s.x, s.y, s.theta, &idx);
-        const double ld = cfg.lookahead_base + cfg.lookahead_gain * s.v;
-        const size_t ti = lookahead_index(cl, s, idx, ld, closed, reverse ? -1 : 1);
 
-        // 纯跟踪转向
-        const double dx = cl[ti].x - s.x;
-        const double dy = cl[ti].y - s.y;
-        const double lx = dx * std::cos(s.theta) + dy * std::sin(s.theta);
-        const double ly = -dx * std::sin(s.theta) + dy * std::cos(s.theta);
-        const double d = std::max(std::hypot(dx, dy), 1e-3);
-        const double alpha = std::atan2(ly, lx);
-        double steer = std::atan(2.0 * vp.wheelbase * std::sin(alpha) / d);
-        steer = std::clamp(steer, -vp.max_steer_angle, vp.max_steer_angle);
+        double steer = 0.0;
+        double accel = 0.0;
+        if (use_mpc) {
+            if (guard % solve_every == 0) {
+                const auto sol = mpc_model.Step(s.x, s.y, s.theta, s.v, mpc_steer, mpc_accel, mpc_ref);
+                if (sol.success) {
+                    mpc_steer = sol.steering_rad;
+                    mpc_accel = sol.accel_mps2;
+                    mpc_has_cmd = true;
+                }
+                // 失败：保持上次指令（首步即失败则维持零指令）
+            }
+            steer = mpc_steer;
+            accel = mpc_accel;
+            if (mpc_has_cmd) {
+                steer = std::clamp(steer, -vp.max_steer_angle, vp.max_steer_angle);
+                accel = std::clamp(accel, -vp.max_decel, vp.max_accel);
+            }
+        } else {
+            const double ld = cfg.lookahead_base + cfg.lookahead_gain * s.v;
+            const size_t ti = lookahead_index(cl, s, idx, ld, closed, reverse ? -1 : 1);
 
-        // 曲率限速 + P 控制器（--speed-source constant 时改用固定限速，作公平对比的另一口径）
-        const double kappa = std::abs(cl[idx].curvature);
-        const double v_curve = (cfg.speed_source == "constant") ? cfg.const_speed_mps
-                                                                : std::sqrt(cfg.lat_accel_max / std::max(kappa, 1e-3));
-        const double v_ref = std::min(vp.max_speed, v_curve);
-        double accel = std::clamp(cfg.speed_kp * (v_ref - s.v), -vp.max_decel, vp.max_accel);
+            // 纯跟踪转向
+            const double dx = cl[ti].x - s.x;
+            const double dy = cl[ti].y - s.y;
+            const double lx = dx * std::cos(s.theta) + dy * std::sin(s.theta);
+            const double ly = -dx * std::sin(s.theta) + dy * std::cos(s.theta);
+            const double d = std::max(std::hypot(dx, dy), 1e-3);
+            const double alpha = std::atan2(ly, lx);
+            steer = std::atan(2.0 * vp.wheelbase * std::sin(alpha) / d);
+            steer = std::clamp(steer, -vp.max_steer_angle, vp.max_steer_angle);
+
+            // 曲率限速 + P 控制器（--speed-source constant 时改用固定限速，作公平对比的另一口径）
+            const double kappa = std::abs(cl[idx].curvature);
+            const double v_curve = (cfg.speed_source == "constant")
+                                       ? cfg.const_speed_mps
+                                       : std::sqrt(cfg.lat_accel_max / std::max(kappa, 1e-3));
+            const double v_ref = std::min(vp.max_speed, v_curve);
+            accel = std::clamp(cfg.speed_kp * (v_ref - s.v), -vp.max_decel, vp.max_accel);
+        }
 
         // 故障注入（均基于仿真时间，位级可复现）
         if (cfg.inject == "stuck" && t >= cfg.freeze_after_s)
@@ -210,6 +297,7 @@ RunResult run(const RunnerConfig& cfg) {
 
     KpiSummary summary = eval.GetSummary();
     summary.track_name = track->name;
+    summary.controller_name = use_mpc ? "MPC" : "PurePursuit";  // #19 B1：MPC 路径标记；PP 与基线常量同值
     summary.elapsed_s = t;
     const bool laps_ok = !closed || cfg.require_laps == 0 || summary.valid_laps >= cfg.require_laps;
     const bool rmse_ok = !(summary.total_samples > 0 && summary.rmse_lateral_m > cfg.rmse_max);
@@ -235,10 +323,12 @@ void print_usage() {
               << "       [--require-laps N] [--timeout S] [--rmse-max M] [--lookahead-base M]\n"
               << "       [--inject none|offroute|cone|reverse|stuck] [--freeze-after S]\n"
               << "       [--speed-source curvature|constant] [--const-speed MPS]\n"
+              << "       [--controller pure_pursuit|mpc] [--mpc-update-period S]\n"
               << "       [--out FILE.json]\n"
               << "       [--export-tracks DIR]   # 导出唯一赛道来源（CSV + tracks.json）后退出\n"
               << "  --inject: #17 人工构造故障场景（退出码非 0，并应在 JSON 里命中对应判据字段）\n"
-              << "  --speed-source: #19 A 速度口径（constant = 全程固定限速，与 curvature 同控制器同赛道对比）\n";
+              << "  --speed-source: #19 A 速度口径（constant = 全程固定限速，与 curvature 同控制器同赛道对比）\n"
+              << "  --controller: #19 B1 控制律（mpc = 离线 MPC 数学核；默认 pure_pursuit 与 v1 基线位级一致）\n";
 }
 
 // #17：把生成器几何导出为仿真器可直接消费的 CSV + 清单。回归脚本拿它与仓内已提交 CSV 做
@@ -288,6 +378,10 @@ int main(int argc, char** argv) {
             cfg.freeze_after_s = std::stod(next("3"));
         else if (a == "--speed-source")
             cfg.speed_source = next("curvature");
+        else if (a == "--controller")
+            cfg.controller = next("pure_pursuit");
+        else if (a == "--mpc-update-period")
+            cfg.mpc_update_period_s = std::stod(next("0.02"));
         else if (a == "--const-speed")
             cfg.const_speed_mps = std::stod(next("5"));
         else if (a == "--out")
@@ -311,8 +405,8 @@ int main(int argc, char** argv) {
         else
             std::cerr << "WARN: cannot write " << cfg.out << "\n";
     }
-    std::cerr << "[benchmark_runner] track=" << cfg.track << " inject=" << cfg.inject
-              << " speed_source=" << cfg.speed_source << " status=" << res.run_status
+    std::cerr << "[benchmark_runner] track=" << cfg.track << " controller=" << cfg.controller
+              << " inject=" << cfg.inject << " speed_source=" << cfg.speed_source << " status=" << res.run_status
               << " laps=" << res.summary.valid_laps << " rmse=" << res.summary.rmse_lateral_m << "\n";
     return res.ok ? 0 : 1;
 }

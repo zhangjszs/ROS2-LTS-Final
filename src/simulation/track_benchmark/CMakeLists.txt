@@ -16,6 +16,9 @@ find_package(nav_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(visualization_msgs REQUIRED)
 find_package(vehicle_simulator REQUIRED)
+# #19 B1：离线 runner 接入 MPC 数学核（mpc_controller_lib 无 rclcpp 依赖，仅链 ROS 基础消息库）
+find_package(mpc_controller REQUIRED)
+find_package(Eigen3 REQUIRED)  # mpc_model.hpp 自带 Eigen 头（与 mpc_controller 同一老式依赖声明）
 
 include_directories(
   include
@@ -51,10 +54,15 @@ target_link_libraries(track_benchmark_node
 
 # #17-B：离线确定性核心回归 runner（纯定步长积分，不依赖 ROS 调度）
 add_executable(benchmark_runner src/benchmark_runner.cpp)
-target_include_directories(benchmark_runner PRIVATE ${vehicle_simulator_INCLUDE_DIRS})
+target_include_directories(benchmark_runner PRIVATE
+  ${vehicle_simulator_INCLUDE_DIRS}
+  ${mpc_controller_INCLUDE_DIRS}
+  ${EIGEN3_INCLUDE_DIR}
+)
 target_link_libraries(benchmark_runner
   track_benchmark_lib
   ${vehicle_simulator_LIBRARIES}
+  ${mpc_controller_LIBRARIES}
   common_msgs::common_msgs
 )
 

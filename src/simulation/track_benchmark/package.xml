@@ -16,6 +16,8 @@
   <depend>std_msgs</depend>
   <depend>visualization_msgs</depend>
   <depend>vehicle_simulator</depend>
+  <!-- #19 B1：benchmark_runner 链 MPC 数学核 (mpc_controller_lib) -->
+  <depend>mpc_controller</depend>
 
   <test_depend>ament_cmake_gtest</test_depend>
   <test_depend>ament_lint_auto</test_depend>

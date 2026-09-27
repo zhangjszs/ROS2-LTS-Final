@@ -91,3 +91,51 @@ TEST(BoxQpSolverTest, ReportsNonConvergenceEvidenceAtIterationLimit) {
     EXPECT_GT(result.primal_tolerance, 0.0);
     EXPECT_GT(result.dual_tolerance, 0.0);
 }
+
+// #19 B1：耦合 2x2 小问题，解析最优只有一个分量贴边（可用 KKT 手验）：
+// min 1/2 x^T [[4,1],[1,3]] x - [8,6]^T x, s.t. x in [-1.5, 1.5] x [-2, 2]
+// x1* = 1.5（上界活动，梯度 4*1.5+1.5-8 = -0.5 ≤ 0 与上界一致），
+// x2* = (6 - x1)/3 = 1.5（内部，梯度为 0）。
+TEST(BoxQpSolverTest, AnalyticSolutionWithSingleActiveBound) {
+    BoxQpSolver solver;
+
+    Eigen::MatrixXd H(2, 2);
+    H << 4.0, 1.0, 1.0, 3.0;
+    Eigen::VectorXd g(2);
+    g << -8.0, -6.0;
+    Eigen::VectorXd lb(2);
+    lb << -1.5, -2.0;
+    Eigen::VectorXd ub(2);
+    ub << 1.5, 2.0;
+
+    const auto res = solver.Solve(H, g, lb, ub);
+
+    ASSERT_TRUE(res.converged);
+    EXPECT_NEAR(res.x(0), 1.5, 5e-3);
+    EXPECT_NEAR(res.x(1), 1.5, 5e-3);
+}
+
+// #19 B1：Reset() 必须丢弃跨问题残留的内状态：同一实例解完一个 QP 后
+// Reset 再解原问题，结果与首解一致（不热启动不可幂等则说明状态残留）。
+TEST(BoxQpSolverTest, ResetDropsCarriedOverAdmmState) {
+    BoxQpSolver solver;
+    Eigen::MatrixXd H(2, 2);
+    H << 2.0, 0.0, 0.0, 2.0;
+    Eigen::VectorXd g(2);
+    g << -4.0, -6.0;
+    Eigen::VectorXd lb(2);
+    lb << -10.0, -10.0;
+    Eigen::VectorXd ub(2);
+    ub << 10.0, 10.0;
+
+    const auto first = solver.Solve(H, g, lb, ub);
+    // 中途去解一个异号、同维的无关问题，然后 Reset 回到原问题
+    Eigen::VectorXd g_neg = -g;
+    solver.Solve(H, g_neg, lb, ub);
+    solver.Reset();
+    const auto after = solver.Solve(H, g, lb, ub);
+
+    ASSERT_TRUE(after.converged);
+    EXPECT_NEAR(after.x(0), first.x(0), 1e-9);
+    EXPECT_NEAR(after.x(1), first.x(1), 1e-9);
+}
