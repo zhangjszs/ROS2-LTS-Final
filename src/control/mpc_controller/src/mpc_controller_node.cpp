@@ -44,14 +44,15 @@ MpcControllerNode::MpcControllerNode(const rclcpp::NodeOptions& options) : Node(
 }
 
 void MpcControllerNode::LoadParameters() {
+    // 默认值与 config/mpc_params.yaml 逐值一致（#19 B0，真值源: simulator_params.yaml）
     declare_parameter<double>("system.control_rate", 50.0);
     declare_parameter<double>("system.startup_delay", 0.0);
     declare_parameter<int>("system.racing_num", 1);
-    declare_parameter<double>("system.wheelbase", 1.53);
+    declare_parameter<double>("system.wheelbase", 1.55);
 
-    declare_parameter<int>("mpc.horizon_steps", 15);
-    declare_parameter<int>("mpc.control_horizon", 10);
-    declare_parameter<double>("mpc.sample_time", 0.05);
+    declare_parameter<int>("mpc.horizon_steps", 38);
+    declare_parameter<int>("mpc.control_horizon", 25);
+    declare_parameter<double>("mpc.sample_time", 0.02);
     declare_parameter<double>("mpc.target_speed", 8.0);
 
     declare_parameter<double>("mpc.weight_lat_error", 50.0);
@@ -62,12 +63,13 @@ void MpcControllerNode::LoadParameters() {
     declare_parameter<double>("mpc.weight_steer_rate", 8.0);
     declare_parameter<double>("mpc.weight_accel_rate", 2.0);
 
-    declare_parameter<double>("mpc.max_steer_rad", 0.436332);
+    declare_parameter<double>("mpc.max_steer_rad", 0.40);
     declare_parameter<double>("mpc.max_steer_rate", 3.0);
     declare_parameter<double>("mpc.min_accel", -4.0);
     declare_parameter<double>("mpc.max_accel", 3.0);
 
     // 转向指令编码（issue #2）：默认与仿真器/评测一致（零位 90，1 raw/度，±25°），真实底盘协议由参数覆盖
+    // 注: raw 量程是编码器行程边界，保持不派生自 mpc.max_steer_rad（#19 B0 收敛的是预测模型物理约束）
     declare_parameter<double>("steering.neutral", 90.0);
     declare_parameter<double>("steering.units_per_degree", 1.0);
     declare_parameter<double>("steering.min_raw", 65.0);
@@ -96,8 +98,8 @@ void MpcControllerNode::LoadParameters() {
     get_parameter("system.racing_num", config_.system.racing_num);
     get_parameter("system.wheelbase", config_.system.wheelbase);
 
-    int np = 15;
-    int nc = 10;
+    int np = 38;
+    int nc = 25;
     get_parameter("mpc.horizon_steps", np);
     get_parameter("mpc.control_horizon", nc);
     config_.horizon.Np = static_cast<size_t>(std::max(3, np));

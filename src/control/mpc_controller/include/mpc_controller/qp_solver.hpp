@@ -59,6 +59,16 @@ class BoxQpSolver {
     void SetSettings(const QpSettings& settings) noexcept { settings_ = settings; }
     [[nodiscard]] const QpSettings& GetSettings() const noexcept { return settings_; }
 
+    /**
+     * @brief 清空跨问题残留的 ADMM 内状态 (z/y)
+     * 盒约束 ADMM 的热启动只对"同一问题的连续求解"有效；若用同一实例求解另一个
+     * QP（如纠偏符号翻转），维数相同但携带的对偶状态会污染迭代。
+     */
+    void Reset() noexcept {
+        y_ = Eigen::VectorXd();
+        z_ = Eigen::VectorXd();
+    }
+
    private:
     QpSettings settings_;
     Eigen::VectorXd y_;  // 对偶变量 (Lagrange 乘子)

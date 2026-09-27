@@ -5,11 +5,13 @@
 
 namespace mpc {
 
+// 车辆几何/执行器默认值真值源: src/simulation/vehicle_simulator/config/simulator_params.yaml
+// (#19 B0) 未加载 mpc_params.yaml 时的回退默认值，须与 YAML 逐值一致。
 struct SystemParams {
     double control_rate{50.0};
     double startup_delay{0.0};
     int racing_num{1};
-    double wheelbase{1.53};
+    double wheelbase{1.55};
 };
 
 struct MpcWeights {
@@ -23,16 +25,17 @@ struct MpcWeights {
 };
 
 struct MpcLimits {
-    double max_steer_rad{0.436332};  // 最大转角 (25度)
-    double max_steer_rate{3.0};      // 最大角速度 (rad/s)
-    double min_accel{-4.0};          // 最大制动减速度 (m/s^2)
-    double max_accel{3.0};           // 最大驱动加速度 (m/s^2)
+    // max_steer_rad: 最大转角 (rad)，= 仿真器 max_steer_angle 真值 (#19 B0)
+    double max_steer_rad{0.40};
+    double max_steer_rate{3.0};  // 最大角速度 (rad/s)
+    double min_accel{-4.0};      // 最大制动减速度 (m/s^2)
+    double max_accel{3.0};       // 最大驱动加速度 (m/s^2)
 };
 
 struct MpcHorizon {
-    size_t Np{15};             // 预测时域长度
-    size_t Nc{10};             // 控制时域长度
-    double Ts{0.05};           // 控制步长 (s)
+    size_t Np{38};             // 预测时域长度 (38 x 0.02s ≈ 0.76s, #19 B0 等时长换算)
+    size_t Nc{25};             // 控制时域长度 (25 x 0.02s = 0.50s)
+    double Ts{0.02};           // 控制步长 (s), 与 1/control_rate 一致
     double target_speed{8.0};  // 巡航目标车速 (m/s)
 };
 

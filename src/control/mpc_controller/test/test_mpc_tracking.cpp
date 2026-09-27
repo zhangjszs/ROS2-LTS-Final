@@ -6,10 +6,11 @@ using namespace mpc;
 
 TEST(MpcModelTest, StraightLineLateralErrorCorrection) {
     MpcConfig config;
-    config.system.wheelbase = 1.53;
-    config.horizon.Np = 15;
-    config.horizon.Nc = 10;
-    config.horizon.Ts = 0.05;
+    // 显式赋值与 #19 B0 后的默认值/真值源一致 (wheelbase 1.55, Ts 0.02, 等时长时域)
+    config.system.wheelbase = 1.55;
+    config.horizon.Np = 38;
+    config.horizon.Nc = 25;
+    config.horizon.Ts = 0.02;
     config.horizon.target_speed = 8.0;
 
     MpcModel model(config);
@@ -87,10 +88,10 @@ TEST(MpcModelTest, ExplicitZeroSpeedRemainsAStopTarget) {
 // issue #3：同一几何轨迹分别以 map（非零平移+非零航向）与 base_link（局部契约）输入，控制解应等价
 TEST(MpcModelTest, GlobalAndLocalFrameInputsYieldEquivalentControls) {
     MpcConfig config;
-    config.system.wheelbase = 1.53;
-    config.horizon.Np = 15;
-    config.horizon.Nc = 10;
-    config.horizon.Ts = 0.05;
+    config.system.wheelbase = 1.55;
+    config.horizon.Np = 38;
+    config.horizon.Nc = 25;
+    config.horizon.Ts = 0.02;
     config.horizon.target_speed = 8.0;
     MpcModel model(config);
 

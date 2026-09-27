@@ -1,15 +1,21 @@
+# 车辆几何/执行器真值源: src/simulation/vehicle_simulator/config/simulator_params.yaml
+# (#19 B0 / F1) wheelbase、max_steer_rad、max_steer_rate 必须与真值源逐值一致；
+# 修改真值源时须同步本文件，否则 MPC 预测模型与被控对象失配。
 /**:
   ros__parameters:
     system:
       control_rate: 50.0
       startup_delay: 0.0
       racing_num: 1
-      wheelbase: 1.53
+      wheelbase: 1.55
 
     mpc:
-      horizon_steps: 15
-      control_horizon: 10
-      sample_time: 0.05
+      # (#19 B0 / F2) sample_time 与 1/control_rate 统一为 0.02s；
+      # 预测时域物理长度守恒: 15 x 0.05 = 0.75s -> 38 x 0.02 = 0.76s；
+      # 控制时域同比: 10 x 0.05 = 0.50s -> 25 x 0.02 = 0.50s。见 .omc/unattended/decisions.md D9。
+      horizon_steps: 38
+      control_horizon: 25
+      sample_time: 0.02
       target_speed: 8.0
 
       # 状态跟踪与终态权重
@@ -23,8 +29,8 @@
       weight_steer_rate: 8.0
       weight_accel_rate: 2.0
 
-      # 执行器物理约束
-      max_steer_rad: 0.436332   # 25 度
+      # 执行器物理约束 (与 simulator_params.yaml 逐值一致)
+      max_steer_rad: 0.40       # 仿真器 max_steer_angle 真值 (rad)
       max_steer_rate: 3.0       # rad/s
       min_accel: -4.0           # m/s^2
       max_accel: 3.0            # m/s^2

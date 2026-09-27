@@ -17,7 +17,7 @@ MpcSolution MpcModel::Step(double current_x, double current_y, double current_th
     const size_t Np = config_.horizon.Np;
     const size_t Nc = config_.horizon.Nc;
     const double Ts = config_.horizon.Ts;
-    const double L = (config_.system.wheelbase > 0.5) ? config_.system.wheelbase : 1.53;
+    const double L = (config_.system.wheelbase > 0.5) ? config_.system.wheelbase : 1.55;
 
     // 1. 寻找参考路径上距离车辆当前位置最近的航路点
     size_t best_idx = 0;
@@ -191,7 +191,9 @@ MpcSolution MpcModel::Step(double current_x, double current_y, double current_th
         ub(j * kNu + 1) = accel_max;
     }
 
-    // 8. 调用 ADMM QP 求解器
+    // 8. 调用 ADMM QP 求解器（每次 Step 是独立 QP：先清跨问题残留的内状态，
+    // 同实例连续解异号纠偏场景会因陈旧对偶变量无法收敛，#19 B0 新时域暴露）
+    qp_solver_.Reset();
     QpResult qp_res = qp_solver_.Solve(H, g, lb, ub);
 
     const bool acceptable_approximation =
