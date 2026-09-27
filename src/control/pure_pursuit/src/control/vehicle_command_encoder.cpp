@@ -38,16 +38,3 @@ uint16_t VehicleCommandEncoder::computeChecksum(std::span<const uint8_t> payload
 bool VehicleCommandEncoder::verifyChecksum(std::span<const uint8_t> payload, uint16_t expected_checksum) {
     return computeChecksum(payload) == expected_checksum;
 }
-
-uint16_t VehicleCommandEncoder::computeChecksum(const common_msgs::msg::HuatVehicleCmd& cmd) {
-    // #15：委托共用编解码层的累加和（与 MPC/仿真解码同一来源，杜绝漂移）。
-    common_msgs::vehicle::VehicleCommandRaw raw;
-    raw.steering = cmd.steering;
-    raw.brake_force = cmd.brake_force;
-    raw.pedal_ratio = cmd.pedal_ratio;
-    raw.gear_position = cmd.gear_position;
-    raw.working_mode = cmd.working_mode;
-    raw.racing_num = cmd.racing_num;
-    raw.racing_status = cmd.racing_status;
-    return common_msgs::vehicle::checksumRaw(raw);
-}

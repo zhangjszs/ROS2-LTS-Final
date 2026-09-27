@@ -25,9 +25,6 @@ class VehicleCommandEncoder {
     // 校验接收到的二进制负载是否匹配
     static bool verifyChecksum(std::span<const uint8_t> payload, uint16_t expected_checksum);
 
-    // 计算 HuatVehicleCmd 控制指令的校验码
-    static uint16_t computeChecksum(const common_msgs::msg::HuatVehicleCmd& cmd);
-
    private:
     int neutral_steering_;
 };

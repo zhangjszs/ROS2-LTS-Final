@@ -30,6 +30,7 @@
 | 5 | 非零位姿下 map/base_link 等价输入 | —（本仓 #3） | 物理转角/加速度与坐标原点解耦：同物理量→同出口字节；参照点平移不改变命令 | `PhysicalCommandIsIndependentOfPoseOrigin`（MPC 完整等价性见 `mpc_tracking`、`test_path_reference_builder`） | 预期算法差异（本仓缺陷已修复） |
 | 6 | 中位及正负转向、制动满量程 | [#12](https://github.com/zhangjszs/ROS1-LTS-Final/issues/12) 零位与缩放分歧 | 零位/比例/限幅由单一标定表达；正负对称、极限 clamp 不越界；**混用两套标定必然得到错误零位** | `SteeringNeutralAndScaleAreSharedNotDuplicated` | 缺陷修复差异 |
 | 7 | 曲率限速与最低速度冲突 | [#13](https://github.com/zhangjszs/ROS1-LTS-Final/issues/13) 最低速度覆盖横向约束 | 向心加速度约束优先，允许剖面出现低于 `min_velocity` 的目标速度；退化几何不给可行驶速度 | `CornerLimitOverridesMinimumCruisingSpeed`、`DegenerateGeometryMustNotYieldDrivableSpeed` | 缺陷修复差异 |
+| 8 | 跟踪确认语义（本仓 #32） | ROS1 `cone_tracker`（confirm 近 3 / 远 2、coast 近 5 / 远 8、仅输出已确认、加成 0.1）在 ROS2 只剩去重器；节点默认 `min_track_frames=1`、kalman/ego 关闭使确认语义等价失效 | 同 detection 序列→同 confirmed 输出 + coast 存活帧；未确认不外泄 | `ReferenceTrackerTest.*`（规格）+ `CurrentLayerTest.*`（现状锁定，`test_cone_tracker_differential`） | 接口回归候选（夹具已落，恢复/标 gap 待定） |
 
 ## 本会话差分夹具新发现的缺陷（已修）
 

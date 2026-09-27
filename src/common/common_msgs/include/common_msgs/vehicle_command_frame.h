@@ -29,5 +29,16 @@ namespace vehicle {
     return msg;
 }
 
+// 安全停车意图工厂：零油门 + 制动字节 + 停车状态字。全零≠安全，禁止手写停车帧。
+[[nodiscard]] inline VehicleCommandRaw makeSafeStopRaw(uint8_t steering_raw, uint8_t brake_raw, uint8_t racing_num) {
+    VehicleCommandRaw raw;
+    raw.steering = steering_raw;
+    raw.brake_force = brake_raw;
+    raw.pedal_ratio = 0;
+    raw.racing_num = racing_num;
+    raw.racing_status = 4;
+    return raw;
+}
+
 }  // namespace vehicle
 }  // namespace common_msgs

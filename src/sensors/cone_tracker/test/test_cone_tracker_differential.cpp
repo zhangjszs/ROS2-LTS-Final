@@ -14,9 +14,34 @@
 
 #include <cmath>
 #include <cstdint>
+#include <filesystem>
+#include <fstream>
+#include <regex>
+#include <sstream>
+#include <string>
 #include <vector>
 
 #include "cone_dedup_algo.h"
+
+// 测试源码相对仓库根的路径读取：从 __FILE__ 反推仓库根（core_standalone 与
+// colcon 的工作目录不同，但 __FILE__ 在两边都是源文件绝对路径）。
+std::string ReadFileSource(const std::string& repo_relative) {
+    const std::filesystem::path test_file(__FILE__);
+    // .../src/sensors/cone_tracker/test/<file> 上跳 5 级到仓库根
+    std::filesystem::path repo_root = test_file;
+    for (int i = 0; i < 5; ++i)
+        repo_root = repo_root.parent_path();
+    std::ifstream in(repo_root / repo_relative);
+    std::ostringstream ss;
+    ss << in.rdbuf();
+    return ss.str();
+}
+
+// declare_parameter("name", default) 的默认值文本匹配。
+bool HasDeclareDefault(const std::string& source, const std::string& name, const std::string& want) {
+    const std::regex pattern("declare_parameter\\(\"" + name + "\",\\s*" + want + "\\)");
+    return std::regex_search(source, pattern);
+}
 
 // ── A. 中立参考策略（ROS1 默认语义） ─────────────────────────────────────────
 
@@ -54,7 +79,7 @@ struct Policy {
 
 class ReferenceTracker {
    public:
-    explicit ReferenceTracker(Policy policy = Policy{}) : policy_(policy) {}
+    explicit ReferenceTracker(const Policy& policy = Policy{}) : policy_(policy) {}
 
     void update(const std::vector<Detection>& detections) {
         std::vector<bool> matched(detections.size(), false);
@@ -123,7 +148,7 @@ class ReferenceTracker {
         return out;
     }
 
-    std::vector<Track> all() const { return tracks_; }
+    const std::vector<Track>& all() const { return tracks_; }
 
    private:
     Policy policy_;
@@ -205,12 +230,15 @@ TEST(CurrentLayerTest, AlgoLayerAssociatesImmediatelyWithoutFrameGate) {
 }
 
 TEST(CurrentLayerTest, NodeDefaultsWeakenConfirmationSemantics) {
-    // cone_dedup.cpp 节点默认值（构建时核对）：
+    // cone_dedup.cpp 节点默认值（源码正则读出，非手写断言）：
     //   min_track_frames=1（ROS1 only_output_confirmed=true 在此等价失效），
     //   enable_kalman=false、enable_ego_motion_compensation=false
     //   （ROS1 默认 Kalman 平滑 + 速度预测 + 自车运动补偿开启）。
-    // 本测试钉住差值存在：若某天默认值收敛到 ROS1 语义，此测试必须同步更新。
-    // 算法层本身无输出门概念——断言其恒为真即代表“无门可测”。
-    constexpr bool kAlgoLayerHasOutputGate = false;
-    EXPECT_FALSE(kAlgoLayerHasOutputGate);
+    // 本测试钉住差值存在：若某天默认值收敛到 ROS1 语义（#32 verdict 的恢复方向），
+    // 此测试变红即提醒同步更新台账与夹具。
+    const std::string source = ReadFileSource("src/sensors/cone_tracker/src/cone_dedup.cpp");
+    EXPECT_TRUE(HasDeclareDefault(source, "min_track_frames", "1"));
+    EXPECT_TRUE(HasDeclareDefault(source, "confirmation_frames", "3"));
+    EXPECT_TRUE(HasDeclareDefault(source, "enable_kalman", "false"));
+    EXPECT_TRUE(HasDeclareDefault(source, "enable_ego_motion_compensation", "false"));
 }

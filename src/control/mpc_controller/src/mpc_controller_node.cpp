@@ -218,8 +218,8 @@ void MpcControllerNode::ControlLoop() {
         return;
     }
 
-    if (state_arrival_.check(now_sec) == Freshness::kStale || path_arrival_.check(now_sec) == Freshness::kStale) {
-        RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 1000, "[MPC] Timeout on state or path, braking!");
+    if (state_arrival_.check(now_sec) != Freshness::kFresh || path_arrival_.check(now_sec) != Freshness::kFresh) {
+        RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 1000, "[MPC] Timeout or future stamp on state or path!");
         PublishEmergencyBrake();
         return;
     }

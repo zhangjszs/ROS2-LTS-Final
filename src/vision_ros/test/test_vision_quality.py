@@ -169,6 +169,30 @@ class TestStateMachine:
         assert node.state == STATE_FALLBACK
         assert self._feed(node, QUALITY_DEGRADED, 5) == STATE_DEGRADED
 
+    def test_normal_to_vision_lost_direct(self):
+        node = _bare_node()
+        assert self._feed(node, QUALITY_UNUSABLE, 9) == STATE_NORMAL
+        assert self._feed(node, QUALITY_UNUSABLE, 1) == STATE_VISION_LOST
+
+    def test_degraded_to_fallback_on_poor(self):
+        node = _bare_node()
+        self._feed(node, QUALITY_DEGRADED, 3)
+        assert node.state == STATE_DEGRADED
+        assert self._feed(node, QUALITY_POOR, 5) == STATE_FALLBACK
+
+    def test_degraded_to_vision_lost_on_unusable(self):
+        node = _bare_node()
+        self._feed(node, QUALITY_DEGRADED, 3)
+        assert node.state == STATE_DEGRADED
+        assert self._feed(node, QUALITY_UNUSABLE, 10) == STATE_VISION_LOST
+
+    def test_good_resets_degraded_counter(self):
+        node = _bare_node()
+        self._feed(node, QUALITY_DEGRADED, 2)
+        self._feed(node, QUALITY_GOOD, 1)
+        self._feed(node, QUALITY_DEGRADED, 2)
+        assert node.state == STATE_NORMAL
+
 
 # ── 融合选择（ONNX 缺席时 HSV 接管） ─────────────────────────────────────────
 
@@ -227,6 +251,76 @@ class TestTemporalTracker:
         tracker.update([])
         assert tracker.update([_det()]) == []
 
+
+# ── 默认值漂移门：节点源码的 declare_parameter 默认必须与本文件常量一致 ──
+# 改节点默认值必须同步改测试（防静默漂移），读的是源码 AST，无需起 ROS 节点。
+
+import ast
+import pathlib
+
+
+def _node_defaults():
+    src = pathlib.Path(__file__).parent.parent.joinpath("vision_ros", "vision_node_py.py").read_text()
+    tree = ast.parse(src)
+    defaults = {}
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        func = node.func
+        name = ""
+        if isinstance(func, ast.Attribute) and func.attr == "declare_parameter":
+            if node.args and isinstance(node.args[0], ast.Constant):
+                name = node.args[0].value
+        if name and len(node.args) > 1 and isinstance(node.args[1], ast.Constant):
+            defaults[name] = node.args[1].value
+    return defaults
+
+
+class TestDefaultDriftGate:
+    EXPECTED = {
+        "quality/blur_threshold": 200.0,
+        "quality/blur_degraded": 100.0,
+        "quality/blur_poor": 50.0,
+        "quality/brightness_low": 40.0,
+        "quality/brightness_high": 220.0,
+        "quality/brightness_very_low": 15.0,
+        "quality/brightness_very_high": 250.0,
+        "quality/overexposure_limit": 0.3,
+        "quality/underexposure_limit": 0.3,
+        "quality/overexposure_unusable": 0.5,
+        "quality/underexposure_unusable": 0.5,
+        "node/degraded_frame_count": 3,
+        "node/poor_frame_count": 5,
+        "node/unusable_frame_count": 10,
+        "node/recovery_frame_count": 5,
+        "tracker/iou_threshold": 0.4,
+        "tracker/max_miss": 1,
+        "tracker/min_hits": 2,
+    }
+
+    def test_node_defaults_match_test_constants(self):
+        actual = _node_defaults()
+        for key, want in self.EXPECTED.items():
+            assert key in actual, f"节点删了参数 {key}？测试与实现脱钩"
+            assert actual[key] == want, f"参数 {key} 默认漂移：节点={actual[key]}，测试={want}"
+
+    def test_quality_thresholds_mirror_node_defaults(self):
+        actual = _node_defaults()
+        mirror = {
+            "blur_good": "quality/blur_threshold",
+            "blur_degraded": "quality/blur_degraded",
+            "blur_poor": "quality/blur_poor",
+            "brightness_low": "quality/brightness_low",
+            "brightness_high": "quality/brightness_high",
+            "brightness_very_low": "quality/brightness_very_low",
+            "brightness_very_high": "quality/brightness_very_high",
+            "overexposure_limit": "quality/overexposure_limit",
+            "underexposure_limit": "quality/underexposure_limit",
+            "overexposure_unusable": "quality/overexposure_unusable",
+            "underexposure_unusable": "quality/underexposure_unusable",
+        }
+        for local, remote in mirror.items():
+            assert DEFAULT_THRESHOLDS[local] == actual[remote], f"测试常量 {local} 与节点默认脱钩"
 
 # ── 最新帧缓冲 ──────────────────────────────────────────────────────────────
 

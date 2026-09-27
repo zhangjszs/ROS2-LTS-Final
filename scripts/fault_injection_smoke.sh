@@ -491,9 +491,20 @@ def c09d(tl, f, extra):
 def gap_case(name, reason, drive=None):
     def _drive(h):
         if drive is not None:
-            return drive(h) or {}
-        h.spin_for(1.0)
-        return {"gap": reason}
+            extra = drive(h) or {}
+        else:
+            h.spin_for(1.0)
+            extra = {}
+        # 缺口证据：记录缺口场景下出口的实际状态（不断言，只落盘）。
+        ev = snap(h, "gap_evidence")
+        extra.setdefault("gap", reason)
+        extra["gap_evidence"] = {
+            "out_pedal": ev.get("out_pedal"),
+            "out_brake": ev.get("out_brake"),
+            "speed_mps": ev.get("speed_mps"),
+            "stop_active": ev.get("stop_active"),
+        }
+        return extra
 
     def _check(tl, f, extra):
         pass

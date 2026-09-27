@@ -18,6 +18,7 @@
 
 using common_msgs::vehicle::ActuatorCalibration;
 using common_msgs::vehicle::checksumRaw;
+using common_msgs::vehicle::makeSafeStopRaw;
 using common_msgs::vehicle::SteeringCalibration;
 using common_msgs::vehicle::toMsg;
 using common_msgs::vehicle::VehicleCommandRaw;
@@ -184,4 +185,14 @@ TEST(CommandRoundTrip, EncoderAgreesWithToMsg) {
     EXPECT_EQ(via_enc.steering, via_tomsg.steering);
     EXPECT_EQ(via_enc.brake_force, via_tomsg.brake_force);
     EXPECT_EQ(via_enc.pedal_ratio, via_tomsg.pedal_ratio);
+}
+
+// #31：安全停车工厂——零油门 + 制动字节 + 停车状态字，组帧后校验和自洽（全零≠安全）。
+TEST(CommandRoundTrip, SafeStopFactoryCarriesBrakeBytes) {
+    const auto msg = toMsg(makeSafeStopRaw(/*steering=*/90, /*brake=*/80, /*racing_num=*/1));
+    EXPECT_EQ(msg.pedal_ratio, 0u);
+    EXPECT_EQ(msg.brake_force, 80u);
+    EXPECT_EQ(msg.racing_status, 4u);
+    EXPECT_TRUE(verifyFrame(msg.head1, msg.head2, msg.length));
+    EXPECT_TRUE(verifyChecksum(rawOf(msg), msg.checksum));
 }
