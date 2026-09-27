@@ -249,6 +249,29 @@ else
     fail=1
 fi
 
+echo "=== 7b) 第三口径 profiler（#36：复用 velocity_profiler_lib，不污染既有基线） ==="
+# 新口径基线单独留存：本节只断言“可完赛且数值可区分”，不与 benchmarks/baseline/ 里
+# curvature 口径的 v1 基线比对（基线对账第 6 节仍只走默认 curvature 口径）。
+ros2 run track_benchmark benchmark_runner --out "${OUT_DIR}/trackdrive_profiler.json" \
+  --track trackdrive --require-laps 1 --timeout 400 --speed-source profiler \
+  >/dev/null 2>"${OUT_DIR}/trackdrive_profiler.log"
+prof_rc=$?
+prof_lap=$(grep -oE '"best_valid_lap_time_s": [0-9.]+' "${OUT_DIR}/trackdrive_profiler.json" | grep -oE '[0-9.]+')
+prof_status=$(grep -oE '"run_status": "[^"]+"' "${OUT_DIR}/trackdrive_profiler.json" 2>/dev/null | head -1)
+if [ "${prof_rc}" -ne 0 ]; then
+    echo "FAIL profiler 口径未完赛（rc=${prof_rc}）"
+    tail -3 "${OUT_DIR}/trackdrive_profiler.log" | sed 's/^/       /'
+    fail=1
+elif [ -z "${prof_lap:-}" ] || [ -z "${cur_lap:-}" ] || [ -z "${cst_lap:-}" ]; then
+    echo "FAIL profiler 结果缺少 best_valid_lap_time_s（profiler ${prof_lap:-<none>}s vs 曲率 ${cur_lap:-<none>}s vs 固定 ${cst_lap:-<none>}s）"
+    fail=1
+elif python3 -c "import sys; c=float('${cur_lap}'); s=float('${cst_lap}'); p=float('${prof_lap}'); sys.exit(0 if (abs(p-c)>1e-9 and abs(p-s)>1e-9) else 1)"; then
+    echo "OK   三种口径均可完赛且可区分：曲率 ${cur_lap}s vs 固定 ${cst_lap}s vs profiler ${prof_lap}s (${prof_status})"
+else
+    echo "FAIL profiler 口径圈速与既有口径无法区分（曲率 ${cur_lap}s vs 固定 ${cst_lap}s vs profiler ${prof_lap}s）"
+    fail=1
+fi
+
 if [ "${fail}" -ne 0 ]; then
   echo "Benchmark regression: FAILED"
   exit 1

@@ -18,6 +18,7 @@
 #include "track_benchmark/speed_envelope.hpp"  // #29：速度包络单一实现（PP 分支与 MPC 参考同函数）
 #include "track_benchmark/track_generator.hpp"
 #include "vehicle_simulator/bicycle_model.hpp"
+#include "velocity_profiler/velocity_profiler.hpp"  // #36：第三口径复用 profiler DP（与 runner 内包络并存）
 
 namespace {
 
@@ -51,10 +52,11 @@ struct RunnerConfig {
     //   stuck      行驶一段后永久制动驻停（未完赛：不得产出 best lap）
     std::string inject = "none";
     double freeze_after_s = 3.0;  // stuck 算子的驻停时刻（仿真时间）
-    // #19 A：速度参照口径。两种剖面对**同一个控制器、同一条赛道、同一种子**跑，
+    // #19 A：速度参照口径。三种剖面对**同一个控制器、同一条赛道、同一种子**跑，
     // 才能把“速度策略收益”与“控制器收益”分开（#19 验收：固定速度策略下的横向对比）。
     //   curvature 逐点按 sqrt(a_lat_max/|κ|) 限速（默认，与既有基线一致）
     //   constant  全程固定限速，不看曲率
+    //   profiler  复用 velocity_profiler_lib 的 G-G/DP 全剖面（#36 第三臂；中心线预计算后按 idx 取速）
     std::string speed_source = "curvature";
     double const_speed_mps = 5.0;  // constant 口径的固定限速
     // #19 B1：控制器选择。pure_pursuit（默认）走既有内联控制律，输出与 v1 基线
@@ -73,25 +75,63 @@ constexpr double kConeBiasRad = 0.05;
 }
 
 [[nodiscard]] bool known_speed_source(const std::string& s) {
-    return s == "curvature" || s == "constant";
+    return s == "curvature" || s == "constant" || s == "profiler";
 }
 
 [[nodiscard]] bool known_controller(const std::string& s) {
     return s == "pure_pursuit" || s == "mpc";
 }
 
+// #36：profiler 第三口径 —— 复用 velocity_profiler_lib 的 G-G/DP 全剖面。
+// 中心线预计算一次、按 idx 取速（调用方负责闭环回绕取模）。与 curvature/constant
+// 口径并存：后两者走 speed_envelope.hpp 单一实现一字不动，本函数只为 profiler 口径服务。
+[[nodiscard]] std::vector<double> build_profiler_speeds(const std::vector<CenterlinePoint>& cl, double lat_accel_max,
+                                                        double v_max) {
+    std::vector<std::pair<double, double>> raw;
+    raw.reserve(cl.size());
+    for (const auto& p : cl)
+        raw.emplace_back(p.x, p.y);
+    velocity_profiler::ProfilerLimits lim;
+    lim.max_velocity = v_max;
+    lim.max_lat_accel = lat_accel_max;
+    // 纵向/摩擦/平滑沿用 profiler 默认（max_lon_accel 3.5 / max_lon_decel 5.0 / friction true），
+    // 只把横向与极速两项对齐 runner 口径，保证“同一赛道、同一限速输入”下三口径可比。
+    const velocity_profiler::VelocityProfiler profiler(lim);
+    const auto prof = profiler.ComputeProfile(raw, 0.0);
+    std::vector<double> out;
+    out.reserve(cl.size());
+    for (const auto& pt : prof)
+        out.push_back(pt.target_speed);
+    // 退化输入（<2 点）时 profiler 返回 0/1 个 0 速点：按 #11 语义补齐为停车目标，不臆造巡航速度。
+    while (out.size() < cl.size())
+        out.push_back(0.0);
+    if (out.size() > cl.size())
+        out.resize(cl.size());
+    return out;
+}
+
 // #19 B1：中心线 → MPC 参考路径（逐点显式速度按 --speed-source 口径，与 PP 同一剖面；
 // speed_valid=true 确保 MpcModel 不回填 target_speed，两种口径真正可区分）。
 // #29：限速包络走 speed_envelope.hpp 单一实现（与 PP 分支同函数），不得在此另写一份。
+// #36：profiler 口径走 build_profiler_speeds（复用 velocity_profiler_lib），与 PP 分支同源。
 [[nodiscard]] std::vector<mpc::ReferencePoint> build_mpc_reference(const std::vector<CenterlinePoint>& cl,
                                                                    const std::string& speed_source, double const_speed,
                                                                    double lat_accel_max, double v_max) {
     std::vector<mpc::ReferencePoint> ref;
     ref.reserve(cl.size());
-    for (const auto& p : cl) {
-        const double v_curve = (speed_source == "constant")
-                                   ? const_speed
-                                   : benchmark::referenceSpeedForCurvature(p.curvature, lat_accel_max, v_max);
+    // #36：profiler 口径预计算一次（与 PP 分支同函数同输入，保证双控制器同剖面）。
+    const std::vector<double> prof_speeds =
+        (speed_source == "profiler") ? build_profiler_speeds(cl, lat_accel_max, v_max) : std::vector<double>{};
+    for (size_t i = 0; i < cl.size(); ++i) {
+        const auto& p = cl[i];
+        double v_curve;
+        if (speed_source == "constant") {
+            v_curve = const_speed;
+        } else if (speed_source == "profiler") {
+            v_curve = prof_speeds[i];
+        } else {
+            v_curve = benchmark::referenceSpeedForCurvature(p.curvature, lat_accel_max, v_max);
+        }
         // .curvature 传带符号值：MPC 前馈项 d(1) = -v·κ·Ts 依赖转向方向；skidpad/trackdrive 生成器
         // 已给出符号（track_generator.cpp:145），而 PP 基线口径只取幅值限速，两者不互相影响。
         ref.push_back({.x = p.x,
@@ -206,6 +246,10 @@ RunResult run(const RunnerConfig& cfg) {
     mpc::MpcModel mpc_model(mpc_cfg);
     std::vector<mpc::ReferencePoint> mpc_ref =
         build_mpc_reference(cl, cfg.speed_source, cfg.const_speed_mps, cfg.lat_accel_max, vp.max_speed);
+    // #36：PP 分支的 profiler 剖面与 MPC 同源（同一 helper、同一输入），按 idx 取速。
+    const std::vector<double> profiler_speeds = (cfg.speed_source == "profiler")
+                                                    ? build_profiler_speeds(cl, cfg.lat_accel_max, vp.max_speed)
+                                                    : std::vector<double>{};
     if (closed) {
         // 闭环回绕：MpcModel::Step 取 best_idx 后 Np 点、无回绕语义（与 ROS 节点开路径一致，
         // 不动共享核）；离线侧把头部再拼一段，使末端时域看到的仍是真实弯道而非切线外推。
@@ -263,10 +307,15 @@ RunResult run(const RunnerConfig& cfg) {
 
             // 曲率限速 + P 控制器（--speed-source constant 时改用固定限速，作公平对比的另一口径）
             // #29：限速包络走 speed_envelope.hpp 单一实现（与 MPC 参考构建同函数）。
-            const double v_curve =
-                (cfg.speed_source == "constant")
-                    ? cfg.const_speed_mps
-                    : benchmark::referenceSpeedForCurvature(cl[idx].curvature, cfg.lat_accel_max, vp.max_speed);
+            // #36：profiler 口径按预计算剖面取速（与 MPC 同源）；curvature/constant 分支一字不动。
+            double v_curve;
+            if (cfg.speed_source == "constant") {
+                v_curve = cfg.const_speed_mps;
+            } else if (cfg.speed_source == "profiler") {
+                v_curve = (idx < profiler_speeds.size()) ? profiler_speeds[idx] : 0.0;
+            } else {
+                v_curve = benchmark::referenceSpeedForCurvature(cl[idx].curvature, cfg.lat_accel_max, vp.max_speed);
+            }
             const double v_ref = std::min(vp.max_speed, v_curve);
             accel = std::clamp(cfg.speed_kp * (v_ref - s.v), -vp.max_decel, vp.max_accel);
         }
@@ -325,12 +374,13 @@ void print_usage() {
     std::cout << "Usage: benchmark_runner [--track acceleration|skidpad|trackdrive] [--dt S]\n"
               << "       [--require-laps N] [--timeout S] [--rmse-max M] [--lookahead-base M]\n"
               << "       [--inject none|offroute|cone|reverse|stuck] [--freeze-after S]\n"
-              << "       [--speed-source curvature|constant] [--const-speed MPS]\n"
+              << "       [--speed-source curvature|constant|profiler] [--const-speed MPS]\n"
               << "       [--controller pure_pursuit|mpc] [--mpc-update-period S]\n"
               << "       [--out FILE.json]\n"
               << "       [--export-tracks DIR]   # 导出唯一赛道来源（CSV + tracks.json）后退出\n"
               << "  --inject: #17 人工构造故障场景（退出码非 0，并应在 JSON 里命中对应判据字段）\n"
-              << "  --speed-source: #19 A 速度口径（constant = 全程固定限速，与 curvature 同控制器同赛道对比）\n"
+              << "  --speed-source: #19 A 速度口径（constant = 全程固定限速，与 curvature 同控制器同赛道对比；"
+                 "profiler = 复用 velocity_profiler_lib 的 G-G/DP 剖面，#36 第三臂）\n"
               << "  --controller: #19 B1 控制律（mpc = 离线 MPC 数学核；默认 pure_pursuit 与 v1 基线位级一致）\n";
 }
 
