@@ -48,6 +48,11 @@
 未标定期间：`HuatCarstate.quality_validated` 保持 `false`（#12），
 `safety.state_source_age_tolerance_sec` 保持 `-1`（禁用年龄判定，不臆判）。
 
+非 sim 链声明（#34）：默认链（`use_arbiter=false`）的故障冒烟只覆盖软件可观测子集
+（超时/外部停车/监控退出经锁存 stop 传播；abort/reset/晚加入等任务语义在默认链
+上不存在，见 `CHAIN=direct` 的 GAP 行）。真急停优先级、VCU 断连/掉电、底盘超时
+接管一律需台架/实车标定，不得以 sim 链冒烟通过为据声称已验收。
+
 ---
 
 ## 2. 转向标定（逐点记录）

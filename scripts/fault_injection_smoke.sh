@@ -22,12 +22,23 @@
 # 进程控制：只按 PID 递进 INT→TERM→KILL（本机 bwrap 会话命令行含脚本全文，
 # `pkill -f <节点名>` 会自伤 —— 实测会杀掉整个测试会话）。
 # 本机若 UDP 组播被 VPN 挡住，调用前 export FASTDDS_BUILTIN_TRANSPORTS=SHM（CI 上不需要）。
+#
+# 双链模式（#34）：CHAIN=arbiter（默认，CI 现状）| CHAIN=direct（默认链：PP 直发
+# /vehicle_command，不拉起仲裁器）。direct 链没有任务仲裁器，abort/reset/晚加入等
+# 任务语义天然缺失——这些用例记为 gap（交付物），不判失败；超时/外部停车等经
+# safety_monitor 锁存 stop 传播的用例照常断言。
 # ==============================================================================
 set -uo pipefail
 export ROS_LOCALHOST_ONLY=1
 : "${ROS_HOME:=$PWD/build/.ros}"
 export ROS_HOME
 mkdir -p "$ROS_HOME"
+
+CHAIN="${CHAIN:-arbiter}"
+if [ "$CHAIN" != "arbiter" ] && [ "$CHAIN" != "direct" ]; then
+    echo "FAIL: CHAIN 只能是 arbiter|direct（当前 $CHAIN）"
+    exit 1
+fi
 
 OUT_DIR="${1:-build/fault_injection}"
 mkdir -p "$OUT_DIR" || { echo "cannot create $OUT_DIR"; exit 1; }
@@ -68,23 +79,31 @@ start "$OUT_DIR/safety.log" ros2 run safety_monitor safety_monitor --ros-args -p
 start "$OUT_DIR/profiler.log" ros2 run velocity_profiler velocity_profiler_node --ros-args \
     -p use_sim_time:=true
 # PP 改发源话题 A；最终出口由仲裁器独占（单一权威，控制器不得绕过）
-start "$OUT_DIR/pp.log" ros2 run pure_pursuit pure_pursuit_controller --ros-args \
-    -p use_sim_time:=true -p topics.vehicle_command:=/control/vehicle_command
-start "$OUT_DIR/arbiter.log" ros2 run safety_monitor command_arbiter_node --ros-args \
-    -p use_sim_time:=true -p arbitration.source_timeout_sec:=0.5
+# direct 链：PP 直发契约出口（与闭环冒烟同构），不拉起仲裁器
+if [ "$CHAIN" = "arbiter" ]; then
+    start "$OUT_DIR/pp.log" ros2 run pure_pursuit pure_pursuit_controller --ros-args \
+        -p use_sim_time:=true -p topics.vehicle_command:=/control/vehicle_command
+    start "$OUT_DIR/arbiter.log" ros2 run safety_monitor command_arbiter_node --ros-args \
+        -p use_sim_time:=true -p arbitration.source_timeout_sec:=0.5
+    EXPECT_NODES="vehicle_simulator safety_monitor velocity_profiler pure_pursuit command_arbiter_node"
+else
+    start "$OUT_DIR/pp.log" ros2 run pure_pursuit pure_pursuit_controller --ros-args \
+        -p use_sim_time:=true -p topics.vehicle_command:=/vehicle_command
+    EXPECT_NODES="vehicle_simulator safety_monitor velocity_profiler pure_pursuit"
+fi
 
 miss=1
 for _ in $(seq 1 12); do
     nodes="$(timeout 12 ros2 node list --no-daemon 2>/dev/null)"
     miss=0
-    for n in vehicle_simulator safety_monitor velocity_profiler pure_pursuit command_arbiter_node; do
+    for n in $EXPECT_NODES; do
         grep -q "$n" <<<"$nodes" || miss=1
     done
     [ "$miss" -eq 0 ] && break
     sleep 2
 done
 if [ "$miss" -ne 0 ]; then
-    echo "FAIL: 故障注入拓扑节点未全部注册；ros2 node list --no-daemon 输出："
+    echo "FAIL: 故障注入拓扑节点未全部注册（CHAIN=$CHAIN）；ros2 node list --no-daemon 输出："
     printf '%s\n' "$nodes"
     tail -n 3 "$OUT_DIR"/*.log
     exit 1
@@ -93,11 +112,17 @@ NODE_PIDS=()
 for p in "${PIDS[@]}"; do
     while read -r c; do NODE_PIDS+=("$c"); done < <(pgrep -P "$p" 2>/dev/null || true)
 done
-SAFETY_PID="${NODE_PIDS[1]}"
-ARBITER_PID="${NODE_PIDS[4]}"
-echo "OK   拓扑就绪（5 节点，单一权威出口 /vehicle_command；safety=$SAFETY_PID arbiter=$ARBITER_PID）"
+# direct 链无仲裁器：SAFETY_PID 取 safety 节点（启动顺序第 2），ARBITER_PID 置空哨兵
+if [ "$CHAIN" = "arbiter" ]; then
+    SAFETY_PID="${NODE_PIDS[1]}"
+    ARBITER_PID="${NODE_PIDS[4]}"
+else
+    SAFETY_PID="${NODE_PIDS[1]}"
+    ARBITER_PID="-1"
+fi
+echo "OK   拓扑就绪（CHAIN=$CHAIN；safety=$SAFETY_PID arbiter=$ARBITER_PID）"
 
-python3 - "$OUT_DIR" "$SAFETY_PID" "$ARBITER_PID" <<'PY'
+python3 - "$OUT_DIR" "$SAFETY_PID" "$ARBITER_PID" "$CHAIN" <<'PY'
 import json
 import os
 import signal
@@ -114,6 +139,8 @@ from rclpy.qos import QoSDurabilityPolicy, QoSProfile, QoSReliabilityPolicy
 from std_msgs.msg import String
 
 out_dir, safety_pid, arbiter_pid = sys.argv[1], int(sys.argv[2]), int(sys.argv[3])
+CHAIN = sys.argv[4] if len(sys.argv) > 4 else "arbiter"
+DIRECT = (CHAIN == "direct")
 
 SRC_A, SRC_B, OUT_CMD = "/control/vehicle_command", "/mpc/vehicle_command", "/vehicle_command"
 STATE, EVENT, RAW_PATH, STOP = "/system/state", "/system/task_event", "/planning/raw_pathlimits", "/system/stop"
@@ -134,11 +161,15 @@ class Harness(Node):
         super().__init__("fault_injection_harness")
         self.last_state = None
         self.last_cmd = None
+        self.last_stop = None
         self.speed = 0.0
         self.publish_path = True
         self.path_points = 60
         self.create_subscription(HuatSystemState, STATE, self.on_state, 50)
         self.create_subscription(HuatVehicleCmd, OUT_CMD, self.on_cmd, 50)
+        self.create_subscription(HuatStop, STOP, self.on_stop,
+                                 QoSProfile(depth=1, reliability=QoSReliabilityPolicy.RELIABLE,
+                                            durability=QoSDurabilityPolicy.TRANSIENT_LOCAL))
         from common_msgs.msg import HuatCarstate
         self.create_subscription(HuatCarstate, "/localization/vehicle_state",
                                  lambda m: setattr(self, "speed", float(m.v)), 50)
@@ -165,6 +196,9 @@ class Harness(Node):
 
     def on_state(self, m):
         self.last_state = m
+
+    def on_stop(self, m):
+        self.last_stop = bool(m.stop)
 
     def on_cmd(self, m):
         self.last_cmd = m
@@ -217,6 +251,8 @@ class Harness(Node):
         return False
 
     def kill_arbiter(self):
+        if arbiter_pid < 0:
+            return
         try:
             os.kill(arbiter_pid, signal.SIGKILL)
         except ProcessLookupError:
@@ -232,13 +268,18 @@ class Harness(Node):
 
 def snap(h, marker):
     s, c = h.last_state, h.last_cmd
+    # direct 链无 /system/state：stop_active 回退到锁存 stop 话题
+    if s is not None:
+        stop_active = bool(s.stop_active)
+    else:
+        stop_active = bool(h.last_stop)
     return {
         "at": round(time.time(), 3),
         "marker": marker,
         "task_state": None if s is None else int(s.task_state),
         "safety_state": None if s is None else int(s.safety_state),
         "stop_kind": None if s is None else int(s.stop_kind),
-        "stop_active": None if s is None else bool(s.stop_active),
+        "stop_active": stop_active,
         "can_drive": None if s is None else bool(s.can_drive),
         "winner": None if s is None else int(s.winner_source),
         "reason": None if s is None else int(s.reason),
@@ -407,29 +448,110 @@ CASES = [
     ("10_arbiter_restart_late_join", d10, c10),
 ]
 
+
+# ── direct 链（#34）：无任务仲裁器，用锁存 stop + 出口 + 车速断言 ─────────────
+def d01d(h):
+    h.spin_for(6.0)  # 默认链无需 arm：路径流动即行驶
+    return {}
+
+
+def c01d(tl, f, extra):
+    expect(stopped_ok(tl) is False, "默认链正常行驶场景出口仍是制动", f)
+    expect((tl.get("speed_mps") or 0) > 0.2, "默认链闭环未驱动车辆", f)
+
+
+def c02d(tl, f, extra):
+    # 路径停发 → safety 心跳超时发锁存 stop → PP 直连 stop 制动
+    expect(bool(tl.get("stop_active")), "默认链路径停发后锁存 stop 未生效", f)
+    expect(stopped_ok(tl), "默认链出口未回到零油门+制动", f)
+
+
+def c03d(tl, f, extra):
+    expect(stopped_ok(tl), "默认链空路径下出口未回到制动", f)
+
+
+def c05d(tl, f, extra):
+    ext = extra.get("external_stop", {})
+    expect(bool(ext.get("stop_active")), "默认链外部停车请求未生效", f)
+    expect(stopped_ok(ext), "默认链外部停车期间出口未回到制动", f)
+    expect(not tl.get("stop_active"), "默认链监控释放后停车未解除", f)
+
+
+def c07d(tl, f, extra):
+    expect(bool(tl.get("stop_active")), "默认链重复停车后不再是停车态", f)
+    expect(stopped_ok(tl), "默认链重复停车后出口未保持制动", f)
+
+
+def c09d(tl, f, extra):
+    # 监控退出：锁存 stop 仍在（transient_local），PP 保持最后 stop_requested
+    expect(bool(tl.get("stop_active")), "默认链监控退出后锁存 stop 丢失", f)
+    expect(stopped_ok(tl), "默认链监控退出后出口未保持制动", f)
+
+
+def gap_case(name, reason, drive=None):
+    def _drive(h):
+        if drive is not None:
+            return drive(h) or {}
+        h.spin_for(1.0)
+        return {"gap": reason}
+
+    def _check(tl, f, extra):
+        pass
+
+    return (name, _drive, _check)
+
+
+def _restore_path_drive(h):
+    # 与 d04 同步：恢复非空路径，让 safety 在 d05 前解除超时锁存
+    h.publish_path = True
+    h.path_points = 60
+    h.spin_for(2.0)
+    return {"gap": "默认链无仲裁信任门：篡改源无消费者，篡改帧不被拒也不生效"}
+
+
+CASES_DIRECT = [
+    ("01_baseline_drive", d01d, c01d),
+    ("02_path_lost", d02, c02d),
+    ("03_empty_path", d03, c03d),
+    gap_case("04_tampered_source_frame", "", drive=_restore_path_drive),
+    ("05_external_stop_and_resume", d05, c05d),
+    gap_case("06_abort_is_latched", "默认链无任务状态机：abort 事件无人处理，不锁存"),
+    ("07_repeat_stop_idempotent", d07, c07d),
+    gap_case("08_manual_reset_no_permission", "默认链无任务状态机：reset/arm 语义不存在"),
+    ("09_monitor_exit", d09, c09d),
+    gap_case("10_arbiter_restart_late_join", "默认链无仲裁器：晚加入语义不存在"),
+]
+
 rclpy.init()
 h = Harness()
 h.spin_for(1.5)
+TABLE = CASES_DIRECT if DIRECT else CASES
 overall = 0
 summary = []
-for name, drive, check in CASES:
+gaps = []
+for name, drive, check in TABLE:
     fails = []
     pre = snap(h, "pre_trigger")
     extra = drive(h) or {}
     post = snap(h, "post_trigger")
     check(post, fails, extra)
+    gap = extra.get("gap")
     rec = {"case": name, "pre": pre, "post": post, "extra": extra, "fails": fails}
     with open(f"{out_dir}/{name}.json", "w") as fp:
         json.dump(rec, fp, ensure_ascii=False, indent=2)
     ok = not fails
     overall |= 0 if ok else 1
-    print(f"{'OK  ' if ok else 'FAIL'} {name}: task={post.get('task_state')} safety={post.get('safety_state')} "
-          f"kind={post.get('stop_kind')} reason={post.get('reason')} winner={post.get('winner')} "
-          f"A={post.get('src_a_status')} B={post.get('src_b_status')} pedal={post.get('out_pedal')} "
-          f"brake={post.get('out_brake')} v={post.get('speed_mps')}")
+    if gap is not None:
+        gaps.append({"case": name, "gap": gap})
+        print(f"GAP  {name}: {gap}")
+    else:
+        print(f"{'OK  ' if ok else 'FAIL'} {name}: task={post.get('task_state')} safety={post.get('safety_state')} "
+              f"kind={post.get('stop_kind')} reason={post.get('reason')} winner={post.get('winner')} "
+              f"A={post.get('src_a_status')} B={post.get('src_b_status')} pedal={post.get('out_pedal')} "
+              f"brake={post.get('out_brake')} v={post.get('speed_mps')}")
     for m in fails:
         print(f"       - {m}")
-    summary.append({"case": name, "ok": ok, "fails": fails, "post": post})
+    summary.append({"case": name, "ok": ok, "gap": gap, "fails": fails, "post": post})
 
 with open(f"{out_dir}/summary.json", "w") as fp:
     json.dump(summary, fp, ensure_ascii=False, indent=2)
@@ -444,8 +566,12 @@ rc=$?
 cleanup
 trap - EXIT
 if [ "$rc" -eq 0 ]; then
-    echo "Fault injection smoke: PASS ✔ （10 个软故障场景终态自动判定；硬件急停/VCU 断连仍需台架实车）"
+    if [ "$CHAIN" = "direct" ]; then
+        echo "Fault injection smoke (CHAIN=direct): PASS ✔ （默认链断言通过；任务语义缺口见上方 GAP 行与 $OUT_DIR/summary.json）"
+    else
+        echo "Fault injection smoke: PASS ✔ （10 个软故障场景终态自动判定；硬件急停/VCU 断连仍需台架实车）"
+    fi
 else
-    echo "Fault injection smoke: FAILED（详见 $OUT_DIR/*.json 时间线）"
+    echo "Fault injection smoke (CHAIN=$CHAIN): FAILED（详见 $OUT_DIR/*.json 时间线）"
 fi
 exit $rc
