@@ -40,6 +40,12 @@ if(BUILD_TESTING)
   target_link_libraries(test_cone_dedup_algo
     ${PROJECT_NAME}_algo
   )
+  ament_add_gtest(test_cone_tracker_differential
+    test/test_cone_tracker_differential.cpp
+  )
+  target_link_libraries(test_cone_tracker_differential
+    ${PROJECT_NAME}_algo
+  )
 endif()
 
 ament_export_dependencies(

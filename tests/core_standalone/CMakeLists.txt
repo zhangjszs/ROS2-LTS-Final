@@ -33,6 +33,7 @@ set(CORE_INCLUDE_DIRS
     "${REPO_ROOT}/src/control/mpc_controller/include"
     "${REPO_ROOT}/src/planning/straight_line_planner/include"
     "${REPO_ROOT}/src/planning/velocity_profiler/include"
+    "${REPO_ROOT}/src/sensors/cone_tracker/include"
     "${REPO_ROOT}/src/simulation/track_benchmark/include"
 )
 
@@ -85,3 +86,8 @@ add_core_test(test_defect_differential
         "${REPO_ROOT}/src/control/pure_pursuit/test/test_defect_differential.cpp"
         "${REPO_ROOT}/src/planning/velocity_profiler/test/test_velocity_profiler.cpp"
         "${REPO_ROOT}/src/planning/velocity_profiler/src/velocity_profiler.cpp")
+# #32：cone_tracker 差分夹具（ROS1 确认/coast 语义可执行规格 + ROS2 现状锁定）
+add_core_test(test_cone_tracker_differential
+    SOURCES
+        "${REPO_ROOT}/src/sensors/cone_tracker/test/test_cone_tracker_differential.cpp"
+        "${REPO_ROOT}/src/sensors/cone_tracker/src/cone_dedup_algo.cpp")
