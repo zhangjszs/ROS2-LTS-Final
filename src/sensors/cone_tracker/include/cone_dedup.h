@@ -127,7 +127,7 @@ class ConeDedup {
     double cone_match_radius_ = 1.0;
     double ema_alpha_ = 0.3;
     int max_miss_frames_ = 3;
-    int min_track_frames_ = 1;
+    int min_track_frames_ = 3;
     int confirmation_frames_ = 3;
     int max_miss_frames_confirmed_ = 6;
 
@@ -148,13 +148,13 @@ class ConeDedup {
     double sliding_window_rear_radius_ = 30.0;
 
     // P3-2: 卡尔曼滤波器跟踪
-    bool enable_kalman_ = false;
+    bool enable_kalman_ = true;
     double kf_q_ = 0.01;  // 过程噪声
     double kf_r_ = 0.1;   // 测量噪声
 
     // P1-B: 自运动补偿
     // 车辆运动时 INS 误差会使静止锥桶呈现虚假速度，补偿后减少高速转弯时的预测漂移
-    bool enable_ego_motion_compensation_ = false;
+    bool enable_ego_motion_compensation_ = true;
     double kf_ego_correction_factor_ = 0.5;  // 补偿系数 [0,1]，越大越激进
     double kf_vel_decay_rate_ = 1.0;         // 速度衰减率 (1/s)，防止速度估计累积
     double car_vx_ = 0.0;                    // 车辆全局速度 x（由 OnCarState 更新）

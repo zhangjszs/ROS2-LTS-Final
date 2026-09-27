@@ -12,7 +12,7 @@ ConeDedup::ConeDedup(rclcpp::Node::SharedPtr node) : node_(node) {
     node_->declare_parameter("cone_match_radius", 1.0);
     node_->declare_parameter("ema_alpha", 0.3);
     node_->declare_parameter("max_miss_frames", 3);
-    node_->declare_parameter("min_track_frames", 1);
+    node_->declare_parameter("min_track_frames", 3);
     node_->declare_parameter("enable_adaptive_alpha", false);
     node_->declare_parameter("alpha_min", 0.1);
     node_->declare_parameter("alpha_max", 0.5);
@@ -20,10 +20,10 @@ ConeDedup::ConeDedup(rclcpp::Node::SharedPtr node) : node_(node) {
     node_->declare_parameter("enable_sliding_window", false);
     node_->declare_parameter("sliding_window_radius", 30.0);
     node_->declare_parameter("sliding_window_rear_radius", 30.0);
-    node_->declare_parameter("enable_kalman", false);
+    node_->declare_parameter("enable_kalman", true);
     node_->declare_parameter("kf_q", 0.01);
     node_->declare_parameter("kf_r", 0.1);
-    node_->declare_parameter("enable_ego_motion_compensation", false);
+    node_->declare_parameter("enable_ego_motion_compensation", true);
     node_->declare_parameter("kf_ego_correction_factor", 0.5);
     node_->declare_parameter("kf_vel_decay_rate", 1.0);
     node_->declare_parameter("enable_insert_dedup", true);

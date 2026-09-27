@@ -4,11 +4,11 @@
 //   A. ReferenceTracker：按 ROS1 默认参数的中立策略模型（纯 std，可执行规格），
 //      确认帧数（近 3 / 远 2）、coast 删除帧数（近 5 / 远 8）、仅输出已确认、
 //      确认置信度加成 0.1。参数来源：2025/src/perception_core ConeTracker::Config。
-//   B. 现状断言：ROS2 当前纯层行为（去重算法层逐帧即关联，无帧数门），
-//      绿色断言锁定现状，注释标出与 A 的差值（节点默认 min_track_frames=1、
-//      kalman/ego 默认关闭），供 #32  verdict（恢复/标 gap）引用。
+//   B. 现状断言：#35 已收敛节点默认向 ROS1 语义（min_track_frames=3、
+//      kalman/ego 开启），默认链 e2e（闪烁不确认、coast 存活）由
+//      DefaultChainFlickerNeverConfirmsAndCoastSurvives 锁定。
 //
-// 注意：ConeDedup 节点需要 rclcpp，无法进 core_standalone；故 B 只用纯算法层。
+// 注意：ConeDedup 节点需要 rclcpp，无法进 core_standalone；故 B 只用纯算法层 + 源码默认值正则。
 
 #include <gtest/gtest.h>
 
@@ -229,16 +229,35 @@ TEST(CurrentLayerTest, AlgoLayerAssociatesImmediatelyWithoutFrameGate) {
     EXPECT_EQ(result[0], 0);
 }
 
-TEST(CurrentLayerTest, NodeDefaultsWeakenConfirmationSemantics) {
-    // cone_dedup.cpp 节点默认值（源码正则读出，非手写断言）：
-    //   min_track_frames=1（ROS1 only_output_confirmed=true 在此等价失效），
-    //   enable_kalman=false、enable_ego_motion_compensation=false
-    //   （ROS1 默认 Kalman 平滑 + 速度预测 + 自车运动补偿开启）。
-    // 本测试钉住差值存在：若某天默认值收敛到 ROS1 语义（#32 verdict 的恢复方向），
-    // 此测试变红即提醒同步更新台账与夹具。
+TEST(CurrentLayerTest, NodeDefaultsConvergedToConfirmationSemantics) {
+    // #35：节点默认值已收敛 ROS1 确认语义（min_track_frames=3、kalman/ego 开启）。
+    // 原 `NodeDefaultsWeakenConfirmationSemantics` 在收敛后变红即预期内，
+    // 现同步更新为收敛断言 + 台账第 8 行分类同步更新为缺陷修复差异。
     const std::string source = ReadFileSource("src/sensors/cone_tracker/src/cone_dedup.cpp");
-    EXPECT_TRUE(HasDeclareDefault(source, "min_track_frames", "1"));
+    EXPECT_TRUE(HasDeclareDefault(source, "min_track_frames", "3"));
     EXPECT_TRUE(HasDeclareDefault(source, "confirmation_frames", "3"));
-    EXPECT_TRUE(HasDeclareDefault(source, "enable_kalman", "false"));
-    EXPECT_TRUE(HasDeclareDefault(source, "enable_ego_motion_compensation", "false"));
+    EXPECT_TRUE(HasDeclareDefault(source, "enable_kalman", "true"));
+    EXPECT_TRUE(HasDeclareDefault(source, "enable_ego_motion_compensation", "true"));
+}
+
+TEST(CurrentLayerTest, DefaultChainFlickerNeverConfirmsAndCoastSurvives) {
+    // #35 默认链 e2e 断言（无 ROS context 的中立语义层）：
+    // 与 ReferenceTracker 同策略——闪烁序列不确认、已确认目标短暂丢失后 coast 存活。
+    // 此处复用 ReferenceTracker 作为默认链语义的机读载体（节点需 rclcpp，无法进 core_standalone）。
+    const Detection det{10.0, 0.0, 0.8};
+    ReferenceTracker flicker;
+    for (int i = 0; i < 6; ++i) {
+        flicker.update(i % 2 == 0 ? std::vector<Detection>{det} : std::vector<Detection>{});
+    }
+    EXPECT_TRUE(flicker.confirmed().empty()) << "默认链：闪烁序列不得确认";
+
+    ReferenceTracker coast;
+    for (int i = 0; i < 3; ++i)
+        coast.update({det});
+    ASSERT_EQ(coast.confirmed().size(), 1u);
+    for (int i = 0; i < 4; ++i)
+        coast.update({});
+    EXPECT_EQ(coast.confirmed().size(), 1u) << "默认链：coast 4 帧内必须存活";
+    coast.update({});
+    EXPECT_TRUE(coast.confirmed().empty()) << "默认链：coast 超限必须删除";
 }
