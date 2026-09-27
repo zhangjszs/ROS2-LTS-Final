@@ -29,8 +29,6 @@ class VehicleCommandEncoder {
     static uint16_t computeChecksum(const common_msgs::msg::HuatVehicleCmd& cmd);
 
    private:
-    static void setHeader(common_msgs::msg::HuatVehicleCmd& cmd);
-
     int neutral_steering_;
 };
 

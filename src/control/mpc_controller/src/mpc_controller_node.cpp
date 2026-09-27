@@ -11,23 +11,10 @@
 #include "interface_contract_qos.hpp"  // #14：stop 锁存 QoS 由契约单一来源构造
 // #22：path→ReferencePoint 纯算法 core（无 ROS context）
 #include "mpc_controller/path_reference_builder.h"
+// #31：线帧组装唯一拥有者（替代本文件原 anonymous CmdChecksum + 手写帧头）
+#include "vehicle_command_frame.h"
 
 namespace mpc {
-
-namespace {
-// #15：从已填好的指令消息取校验和（委托共用编解码层，与 PP/仿真同一累加和定义）。
-[[nodiscard]] uint16_t CmdChecksum(const common_msgs::msg::HuatVehicleCmd& cmd) {
-    common_msgs::vehicle::VehicleCommandRaw raw;
-    raw.steering = cmd.steering;
-    raw.brake_force = cmd.brake_force;
-    raw.pedal_ratio = cmd.pedal_ratio;
-    raw.gear_position = cmd.gear_position;
-    raw.working_mode = cmd.working_mode;
-    raw.racing_num = cmd.racing_num;
-    raw.racing_status = cmd.racing_status;
-    return common_msgs::vehicle::checksumRaw(raw);
-}
-}  // namespace
 
 MpcControllerNode::MpcControllerNode(const rclcpp::NodeOptions& options) : Node("mpc_controller_node", options) {
     LoadParameters();
@@ -252,41 +239,34 @@ void MpcControllerNode::ControlLoop() {
 }
 
 void MpcControllerNode::PublishVehicleCommand(double steering_rad, double accel_mps2) {
-    common_msgs::msg::HuatVehicleCmd cmd;
-    cmd.head1 = common_msgs::vehicle::kCmdHead1;
-    cmd.head2 = common_msgs::vehicle::kCmdHead2;
-    cmd.length = common_msgs::vehicle::kCmdLength;
-    cmd.gear_position = 1;
-    cmd.working_mode = 1;
-    cmd.racing_num = static_cast<uint8_t>(config_.system.racing_num);
-    cmd.racing_status = 1;
+    // #31：意图（转角/加速度标定）归本函数，线帧拼装走 toMsg。
+    common_msgs::vehicle::VehicleCommandRaw raw;
+    raw.gear_position = 1;
+    raw.working_mode = 1;
+    raw.racing_num = static_cast<uint8_t>(config_.system.racing_num);
+    raw.racing_status = 1;
 
     // 前轮转角映射统一走 SteeringCalibration（零位/比例/限幅均由 steering.* 参数配置）
-    cmd.steering = static_cast<uint8_t>(steering_calib_.encodeRad(steering_rad));
+    raw.steering = static_cast<uint8_t>(steering_calib_.encodeRad(steering_rad));
 
     // #15：加速度 -> 油门/制动 统一到共用执行器标定层（含非有限降级 + clamp-before-narrow，杜绝负值→255）。
     const auto tb = actuator_calib_.encode(accel_mps2);
-    cmd.pedal_ratio = tb.pedal;
-    cmd.brake_force = tb.brake;
+    raw.pedal_ratio = tb.pedal;
+    raw.brake_force = tb.brake;
 
-    cmd.checksum = CmdChecksum(cmd);
-    cmd_pub_->publish(cmd);
+    cmd_pub_->publish(common_msgs::vehicle::toMsg(raw));
 }
 
 void MpcControllerNode::PublishEmergencyBrake() {
-    common_msgs::msg::HuatVehicleCmd cmd;
-    cmd.head1 = common_msgs::vehicle::kCmdHead1;
-    cmd.head2 = common_msgs::vehicle::kCmdHead2;
-    cmd.length = common_msgs::vehicle::kCmdLength;
-    cmd.gear_position = 1;
-    cmd.working_mode = 1;
-    cmd.racing_num = static_cast<uint8_t>(config_.system.racing_num);
-    cmd.racing_status = 4;
-    cmd.steering = static_cast<uint8_t>(steering_calib_.neutralRaw());
-    cmd.pedal_ratio = 0;
-    cmd.brake_force = actuator_calib_.emergencyBrakeRaw();
-    cmd.checksum = CmdChecksum(cmd);
-    cmd_pub_->publish(cmd);
+    common_msgs::vehicle::VehicleCommandRaw raw;
+    raw.gear_position = 1;
+    raw.working_mode = 1;
+    raw.racing_num = static_cast<uint8_t>(config_.system.racing_num);
+    raw.racing_status = 4;
+    raw.steering = static_cast<uint8_t>(steering_calib_.neutralRaw());
+    raw.pedal_ratio = 0;
+    raw.brake_force = actuator_calib_.emergencyBrakeRaw();
+    cmd_pub_->publish(common_msgs::vehicle::toMsg(raw));
 }
 
 void MpcControllerNode::PublishPredictedPath(const std::vector<PredictedPoint>& trajectory) {

@@ -19,7 +19,8 @@
 #include "interface_contract_qos.hpp"  // #14：契约话题 QoS 单一来源
 #include "rclcpp/rclcpp.hpp"
 #include "std_msgs/msg/string.hpp"
-#include "task_state_machine.h"  // #16：TaskSafetyStateMachine
+#include "task_state_machine.h"     // #16：TaskSafetyStateMachine
+#include "vehicle_command_frame.h"  // #31：线帧组装唯一拥有者
 
 using common_msgs::contract::makeQoS;
 using common_msgs::vehicle::ActuatorCalibration;
@@ -241,19 +242,8 @@ class CommandArbiterNode : public rclcpp::Node {
     }
 
     void publishRaw(const VehicleCommandRaw& raw) {
-        common_msgs::msg::HuatVehicleCmd m;
-        m.head1 = common_msgs::vehicle::kCmdHead1;
-        m.head2 = common_msgs::vehicle::kCmdHead2;
-        m.length = common_msgs::vehicle::kCmdLength;
-        m.steering = raw.steering;
-        m.brake_force = raw.brake_force;
-        m.pedal_ratio = raw.pedal_ratio;
-        m.gear_position = raw.gear_position;
-        m.working_mode = raw.working_mode;
-        m.racing_num = raw.racing_num;
-        m.racing_status = raw.racing_status;
-        m.checksum = checksumRaw(raw);
-        pub_out_->publish(m);
+        // #31：线帧拼装唯一走 toMsg，本函数只剩发布。
+        pub_out_->publish(common_msgs::vehicle::toMsg(raw));
     }
 
     // 故障注入验收的机读证据：状态迁移、仲裁理由、各源信任状态与本帧出口字节一起落盘。

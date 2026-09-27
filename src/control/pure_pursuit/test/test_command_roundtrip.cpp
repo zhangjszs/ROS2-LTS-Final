@@ -14,10 +14,12 @@
 #include "pure_pursuit/vehicle_command_encoder.h"
 #include "steering_calibration.h"
 #include "vehicle_command_codec.h"
+#include "vehicle_command_frame.h"  // #31：线帧组装唯一拥有者
 
 using common_msgs::vehicle::ActuatorCalibration;
 using common_msgs::vehicle::checksumRaw;
 using common_msgs::vehicle::SteeringCalibration;
+using common_msgs::vehicle::toMsg;
 using common_msgs::vehicle::VehicleCommandRaw;
 using common_msgs::vehicle::verifyChecksum;
 using common_msgs::vehicle::verifyFrame;
@@ -141,4 +143,45 @@ TEST(CommandRoundTrip, FrameHeadIsNotCoveredByChecksumSoMustBeCheckedSeparately)
     cmd.head1 = 0x00;  // 整帧错位：校验和依旧自洽
     EXPECT_TRUE(verifyChecksum(rawOf(cmd), good));
     EXPECT_FALSE(verifyFrame(cmd.head1, cmd.head2, cmd.length));
+}
+
+// #31：toMsg 是线帧唯一组装点——raw 进，同值 msg 出（帧头/长度/校验和一次成型）。
+TEST(CommandRoundTrip, ToMsgAssemblesFrameFromRawIntent) {
+    VehicleCommandRaw raw;
+    raw.steering = 90;
+    raw.brake_force = 0;
+    raw.pedal_ratio = 30;
+    raw.gear_position = 1;
+    raw.working_mode = 1;
+    raw.racing_num = 7;
+    raw.racing_status = 1;
+    const auto msg = toMsg(raw);
+    EXPECT_TRUE(verifyFrame(msg.head1, msg.head2, msg.length));
+    EXPECT_EQ(msg.steering, 90u);
+    EXPECT_EQ(msg.brake_force, 0u);
+    EXPECT_EQ(msg.pedal_ratio, 30u);
+    EXPECT_EQ(msg.gear_position, 1u);
+    EXPECT_EQ(msg.working_mode, 1u);
+    EXPECT_EQ(msg.racing_num, 7u);
+    EXPECT_EQ(msg.racing_status, 1u);
+    EXPECT_TRUE(verifyChecksum(rawOf(msg), msg.checksum));
+}
+
+// #31：encoder 与 toMsg 同源——同一意图经两条路组帧，出口字节一致。
+TEST(CommandRoundTrip, EncoderAgreesWithToMsg) {
+    VehicleCommandEncoder enc(90);
+    const auto via_enc = enc.encode(90, 0, 30, 1, 1, 7, 1);
+    VehicleCommandRaw raw;
+    raw.steering = 90;
+    raw.brake_force = 0;
+    raw.pedal_ratio = 30;
+    raw.gear_position = 1;
+    raw.working_mode = 1;
+    raw.racing_num = 7;
+    raw.racing_status = 1;
+    const auto via_tomsg = toMsg(raw);
+    EXPECT_EQ(via_enc.checksum, via_tomsg.checksum);
+    EXPECT_EQ(via_enc.steering, via_tomsg.steering);
+    EXPECT_EQ(via_enc.brake_force, via_tomsg.brake_force);
+    EXPECT_EQ(via_enc.pedal_ratio, via_tomsg.pedal_ratio);
 }
