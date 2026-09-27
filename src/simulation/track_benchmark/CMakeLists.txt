@@ -93,6 +93,13 @@ if(BUILD_TESTING)
   target_link_libraries(test_kpi_evaluator
     track_benchmark_lib
   )
+  # #29：速度包络单一实现回归门（header-only 纯 std，链包内 lib 取 include 路径）
+  ament_add_gtest(test_speed_envelope
+    test/test_speed_envelope.cpp
+  )
+  target_link_libraries(test_speed_envelope
+    track_benchmark_lib
+  )
 endif()
 
 ament_export_include_directories(include)

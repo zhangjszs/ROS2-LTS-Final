@@ -15,6 +15,7 @@
 // #19 B1：MPC 数学核（mpc_controller_lib，无 rclcpp 依赖）离线接入
 #include "mpc_controller/mpc_model.hpp"
 #include "track_benchmark/kpi_evaluator.hpp"
+#include "track_benchmark/speed_envelope.hpp"  // #29：速度包络单一实现（PP 分支与 MPC 参考同函数）
 #include "track_benchmark/track_generator.hpp"
 #include "vehicle_simulator/bicycle_model.hpp"
 
@@ -81,15 +82,16 @@ constexpr double kConeBiasRad = 0.05;
 
 // #19 B1：中心线 → MPC 参考路径（逐点显式速度按 --speed-source 口径，与 PP 同一剖面；
 // speed_valid=true 确保 MpcModel 不回填 target_speed，两种口径真正可区分）。
+// #29：限速包络走 speed_envelope.hpp 单一实现（与 PP 分支同函数），不得在此另写一份。
 [[nodiscard]] std::vector<mpc::ReferencePoint> build_mpc_reference(const std::vector<CenterlinePoint>& cl,
                                                                    const std::string& speed_source, double const_speed,
                                                                    double lat_accel_max, double v_max) {
     std::vector<mpc::ReferencePoint> ref;
     ref.reserve(cl.size());
     for (const auto& p : cl) {
-        const double k = std::abs(p.curvature);  // 限速看幅值（与 PP 同一式）
-        const double v_curve =
-            (speed_source == "constant") ? const_speed : std::sqrt(lat_accel_max / std::max(k, 1e-3));
+        const double v_curve = (speed_source == "constant")
+                                   ? const_speed
+                                   : benchmark::referenceSpeedForCurvature(p.curvature, lat_accel_max, v_max);
         // .curvature 传带符号值：MPC 前馈项 d(1) = -v·κ·Ts 依赖转向方向；skidpad/trackdrive 生成器
         // 已给出符号（track_generator.cpp:145），而 PP 基线口径只取幅值限速，两者不互相影响。
         ref.push_back({.x = p.x,
@@ -260,10 +262,11 @@ RunResult run(const RunnerConfig& cfg) {
             steer = std::clamp(steer, -vp.max_steer_angle, vp.max_steer_angle);
 
             // 曲率限速 + P 控制器（--speed-source constant 时改用固定限速，作公平对比的另一口径）
-            const double kappa = std::abs(cl[idx].curvature);
-            const double v_curve = (cfg.speed_source == "constant")
-                                       ? cfg.const_speed_mps
-                                       : std::sqrt(cfg.lat_accel_max / std::max(kappa, 1e-3));
+            // #29：限速包络走 speed_envelope.hpp 单一实现（与 MPC 参考构建同函数）。
+            const double v_curve =
+                (cfg.speed_source == "constant")
+                    ? cfg.const_speed_mps
+                    : benchmark::referenceSpeedForCurvature(cl[idx].curvature, cfg.lat_accel_max, vp.max_speed);
             const double v_ref = std::min(vp.max_speed, v_curve);
             accel = std::clamp(cfg.speed_kp * (v_ref - s.v), -vp.max_decel, vp.max_accel);
         }
