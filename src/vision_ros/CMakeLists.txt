@@ -31,4 +31,9 @@ install(DIRECTORY models/
     PATTERN "*.pt"
 )
 
+if(BUILD_TESTING)
+  find_package(ament_cmake_pytest REQUIRED)
+  ament_add_pytest_test(test_vision_quality test/test_vision_quality.py)
+endif()
+
 ament_package()
