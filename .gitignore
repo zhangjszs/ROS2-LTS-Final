@@ -15,6 +15,8 @@ COLCON_IGNORE
 *.bag.active
 *.db3
 *.mcap
+# launch_ros 的参数临时文件（= tempfile.gettempdir() 不可写时会落在仓库根，#42）
+launch_params_*
 benchmark_*.md
 
 # ============================================================

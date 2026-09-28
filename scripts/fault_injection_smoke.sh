@@ -33,6 +33,11 @@ export ROS_LOCALHOST_ONLY=1
 : "${ROS_HOME:=$PWD/build/.ros}"
 export ROS_HOME
 mkdir -p "$ROS_HOME"
+# #42：launch_ros 的参数临时文件落在 tempfile.gettempdir()（=TMPDIR）；只读 /tmp 时会
+# 掉进仓库根变成未跟踪的 launch_params_*（污染 git status）。指到工作区内可写目录。
+: "${TMPDIR:=$PWD/build/tmp}"
+export TMPDIR
+mkdir -p "$TMPDIR"
 
 CHAIN="${CHAIN:-arbiter}"
 if [ "$CHAIN" != "arbiter" ] && [ "$CHAIN" != "direct" ]; then
