@@ -37,6 +37,7 @@ bash scripts/lint_cpp.sh              # clang-format + cppcheck, no build — se
 bash scripts/lint_shell.sh [--strict]  # #41: bash -n over scripts/*.sh + git hooks (shellcheck advisory)
 bash scripts/check_cpp20.sh           # lint + full build with -DBUILD_TESTING=ON
 colcon test && colcon test-result     # enforce gtest results after build
+bash scripts/core_standalone_check.sh  # #22/#40: pure-std 单测脱 ROS 跑在 ASan+UBSan 下（含覆盖审计）
 
 source /opt/ros/jazzy/setup.bash && source install/setup.bash   # runtime checks need both
 bash scripts/headless_smoke.sh        # #13: nodes actually register on graph (no GUI/hardware)
@@ -56,6 +57,12 @@ bash scripts/fault_injection_smoke.sh   # #16: 10 software fault cases judged fr
 显式绕过，但需在评审说明。`lint_shell.sh` 里 `bash -n` 是必查项（包括“一个脚本都没找到”
 也判红），shellcheck 为建议性（`--strict` 才因告警判红）。两个 workflow 的 apt 步骤均已装
  clang-format / cppcheck / shellcheck。
+
+新增共用层单测的约定（#40）：`src/**/test/test_*.cpp` 每一个都必须在
+`tests/core_standalone/CMakeLists.txt` 里“交代”——能脱 ROS 编译就 `add_core_test(...)`，
+不能（依赖生成消息头 / PCL）就在文件尾的排除清单里写明原因。两者都不做的
+`core_standalone_check.sh` 直接判红。这样 #38 那类只在 sanitizer 下暴露的 UB
+不会因“新测试默默不进本门”而溜掉。
 
 Do NOT write ad-hoc verification when a script above already covers a gate — extend the script instead, so the fix lands in CI too.
 

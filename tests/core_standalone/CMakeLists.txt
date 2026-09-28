@@ -21,6 +21,9 @@ if(CORE_ASAN)
 endif()
 
 find_package(GTest REQUIRED)
+# #40：MPC 数学核（mpc_model/qp_solver）自带 Eigen 头，而本入口的设计前提就是“不 source ROS”，
+# 所以直接依赖系统的 Eigen3（与 CI 构 mpc_controller 时用的是同一份）。
+find_package(Eigen3 REQUIRED)
 enable_testing()
 
 get_filename_component(REPO_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../.." ABSOLUTE)
@@ -33,8 +36,13 @@ set(CORE_INCLUDE_DIRS
     "${REPO_ROOT}/src/control/mpc_controller/include"
     "${REPO_ROOT}/src/planning/straight_line_planner/include"
     "${REPO_ROOT}/src/planning/velocity_profiler/include"
+    "${REPO_ROOT}/src/safety/safety_monitor/include"
     "${REPO_ROOT}/src/sensors/cone_tracker/include"
+    "${REPO_ROOT}/src/sensors/cone_fusion/include"
     "${REPO_ROOT}/src/simulation/track_benchmark/include"
+    "${REPO_ROOT}/src/simulation/vehicle_simulator/include"
+    "${REPO_ROOT}/src/planning/urinay/include"
+    "${EIGEN3_INCLUDE_DIR}"
 )
 
 # add_core_test(<name> [HAS_MAIN] SOURCES <src>...)
@@ -98,3 +106,65 @@ add_core_test(test_cone_tracker_differential
 add_core_test(test_freshness_lease
     SOURCES
         "${REPO_ROOT}/src/safety/safety_monitor/test/test_freshness_lease.cpp")
+
+# ===================== #40：把剩下的纯 std 单测拉进 ASan+UBSan 门 =====================
+# 原则：能脱 ROS 编译的全部注册；确实不行的写进下方“排除清单”，不允许默默漏着。
+
+# 控制：MPC 数学核（盒约束 QP + 运动学模型），只依赖 Eigen
+add_core_test(test_qp_solver
+    SOURCES
+        "${REPO_ROOT}/src/control/mpc_controller/test/test_qp_solver.cpp"
+        "${REPO_ROOT}/src/control/mpc_controller/src/qp_solver.cpp")
+add_core_test(test_mpc_tracking
+    SOURCES
+        "${REPO_ROOT}/src/control/mpc_controller/test/test_mpc_tracking.cpp"
+        "${REPO_ROOT}/src/control/mpc_controller/src/mpc_model.cpp"
+        "${REPO_ROOT}/src/control/mpc_controller/src/qp_solver.cpp")
+
+# 评测：速度包络 + KPI 报告的 schema 边界（speed_envelope 为 header-only）
+add_core_test(test_speed_envelope
+    SOURCES
+        "${REPO_ROOT}/src/simulation/track_benchmark/test/test_speed_envelope.cpp")
+
+# 安全：停车状态机（锁存/重启语义，纯 std 共用层）
+add_core_test(test_stop_state_machine
+    SOURCES
+        "${REPO_ROOT}/src/safety/safety_monitor/test/test_stop_state_machine.cpp"
+        "${REPO_ROOT}/src/safety/safety_monitor/src/state_machine/stop_state_machine.cpp")
+
+# 感知：锥桶去重算法与融合工具（均不依赖 PCL/msgs）
+add_core_test(test_cone_dedup_algo
+    SOURCES
+        "${REPO_ROOT}/src/sensors/cone_tracker/test/test_cone_dedup_algo.cpp"
+        "${REPO_ROOT}/src/sensors/cone_tracker/src/cone_dedup_algo.cpp")
+add_core_test(test_cone_fusion_utils
+    SOURCES
+        "${REPO_ROOT}/src/sensors/cone_fusion/test/test_cone_fusion_utils.cpp"
+        "${REPO_ROOT}/src/sensors/cone_fusion/src/cone_fusion_utils.cpp")
+
+# 规划：赛程主管状态机（纯 std）
+add_core_test(test_race_director
+    SOURCES
+        "${REPO_ROOT}/src/planning/urinay/test/test_race_director.cpp"
+        "${REPO_ROOT}/src/planning/urinay/src/race/race_director.cpp")
+
+# 排除清单（#40 逐个数过，不靠“碰巧没加”）——这些测试文件本身零 rclcpp，
+# 但传递依赖 ROS 生成消息头或 PCL，无法在“不 source ROS”的入口里编译：
+#   test_command_roundtrip      → pure_pursuit/vehicle_command_encoder.h 组的是
+#                                common_msgs::msg::HuatVehicleCmd（需生成消息）
+#   test_vehicle_state_estimator → vehicle_state_estimator.h 直接 include rclcpp + msgs
+#   test_bicycle_model          → 测试文件自己 include sensor_simulator.hpp
+#                                （后者拉 common_msgs/msg/huat_cone.hpp）；
+#                                同文件里的 bicycle_model.cpp 本身是纯 std，
+#                                要进本门需先把传感器仿真部分拆出 core（#22 风格）
+#   test_icp_apf_planner         → icp_apf_planner.hpp include common_msgs/geometry msgs
+#   test_way / test_kdtree_concepts / test_point_concepts
+#                                → Way/delaunay/kdtree 链路 include msgs 与 PCL
+#   test_three_way_comparison    → 文件开头只有 std include，但背后半部分拉
+#                                structures/Node.hpp（include common_msgs/msg/huat_cone.hpp）
+#   test_lidar_cluster_scoring / test_lidar_cluster_component → PCL 点云类型
+#   test_line_detector           → line_detector.hpp include common_msgs/msg/huat_cone.hpp
+#                                 （测试文件自己只 include 该头，没直接碰 rclcpp）
+#   test_pure_pursuit           → 节点级测试，依赖 rclcpp
+# 它们仍由 colcon 侧 `colcon test` 跑（普通构建，无 sanitizer）；要在 sanitizer 下跑
+# 需要先做 #22 风格的 core/ROS 拆分，那不在本 issue 范围。
