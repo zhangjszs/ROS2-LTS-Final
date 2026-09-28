@@ -32,7 +32,7 @@
 | 7 | 曲率限速与最低速度冲突 | [#13](https://github.com/zhangjszs/ROS1-LTS-Final/issues/13) 最低速度覆盖横向约束 | 向心加速度约束优先，允许剖面出现低于 `min_velocity` 的目标速度；退化几何不给可行驶速度 | `CornerLimitOverridesMinimumCruisingSpeed`、`DegenerateGeometryMustNotYieldDrivableSpeed` | 缺陷修复差异 |
 | 8 | 跟踪确认语义（本仓 #32→#35 已收敛） | ROS1 `cone_tracker`（confirm 近 3 / 远 2、coast 近 5 / 远 8、仅输出已确认、加成 0.1）在 ROS2 只剩去重器；#35 前节点默认 `min_track_frames=1`、kalman/ego 关闭使确认语义等价失效 | 同 detection 序列→同 confirmed 输出 + coast 存活帧；未确认不外泄；#35 后节点默认 `min_track_frames=3`、kalman/ego 开启，yaml 同步（`cone_dedup.yaml`），远近分档差异保留为预期算法差异（单值 3 取近距保守值） | `ReferenceTrackerTest.*`（规格）+ `CurrentLayerTest.NodeDefaultsConvergedToConfirmationSemantics` + `DefaultChainFlickerNeverConfirmsAndCoastSurvives`（`test_cone_tracker_differential`） | 缺陷修复差异（#35 收敛；远近分档未做按预期算法差异记录） |
 
-## 本会话差分夹具新发现的缺陷（已修）
+## 差分夹具新发现的缺陷（已修）
 
 | 项 | 内容 |
 | --- | --- |
@@ -40,6 +40,16 @@
 | 归属 | 矩阵第 2 行 + 第 7 行；即 ROS1 [#9](https://github.com/zhangjszs/ROS1-LTS-Final/issues/9)、[#13](https://github.com/zhangjszs/ROS1-LTS-Final/issues/13) 的同一缺陷类在 ROS2 里的新形态（此前未被 #1–#12 任一 issue 覆盖） |
 | 修复 | 退化分支改为 `target_speed = 0.0`（#11 语义下的合法"停车目标"，即明确不可行）；节点侧改用 `contract::geometryValid()` 守卫，几何非法时**原样透传不臆造速度**并告警 |
 | 回归 | `DegenerateGeometryMustNotYieldDrivableSpeed`（含 0 点、1 点、含 NaN 三种输入）+ 既有 `EmptyAndDegeneratePath` |
+
+## 静态审查新发现的缺陷（#38，已修）
+
+| 项 | 内容 |
+| --- | --- |
+| 缺陷 | 转角编解码 `SteeringCalibration` 无类型外的合法性概念：`encodeRad(NaN)` 经 `std::clamp(NaN)`→`std::lround(NaN)`（unspecified）得到 **raw 0**，而 `decodeRad(0)` 又把越界 raw 夹回量程→**-25° 满舵**；参数把 `min_raw/max_raw` 写反则直接踩 `std::clamp` 的 `lo<=hi` 前置条件（libstdc++ 断言 **abort**，无断言时为 UB）；`units_per_degree=0` 时 `decodeRad` 产出 **inf** |
+| 归属 | 矩阵第 1 行（clamp-before-narrow + 非有限降级）与第 6 行（零位/比例/限幅由单一标定表达）的同一缺陷类在**转角轴**上的缺失；纵向已由 `ActuatorCalibration` 实现守卫，横向一直没做（旧文档把“非有限安全”笼统记在 `test_vehicle_command_codec` 名下，而该文件对 `steering` 只有校验和一处引用） |
+| 修复 | 非有限输入一律落零位；所有标定字段先经 `sanitized*()` 规整（保证有限、`lo<=hi`、量程在字节宽度内、`units>0`）再参与 clamp/除法；新增 `isConfigValid()` 与 `encodeRadChecked().safe_fallback`，PP/MPC 启动时非法配置直接 `RCLCPP_ERROR`；合法标定的输出逐值不变 |
+| 回归 | `test_steering_calibration` 的 `SteeringCalibrationGuardTest` 7 例（非有限落零位 / 降级可观测 / 上下限写反不崩 / `units≤0` 不产 inf / 超字节宽度不回绕 / 非法零位被规整 / 合法输出逐值不变），已注册进 `tests/core_standalone` |
+| 机制备注 | `lround(NaN)` 不属 UB，**UBSan 不报**，靠 gtest 断言拦；`std::clamp(lo>hi)` 在本工具链以断言 abort 呈现（测试进程退出码 134）→ ctest 判红。两者都不依赖“上游碰巧没有 NaN”，契约层自身成立 |
 
 ## 有意保持"证据不足"的部分（不得提前收口）
 

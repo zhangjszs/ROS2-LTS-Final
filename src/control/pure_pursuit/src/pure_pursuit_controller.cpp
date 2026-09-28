@@ -48,6 +48,15 @@ PurePursuitController::PurePursuitController(rclcpp::Node::SharedPtr node)
         .min_raw = static_cast<double>(params_.algorithm.steering.mapping.min_raw),
         .max_raw = static_cast<double>(params_.algorithm.steering.mapping.max_raw),
     };
+    // #38：误配标定（NaN / 上下限写反 / units<=0 / 超字节宽度）不再静默生效：编解码层会取
+    // 安全域规整值继续跑（不崩、不产出满舵），但启动时必须明确报错，避免参数错误被掩盖。
+    if (!steering_calib_.isConfigValid()) {
+        RCLCPP_ERROR(node_->get_logger(),
+                     "[pure_pursuit] steering mapping 配置非法（需四字段有限、0<units、min_raw<=max_raw 且落在 "
+                     "[0,255]）: neutral=%g units_per_degree=%g min_raw=%g max_raw=%g；已按安全域规整，请修正参数",
+                     steering_calib_.neutral, steering_calib_.units_per_degree, steering_calib_.min_raw,
+                     steering_calib_.max_raw);
+    }
     steering_ = steering_calib_.neutralRaw();
     encoder_ = VehicleCommandEncoder(steering_);
     pedal_ratio_ = 0;

@@ -44,6 +44,11 @@ QoS 值即 `interface_contract.h` 中对应 `kQos*` 描述符；消费者据此�
 - 到底盘 raw 的字节编码由**共用执行器适配层**负责，均在 `common_msgs` 纯 std 头中：
   - 转角：`SteeringCalibration`（`vehicle_command` 的 `steering` 字节），
     `raw = neutral + deg·units_per_degree`，clamp `[min_raw,max_raw]`；默认对齐仿真协议 90/1/±25°。
+    与纵向同构的安全约束（#38）：**非有限转角输入一律落零位**，标定字段误配（NaN /
+    上下限写反 / `units≤0` / 量程超出 `[0,255]`）不得触发 `std::clamp` 前置条件违反
+    （旧实现在此直接 abort），而是取安全域规整值继续运行；误配经 `isConfigValid()`
+    与 `encodeRadChecked().safe_fallback` 显式可观测，PP / MPC 启动时对非法配置报错。
+    返回值保证落在字节宽度内，调用方可直接 `static_cast<uint8_t>` 而不发生窄化回绕。
   - 纵向：`ActuatorCalibration`（`vehicle_command_codec.h`），加速度↔`pedal_ratio`/`brake_force` 百分比，
     油门与制动**互斥**；关键安全约束：**clamp-before-narrow + 非有限降级**（对齐 ROS1 #6“负油门→255”
     缺陷类），非有限/缺失一律降级为“无油门 + 安全制动”。
@@ -58,8 +63,10 @@ QoS 值即 `interface_contract.h` 中对应 `kQos*` 描述符；消费者据此�
   部署基线集中在 `src/launch/huat_launch/config/vehicle_calibration.yaml`（作为 launch `parameters` 首项，
   值与代码默认一致，接入 0–255 满量程底盘只改参数不改代码）。
 - 标定版本经 `actuator.calibration_version` 参数透传（默认 `sim-default-0`）；真实底盘协议待实车标定后仅改参数/递增版本，
-  禁止在模块内散落硬编码。往返一致性与方向/量化由 `test_steering_calibration`，非有限/限幅安全由
-  `test_vehicle_command_codec`，**跨消息边界（物理量 → `HuatVehicleCmd` → 解码）整链由 `test_command_roundtrip`** 断言。
+  禁止在模块内散落硬编码。往返一致性与方向/量化由 `test_steering_calibration`，纵向非有限/限幅安全由
+  `test_vehicle_command_codec`，**转角侧非有限输入与误配标定的守卫由 `test_steering_calibration`
+  的 `SteeringCalibrationGuardTest`（#38）**，**跨消息边界（物理量 → `HuatVehicleCmd` → 解码）整链由
+  `test_command_roundtrip`** 断言；其中纯 std 部分同时注册进 `tests/core_standalone`（ASan+UBSan）跑一道。
 - 标定状态与待测项：见 [BENCH_CALIBRATION_TEMPLATE.md](BENCH_CALIBRATION_TEMPLATE.md)；截至本提交，
   零位/方向/比例/满量程/制动建立/指令超时仍全部**未标定**，软件适配完成不代表实车适配完成。
 

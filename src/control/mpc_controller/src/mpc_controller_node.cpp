@@ -111,6 +111,15 @@ void MpcControllerNode::LoadParameters() {
     get_parameter("steering.units_per_degree", steering_calib_.units_per_degree);
     get_parameter("steering.min_raw", steering_calib_.min_raw);
     get_parameter("steering.max_raw", steering_calib_.max_raw);
+    // #38：误配标定不再静默生效（也再不会把节点弄崩）：编解码层取安全域规整值，
+    // 但启动时必须明确报错，避免参数错误被掩盖。
+    if (!steering_calib_.isConfigValid()) {
+        RCLCPP_ERROR(get_logger(),
+                     "[MPC] steering 映射配置非法（需四字段有限、0<units、min_raw<=max_raw 且落在 [0,255]）: "
+                     "neutral=%g units_per_degree=%g min_raw=%g max_raw=%g；已按安全域规整，请修正参数",
+                     steering_calib_.neutral, steering_calib_.units_per_degree, steering_calib_.min_raw,
+                     steering_calib_.max_raw);
+    }
     get_parameter("safety.state_source_age_tolerance_sec", state_source_age_tolerance_sec_);
     get_parameter("path.reference_speed_default", reference_speed_default_);
 

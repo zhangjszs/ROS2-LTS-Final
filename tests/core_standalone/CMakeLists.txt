@@ -57,6 +57,9 @@ add_core_test(test_interface_contract
 # #15 执行器协议编解码（纯 std 帧/校验和/标定）
 add_core_test(test_vehicle_command_codec
     SOURCES "${REPO_ROOT}/src/control/pure_pursuit/test/test_vehicle_command_codec.cpp")
+# #38 转向编解码的非有限输入/误配标定守卫（旧实现在此会报 std::clamp / lround UB）
+add_core_test(test_steering_calibration
+    SOURCES "${REPO_ROOT}/src/control/pure_pursuit/test/test_steering_calibration.cpp")
 # #16 任务×安全状态机与最终指令仲裁（纯 std 共用层）
 add_core_test(test_task_state_machine
     SOURCES "${REPO_ROOT}/src/safety/safety_monitor/test/test_task_state_machine.cpp")
