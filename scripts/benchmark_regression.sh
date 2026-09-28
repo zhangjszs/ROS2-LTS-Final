@@ -13,6 +13,7 @@
 #      终态/有效圈/越界必须一致，rmse 与圈速允许 RMSE_TOL / LAP_TOL 比例容差）。基线按
 #      <name>.<track_version>.json 版本化命名：口径变化须显式重录（RECORD_BASELINE=1），
 #      旧版本文件保留为历史基线，不会被覆盖或静默漂移（#17 验收最后一条）。
+#      非默认速度口径另加一段：`<name>.<track_version>.<arm>.json`（#43），既有 v1 文件不动。
 #   7) 速度口径对比（#19 A 前置）：同赛道、同控制器、同种子下分别跑“曲率限速”与
 #      “固定限速”两种参照。两者都必须完赛，且圈速必须可区分——否则“控制器变快”
 #      可能只是速度策略不同的假象。
@@ -272,8 +273,71 @@ else
     fail=1
 fi
 
+echo "=== 7c) profiler 臂基线对账（#43：第三臂不得无基线裸奔）==="
+# 命名方案：默认 curvature 口径沿用第 6 节的 <name>.<track_version>.json（三条既有 v1 基线
+# 一字不改，历史对账链不断）；非默认口径**追加口径段** → <name>.<track_version>.<arm>.json。
+# 第 6 节不加分支：那会让默认口径的匹配逻辑一起改动，风险大于收益。
+# 本节必须排在 7b 之后——只有那时才有 profiler 输出。
+python3 - "$BASE_DIR" "$OUT_DIR" "$RMSE_TOL" "$LAP_TOL" "${RECORD_BASELINE:-0}" <<'PY'
+import json, os, sys
+
+base_dir, out_dir, rmse_tol, lap_tol, rec = sys.argv[1:6]
+rmse_tol, lap_tol = float(rmse_tol), float(lap_tol)
+name, arm = "trackdrive", "profiler"
+src = os.path.join(out_dir, f"{name}_{arm}.json")
+if not os.path.isfile(src):
+    print(f"FAIL {name}/{arm}: 缺本轮输出 {src}，无法对账")
+    sys.exit(1)
+d = json.load(open(src))
+slug = str(d.get("track_version", "unversioned")).replace("/", ".")
+dst = os.path.join(base_dir, f"{name}.{slug}.{arm}.json")
+# 防覆盖护栏：本臂基线必须落在带口径段的文件名上，绝不允许写到第 6 节用的
+# <name>.<slug>.json——那是 curvature 口径的 v1 锚点，覆盖它等于偷改基线。
+bn = os.path.basename(dst)
+assert bn.endswith(f".{arm}.json") and bn != f"{name}.{slug}.json", bn
+
+if rec == "1":
+    text = json.dumps(d, ensure_ascii=False, indent=2) + "\n"
+    if os.path.isfile(dst) and open(dst).read() == text:
+        print(f"OK   {name}/{arm}: 基线未变 {bn}")
+    else:
+        os.makedirs(base_dir, exist_ok=True)
+        with open(dst, "w") as f:
+            f.write(text)
+        print(f"REC  {name}/{arm}: 已录制 {bn}（带口径段，curvature 基线文件未被触碰）")
+    sys.exit(0)
+
+if not os.path.isfile(dst):
+    print(f"FAIL {name}/{arm}: 缺版本化基线 {bn}")
+    print("       第三臂没基线 = 该臂自身口径漂移时无报警（#43 要堵的洞）。")
+    print("       若确为有意建立/变更基线：RECORD_BASELINE=1 bash scripts/benchmark_regression.sh")
+    sys.exit(1)
+b = json.load(open(dst))
+fails = []
+# 硬口径：除第 6 节那组外额外锁 lat_accel_source——臂的身份不得偷换
+for k in ("track_version", "run_status", "valid_laps", "out_of_bounds_events", "collision_events",
+          "lat_accel_source"):
+    if b.get(k) != d.get(k):
+        fails.append(f"{k} 从 {b.get(k)!r} 变到 {d.get(k)!r}")
+for k, tol in (("rmse_lateral_m", rmse_tol), ("best_valid_lap_time_s", lap_tol)):
+    bv, ov = float(b.get(k) or 0), float(d.get(k) or 0)
+    if bv == 0 and ov == 0:
+        continue
+    ref = bv if bv else 1.0
+    if abs(ov - bv) / ref > tol:
+        fails.append(f"{k} {bv} -> {ov} 超出比例容差 {tol}")
+if fails:
+    print(f"FAIL {name}/{arm} 基线对账不通过（基线 {bn}）：")
+    for item in fails:
+        print("       -", item)
+    print("       若确为有意改动：RECORD_BASELINE=1 重录该臂基线（旧文件保留为历史，不得删改）。")
+    sys.exit(1)
+print(f"OK   {name}/{arm}: 口径与 {bn} 一致 (track_version={slug}；第三臂已受基线守护)")
+PY
+[ $? -eq 0 ] || fail=1
+
 if [ "${fail}" -ne 0 ]; then
   echo "Benchmark regression: FAILED"
   exit 1
 fi
-echo "Benchmark regression: 正向完成性 + 可复现性 + 负样本判据 + 单一赛道来源 + 基线对账 + 速度口径 全部通过 ✔"
+echo "Benchmark regression: 正向完成性 + 可复现性 + 负样本判据 + 单一赛道来源 + 基线对账 + 速度口径 + 第三臂基线 全部通过 ✔"
