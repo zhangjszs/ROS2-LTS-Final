@@ -81,6 +81,10 @@ add_core_test(test_throttle_controller
 # #22 增量 2：MPC path→ReferencePoint core
 add_core_test(test_path_reference_builder
     SOURCES "${REPO_ROOT}/src/control/mpc_controller/test/test_path_reference_builder.cpp")
+# #45（#19 协议 P0 前置）：车辆参数一致性自检（文本扫四处真值文件，需仓库根宏）
+add_core_test(test_param_consistency
+    SOURCES "${REPO_ROOT}/src/control/mpc_controller/test/test_param_consistency.cpp")
+target_compile_definitions(test_param_consistency PRIVATE FSAC_REPO_ROOT="${REPO_ROOT}")
 # #22 增量 3：straight_line_planner 锥桶边界 core（自带 main）
 add_core_test(test_cone_boundary HAS_MAIN
     SOURCES "${REPO_ROOT}/src/planning/straight_line_planner/test/test_cone_boundary.cpp")

@@ -101,6 +101,14 @@ if(BUILD_TESTING)
   target_link_libraries(test_path_reference_builder
     mpc_controller_lib
   )
+
+  # #45（#19 协议 P0 前置）：车辆参数一致性自检。它要读四处真值文件，
+  # 所以必须拿到仓库根；拿不到时路径拼不出来→用例失败（不会默声通过）。
+  get_filename_component(FSAC_REPO_ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../.." ABSOLUTE)
+  ament_add_gtest(test_param_consistency
+    test/test_param_consistency.cpp
+  )
+  target_compile_definitions(test_param_consistency PRIVATE FSAC_REPO_ROOT="${FSAC_REPO_ROOT_DIR}")
 endif()
 
 ament_export_include_directories(include)

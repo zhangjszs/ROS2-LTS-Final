@@ -336,8 +336,46 @@ print(f"OK   {name}/{arm}: 口径与 {bn} 一致 (track_version={slug}；第三�
 PY
 [ $? -eq 0 ] || fail=1
 
+echo "=== 8) 调参集/比较集分离机检（#45、#19 协议第 6 条）==="
+# 两条断言：
+#  ① 自审：比较集的全部命令（本节之前的所有内容）绝不允许出现调参旋钮——
+#     一旦有人把 --corridor-scale / QP 覆盖 写进第 1/6/7/7b/7c 节的命令，
+#     “基线对账”就会变成在调参集口径上对账，这个检查把它拦在门前。
+#  ② 活体探针：收紧走廊必须真的改变越界判定（否则“调参集”是个假入口，
+#     比没有更危险——它会让人以为参数已在变体上验证过）。
+#     用 out_of_bounds_**samples**而不是 events：events 是去重后的连续越界次数，
+#     收紧走廊不一定会多一次“进入”，而样本数对走廊宽度单调（写探针时先误用了
+#     events，本节当场判红——说明这道机检确实有效）。
+SELF="${BASH_SOURCE[0]}"
+if knob_lines=$(awk '/=== 8\) 调参集/{exit} /corridor-scale|--mpc-eps-abs|--mpc-eps-rel|--mpc-rho|--mpc-max-iter/ {print NR": "$0}' "$SELF") && [ -n "${knob_lines}" ]; then
+    echo "FAIL 比较集命令里出现调参旋钮（协议第 6 条：三赛道 v1 基线几何为保留比较集）："
+    printf '%s\n' "${knob_lines}" | sed 's/^/       /'
+    fail=1
+else
+    echo "OK   自审：比较集命令不含任何调参旋钮"
+fi
+
+TUNE_DIR="${OUT_DIR}/tune"
+mkdir -p "${TUNE_DIR}"
+# 极端收紧到 20%（只动越界判定，不动赛道几何/被控对象/速度剖面）
+# shellcheck disable=SC2086
+ros2 run track_benchmark benchmark_runner --out "${TUNE_DIR}/trackdrive_tight.json" \
+  --track trackdrive --require-laps 1 --timeout 400 --corridor-scale 0.2 \
+  >/dev/null 2>"${TUNE_DIR}/trackdrive_tight.log"
+base_oob=$(grep -oE '"out_of_bounds_samples": [0-9]+' "${OUT_DIR}/trackdrive.json" | grep -oE '[0-9]+' || true)
+tight_oob=$(grep -oE '"out_of_bounds_samples": [0-9]+' "${TUNE_DIR}/trackdrive_tight.json" 2>/dev/null | grep -oE '[0-9]+' || true)
+if [ -z "${tight_oob:-}" ] || [ -z "${base_oob:-}" ]; then
+    echo "FAIL 调参集探针拿不到越界样本计数（基线跑=${base_oob:-<none>} 收紧跑=${tight_oob:-<none>}）"
+    fail=1
+elif [ "${tight_oob}" -le "${base_oob}" ]; then
+    echo "FAIL --corridor-scale 没有收紧越界判定（样本 ${base_oob} → ${tight_oob}）：调参集会是个假入口"
+    fail=1
+else
+    echo "OK   调参集变体真实生效：走廊收紧 0.2 后越界样本 ${base_oob} → ${tight_oob}（仅入 ${TUNE_DIR}，不参与基线对账）"
+fi
+
 if [ "${fail}" -ne 0 ]; then
   echo "Benchmark regression: FAILED"
   exit 1
 fi
-echo "Benchmark regression: 正向完成性 + 可复现性 + 负样本判据 + 单一赛道来源 + 基线对账 + 速度口径 + 第三臂基线 全部通过 ✔"
+echo "Benchmark regression: 正向完成性 + 可复现性 + 负样本判据 + 单一赛道来源 + 基线对账 + 速度口径 + 第三臂基线 + 调参分离 全部通过 ✔"

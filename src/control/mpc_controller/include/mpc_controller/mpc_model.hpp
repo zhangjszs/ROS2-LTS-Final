@@ -44,6 +44,16 @@ class MpcModel {
     [[nodiscard]] const MpcConfig& GetConfig() const noexcept { return config_; }
 
     /**
+     * @brief 注入 QP 求解器设置（#19 调参腿，#45）
+     *
+     * 没这个入口时 `qp_solver_` 是私有的，离线侧（benchmark_runner）无法在不调车控参数的
+     * 前提下探索容差/迭代上限——而 #44 的诊断表明瓶颈正在这里。默认不调用时行为与以前一致；
+     * 只影响求解精度/停止条件，不碰车辆几何、执行器限幅与契约话题。
+     */
+    void SetQpSettings(const QpSettings& settings) noexcept { qp_solver_.SetSettings(settings); }
+    [[nodiscard]] const QpSettings& GetQpSettings() const noexcept { return qp_solver_.GetSettings(); }
+
+    /**
      * @brief 执行单步 MPC 优化求解
      * @param current_x 当前自车全局 X (m)
      * @param current_y 当前自车全局 Y (m)

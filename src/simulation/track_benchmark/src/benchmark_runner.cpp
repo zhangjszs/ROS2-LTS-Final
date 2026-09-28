@@ -67,6 +67,16 @@ struct RunnerConfig {
     // #44（#19 B2）：控制器诊断产物输出路径。**默认空 = 不写**，且它写的是独立文件，
     // 不往 KPI JSON 里加任何字段（那是三条 v1 基线的口径锚点，需逐字节一致）。
     std::string diag_out = "";
+    // #45（#19 协议第 6 条）：调参集/比较集分离。
+    // corridor_scale 只缩放**越界判定**的走廊半宽，不缩放赛道几何/锥桶/速度剖面；
+    // 默认 1.0 → 与三条 v1 基线口径逐字一致（比较集永远用 1.0）。
+    double corridor_scale = 1.0;
+    // QP 容差/迭代覆盖（-1 = 沿用代码默认值）：调参只允许在这几个旋钮上发生，
+    // 它们不影响车辆几何/执行器限幅，也不进契约话题。
+    double mpc_eps_abs = -1.0;
+    double mpc_eps_rel = -1.0;
+    double mpc_rho = -1.0;
+    int mpc_max_iter = -1;
 };
 
 // 开环固定舵角 (rad)：取单一侧的小角度，使车辆持续向走廊外推进。
@@ -212,7 +222,8 @@ RunResult run(const RunnerConfig& cfg) {
     const bool closed = track->closed_circuit;  // 由赛道定义指定，不靠名字猜（#17 单一来源）
     const auto& cl = track->centerline;
     const double total = track->total_length > 0.0 ? track->total_length : cl.back().s;
-    const double corridor_half = track->track_width * 0.5;
+    // #45：走廊半宽可缩放（仅影响越界判定）；scale==1.0 时表达式与旧值逐字相同。
+    const double corridor_half = track->track_width * 0.5 * cfg.corridor_scale;
 
     VehicleParams vp{};
     BicycleModel model(vp);
@@ -250,6 +261,30 @@ RunResult run(const RunnerConfig& cfg) {
     mpc_cfg.limits.min_accel = -vp.max_decel;
     mpc_cfg.limits.max_accel = vp.max_accel;
     mpc::MpcModel mpc_model(mpc_cfg);
+    // #45：调参集上可用的 QP 覆盖（仅当显式传入时生效；缺省完全沿用代码默认值）
+    {
+        mpc::QpSettings qs = mpc_model.GetQpSettings();
+        bool overridden = false;
+        if (cfg.mpc_eps_abs >= 0.0) {
+            qs.eps_abs = cfg.mpc_eps_abs;
+            overridden = true;
+        }
+        if (cfg.mpc_eps_rel >= 0.0) {
+            qs.eps_rel = cfg.mpc_eps_rel;
+            overridden = true;
+        }
+        if (cfg.mpc_rho > 0.0) {
+            qs.rho = cfg.mpc_rho;
+            overridden = true;
+        }
+        if (cfg.mpc_max_iter > 0) {
+            qs.max_iter = static_cast<size_t>(cfg.mpc_max_iter);
+            overridden = true;
+        }
+        if (overridden) {
+            mpc_model.SetQpSettings(qs);
+        }
+    }
     std::vector<mpc::ReferencePoint> mpc_ref =
         build_mpc_reference(cl, cfg.speed_source, cfg.const_speed_mps, cfg.lat_accel_max, vp.max_speed);
     // #36：PP 分支的 profiler 剖面与 MPC 同源（同一 helper、同一输入），按 idx 取速。
@@ -410,6 +445,9 @@ void print_usage() {
               << "       [--speed-source curvature|constant|profiler] [--const-speed MPS]\n"
               << "       [--controller pure_pursuit|mpc] [--mpc-update-period S]\n"
               << "       [--diag-out FILE.json]   # #44 控制器诊断独立产物，不写则一律行为不变\n"
+              << "       [--corridor-scale S]     # #45 调参集变体（仅缩放越界走廊；比较集必须用 1.0）\n"
+              << "       [--mpc-eps-abs V] [--mpc-eps-rel V] [--mpc-rho V] [--mpc-max-iter N]\n"
+              << "                                  # #45 QP 调参旋钮（缺省=沿用代码默认值，零漂移）\n"
               << "       [--out FILE.json]\n"
               << "       [--export-tracks DIR]   # 导出唯一赛道来源（CSV + tracks.json）后退出\n"
               << "  --inject: #17 人工构造故障场景（退出码非 0，并应在 JSON 里命中对应判据字段）\n"
@@ -473,6 +511,16 @@ int main(int argc, char** argv) {
             cfg.mpc_update_period_s = std::stod(next("0.02"));
         else if (a == "--diag-out")
             cfg.diag_out = next("");
+        else if (a == "--corridor-scale")
+            cfg.corridor_scale = std::stod(next("1"));
+        else if (a == "--mpc-eps-abs")
+            cfg.mpc_eps_abs = std::stod(next("-1"));
+        else if (a == "--mpc-eps-rel")
+            cfg.mpc_eps_rel = std::stod(next("-1"));
+        else if (a == "--mpc-rho")
+            cfg.mpc_rho = std::stod(next("-1"));
+        else if (a == "--mpc-max-iter")
+            cfg.mpc_max_iter = std::stoi(next("-1"));
         else if (a == "--const-speed")
             cfg.const_speed_mps = std::stod(next("5"));
         else if (a == "--out")
@@ -487,6 +535,14 @@ int main(int argc, char** argv) {
     }
 
     const RunResult res = run(cfg);
+    // #45：只要用了调参旋钮就显式标记，使“这一跑不是比较集口径”无法被事后忽略
+    // （KPI JSON 不能加字段，所以审计信息走 stderr + 驱动脚本的产物目录命名）。
+    if (cfg.corridor_scale != 1.0 || cfg.mpc_eps_abs >= 0.0 || cfg.mpc_eps_rel >= 0.0 || cfg.mpc_rho >= 0.0 ||
+        cfg.mpc_max_iter > 0) {
+        std::cerr << "[benchmark_runner] TUNING-KNOBS-USED corridor_scale=" << cfg.corridor_scale
+                  << " eps_abs=" << cfg.mpc_eps_abs << " eps_rel=" << cfg.mpc_eps_rel << " rho=" << cfg.mpc_rho
+                  << " max_iter=" << cfg.mpc_max_iter << "  (结果不得用作 v1 基线对账)\n";
+    }
     const std::string json = KpiEvaluator::GenerateJsonReport(res.summary);
     std::cout << json;
     if (!cfg.out.empty()) {
