@@ -62,6 +62,13 @@ QoS 值即 `interface_contract.h` 中对应 `kQos*` 描述符；消费者据此�
     **仿真器**拒收时保持上一条有效转角并计数（不读墙钟、不引入随机，确定性不变），
     **评测节点**拒收时不计入转角/KPI 样本。两处的拒收数均仅入 markdown 报告，
     **不入** `fsac.benchmark.kpi/v1` 的 JSON 字段集（加字段 = 基线口径变更，需显式重录）。
+  - **控制器诊断走独立产物（#44 / #19 B2）**：`benchmark_runner --diag-out FILE` 写
+    `fsac.benchmark.controller_diag/v1`（`control_ticks`/`command_updates`/`holds`/`solves`/
+    `failures`/`failure_rate` + `mean/p50/p95/p99/max_solve_ms`）。口径：`hold` = 这一拍下发的
+    指令**不是**该臂控制律新鲜算出的（MPC 未收敛或被注入类开环接管）；MPC 只在解算节拍上
+    计 tick，节拍之间的 ZOH 保持**不算降级**。百分位写死为**最近秩**
+    （`idx = ceil(q/100·n)`，1-based，结果必为真实样本值）；`sample_count=0` 时百分位为 0
+    表示“无数据”，不得读成“耗时为零”。PP 为解析律，`solves=0` 属正常而非缺失。
   - 制动分两档且各自标定：`emergency_brake_raw`（急停/非有限输入，默认 80）与
     `soft_brake_raw`（路径末端减速/路径缺失，默认 40）；PP 的 `InputGuard` 不再自带协议字面量，
     改为构造时由标定层注入。

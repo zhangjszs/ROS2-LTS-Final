@@ -125,6 +125,10 @@ add_core_test(test_mpc_tracking
 add_core_test(test_speed_envelope
     SOURCES
         "${REPO_ROOT}/src/simulation/track_benchmark/test/test_speed_envelope.cpp")
+# #44（#19 B2）：控制器诊断采集层（solve_time 百分位/未收敛率/降级计数，header-only 纯 std）
+add_core_test(test_controller_diag
+    SOURCES
+        "${REPO_ROOT}/src/simulation/track_benchmark/test/test_controller_diag.cpp")
 
 # 安全：停车状态机（锁存/重启语义，纯 std 共用层）
 add_core_test(test_stop_state_machine

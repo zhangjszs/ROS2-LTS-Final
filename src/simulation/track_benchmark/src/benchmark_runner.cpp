@@ -14,6 +14,7 @@
 
 // #19 B1：MPC 数学核（mpc_controller_lib，无 rclcpp 依赖）离线接入
 #include "mpc_controller/mpc_model.hpp"
+#include "track_benchmark/controller_diag.hpp"
 #include "track_benchmark/kpi_evaluator.hpp"
 #include "track_benchmark/speed_envelope.hpp"  // #29：速度包络单一实现（PP 分支与 MPC 参考同函数）
 #include "track_benchmark/track_generator.hpp"
@@ -63,6 +64,9 @@ struct RunnerConfig {
     // 逐字节一致；mpc 复用同一被控对象/赛道/KpiEvaluator，只换控制律。
     std::string controller = "pure_pursuit";
     double mpc_update_period_s = 0.02;  // MPC 解算节拍，= ROS 节点 control_rate 50Hz
+    // #44（#19 B2）：控制器诊断产物输出路径。**默认空 = 不写**，且它写的是独立文件，
+    // 不往 KPI JSON 里加任何字段（那是三条 v1 基线的口径锚点，需逐字节一致）。
+    std::string diag_out = "";
 };
 
 // 开环固定舵角 (rad)：取单一侧的小角度，使车辆持续向走廊外推进。
@@ -176,6 +180,8 @@ struct RunResult {
     std::string run_status;  // finished | timeout | diverged
     double elapsed = 0.0;
     bool ok = false;
+    // #44：只观察不干预；不进 KPI JSON，由 --diag-out 写独立产物
+    benchmark::ControllerDiagnostics diag;
 };
 
 RunResult run(const RunnerConfig& cfg) {
@@ -275,9 +281,15 @@ RunResult run(const RunnerConfig& cfg) {
 
         double steer = 0.0;
         double accel = 0.0;
+        // #44：本拍 MPC 是否真的解算了一次、结果如何（计数在下面单一地点统一结算）
+        bool mpc_ticked = false;
+        bool mpc_ok = false;
         if (use_mpc) {
             if (guard % solve_every == 0) {
                 const auto sol = mpc_model.Step(s.x, s.y, s.theta, s.v, mpc_steer, mpc_accel, mpc_ref);
+                mpc_ticked = true;
+                mpc_ok = sol.success;
+                res.diag.RecordSolve(sol.solve_time_ms, sol.success);
                 if (sol.success) {
                     mpc_steer = sol.steering_rad;
                     mpc_accel = sol.accel_mps2;
@@ -332,6 +344,27 @@ RunResult run(const RunnerConfig& cfg) {
             steer = std::clamp(steer_bias, -vp.max_steer_angle, vp.max_steer_angle);
         }
 
+        // #44：诊断统一记账（只观察，不影响上面已算出的 steer/accel）。
+        // 口径：hold = 这一拍下发的指令不是该臂控制律新鲜算出来的（MPC 未收敛，
+        // 或被注入类开环接管）；两臂各自在自己的“控制拍”上计数，跨臂比较的是比率。
+        if (use_mpc) {
+            if (mpc_ticked) {
+                res.diag.RecordControlTick();
+                if (!mpc_ok || frozen || steer_bias != 0.0) {
+                    res.diag.RecordHold();
+                } else {
+                    res.diag.RecordCommandUpdate();
+                }
+            }
+        } else {
+            res.diag.RecordControlTick();
+            if (frozen || steer_bias != 0.0) {
+                res.diag.RecordHold();
+            } else {
+                res.diag.RecordCommandUpdate();
+            }
+        }
+
         ControlCommand cmd{.target_steering = steer, .target_accel = accel};
         model.Step(cmd, cfg.dt);
         t += cfg.dt;
@@ -376,12 +409,15 @@ void print_usage() {
               << "       [--inject none|offroute|cone|reverse|stuck] [--freeze-after S]\n"
               << "       [--speed-source curvature|constant|profiler] [--const-speed MPS]\n"
               << "       [--controller pure_pursuit|mpc] [--mpc-update-period S]\n"
+              << "       [--diag-out FILE.json]   # #44 控制器诊断独立产物，不写则一律行为不变\n"
               << "       [--out FILE.json]\n"
               << "       [--export-tracks DIR]   # 导出唯一赛道来源（CSV + tracks.json）后退出\n"
               << "  --inject: #17 人工构造故障场景（退出码非 0，并应在 JSON 里命中对应判据字段）\n"
               << "  --speed-source: #19 A 速度口径（constant = 全程固定限速，与 curvature 同控制器同赛道对比；"
                  "profiler = 复用 velocity_profiler_lib 的 G-G/DP 剖面，#36 第三臂）\n"
-              << "  --controller: #19 B1 控制律（mpc = 离线 MPC 数学核；默认 pure_pursuit 与 v1 基线位级一致）\n";
+              << "  --controller: #19 B1 控制律（mpc = 离线 MPC 数学核；默认 pure_pursuit 与 v1 基线位级一致）\n"
+              << "  --diag-out:   #19 B2 控制器诊断（solve_time 百分位/未收敛率/降级次数），\n"
+              << "                写独立的 fsac.benchmark.controller_diag/v1 文件，不改 KPI JSON 一个字节\n";
 }
 
 // #17：把生成器几何导出为仿真器可直接消费的 CSV + 清单。回归脚本拿它与仓内已提交 CSV 做
@@ -435,6 +471,8 @@ int main(int argc, char** argv) {
             cfg.controller = next("pure_pursuit");
         else if (a == "--mpc-update-period")
             cfg.mpc_update_period_s = std::stod(next("0.02"));
+        else if (a == "--diag-out")
+            cfg.diag_out = next("");
         else if (a == "--const-speed")
             cfg.const_speed_mps = std::stod(next("5"));
         else if (a == "--out")
@@ -457,6 +495,19 @@ int main(int argc, char** argv) {
             out << json;
         else
             std::cerr << "WARN: cannot write " << cfg.out << "\n";
+    }
+    // #44：诊断走独立产物（默认不写），KPI JSON 保持逐字节不变 → 基线对账/逐字节验收不受影响。
+    if (!cfg.diag_out.empty()) {
+        std::ofstream dout(cfg.diag_out);
+        if (dout.is_open()) {
+            dout << res.diag.GenerateJson(res.summary.track_version, res.summary.controller_name, cfg.speed_source);
+        } else {
+            std::cerr << "WARN: cannot write " << cfg.diag_out << "\n";
+        }
+        const auto snap = res.diag.GetSnapshot();
+        std::cerr << "[benchmark_runner] diag: solves=" << snap.solves << " failures=" << snap.failures
+                  << " holds=" << snap.holds << " ticks=" << snap.control_ticks << " p50/p95/p99_ms=" << snap.p50_ms
+                  << "/" << snap.p95_ms << "/" << snap.p99_ms << "\n";
     }
     std::cerr << "[benchmark_runner] track=" << cfg.track << " controller=" << cfg.controller
               << " inject=" << cfg.inject << " speed_source=" << cfg.speed_source << " status=" << res.run_status

@@ -97,6 +97,11 @@ if(BUILD_TESTING)
   target_link_libraries(test_kpi_evaluator
     track_benchmark_lib
   )
+
+  # #44（#19 B2）：控制器诊断采集层（header-only 纯 std，也注册进 tests/core_standalone）
+  ament_add_gtest(test_controller_diag
+    test/test_controller_diag.cpp
+  )
   # #29：速度包络单一实现回归门（header-only 纯 std，链包内 lib 取 include 路径）
   ament_add_gtest(test_speed_envelope
     test/test_speed_envelope.cpp
