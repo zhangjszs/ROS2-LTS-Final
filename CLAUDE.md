@@ -34,6 +34,7 @@ source install/setup.bash
 
 ```bash
 bash scripts/lint_cpp.sh              # clang-format + cppcheck, no build — seconds; run after every edit batch
+bash scripts/lint_shell.sh [--strict]  # #41: bash -n over scripts/*.sh + git hooks (shellcheck advisory)
 bash scripts/check_cpp20.sh           # lint + full build with -DBUILD_TESTING=ON
 colcon test && colcon test-result     # enforce gtest results after build
 
@@ -49,6 +50,12 @@ bash scripts/closed_loop_sim_smoke.sh   # #17: sim→profiler→PP→sim really 
 bash scripts/closed_loop_fault_smoke.sh # #17: 闭环内注入 越界/持续碰撞/反向/未完赛/超时，断言 KpiEvaluator 报告命中失败判据
 bash scripts/fault_injection_smoke.sh   # #16: 10 software fault cases judged from /system/state + /vehicle_command (no RViz/log eyeballing)
 ```
+
+工具缺失不得静默变绿（#41）：`lint_cpp.sh` 在 clang-format / cppcheck 缺失时**判失败**而不是
+跳过（否则“本地没装工具”会伪装成“格式干净”）；确实无法安装时可用 `ALLOW_MISSING_TOOLS=1`
+显式绕过，但需在评审说明。`lint_shell.sh` 里 `bash -n` 是必查项（包括“一个脚本都没找到”
+也判红），shellcheck 为建议性（`--strict` 才因告警判红）。两个 workflow 的 apt 步骤均已装
+ clang-format / cppcheck / shellcheck。
 
 Do NOT write ad-hoc verification when a script above already covers a gate — extend the script instead, so the fix lands in CI too.
 

@@ -111,7 +111,9 @@ if [ "${QUICK:-0}" != 1 ]; then
     fi
 fi
 
-run_gate lint 1 bash scripts/lint_cpp.sh
+# lint 门同时盖 C++ 与 shell 两类静态检查（#41）；门名与判据位不变，
+# 以免 drive_gates 的门清单与历史台账对不上。
+run_gate lint 1 bash -c 'bash scripts/lint_cpp.sh && bash scripts/lint_shell.sh'
 run_gate cpp20 1 bash scripts/check_cpp20.sh
 run_gate core-standalone 1 bash scripts/core_standalone_check.sh
 run_gate benchmark 1 bash scripts/benchmark_regression.sh
