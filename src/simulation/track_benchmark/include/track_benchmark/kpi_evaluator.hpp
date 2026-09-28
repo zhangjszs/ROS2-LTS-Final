@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cmath>
+#include <cstdint>
 #include <memory>
 #include <optional>
 #include <string>
@@ -72,6 +73,10 @@ struct KpiSummary {
     // 沿参考线的**净带符号弧长进度** (m)：正向为正、反向为负。使“反向跑”不再只是
     // “有效圈=0”的缺失型证据，而是可正值识别的判据（#17 验收：反向经过起点需被识别）。
     double net_arc_progress_m{0.0};
+    // #39：转角 raw 不在标定量程内（损坏/异源/降级产物）而被拒收的指令数。
+    // 只进 markdown 报告，**故意不进** fsac.benchmark.kpi/v1 的 JSON 字段集：那份 schema
+    // 是三条 v1 基线的口径，加字段属于口径变更，必须显式重录基线才能做。
+    uint64_t rejected_steering_cmds{0};
 };
 
 /**

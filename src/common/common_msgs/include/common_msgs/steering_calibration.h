@@ -55,6 +55,12 @@ struct SteeringCalibration {
         bool safe_fallback{};
     };
 
+    struct DecodedSteering {
+        double rad{};
+        // false = 这条 raw 本身不在标定量程内（损坏/异源/降级产物），消费者应当拒收而不是夹取使用
+        bool valid{};
+    };
+
     // 物理前轮转角 (rad) -> raw 指令值。非有限输入落零位；配置误配时按规整后的安全域编码。
     [[nodiscard]] int encodeRad(double steering_rad) const noexcept { return encodeRadChecked(steering_rad).raw; }
 
@@ -86,6 +92,26 @@ struct SteeringCalibration {
         double hi = kFallbackMaxRaw;
         sanitizedRange(lo, hi);
         return clampRounded(sanitizedNeutral(), lo, hi);
+    }
+
+    /**
+     * @brief 带有效性命名的解码（#39）：区分“这是零位”与“这根本不是一个可解释的指令”。
+     *
+     * `decodeRad()` 对越界 raw 会静默夹取到量程边界（+/-满舵），单看返回值无法分辨
+     * 好坏帧；校验和也只能证明“没抄错字节”，证明不了字节值本身合法。消费者（仿真器 /
+     * 评测）应用本函数判定后再决定是否更新被控对象 / KPI 样本。
+     * 仅当标定合法（isConfigValid）且 raw 落在 [min_raw, max_raw] 内时 valid=true。
+     */
+    [[nodiscard]] DecodedSteering decodeRadChecked(int steering_raw) const noexcept {
+        if (!isConfigValid()) {
+            // 标定本身不可用：只能给出安全域内的估算值，并明确告知不可信
+            return DecodedSteering{decodeRad(steering_raw), false};
+        }
+        const double raw = static_cast<double>(steering_raw);
+        if (raw < min_raw || raw > max_raw) {
+            return DecodedSteering{decodeRad(steering_raw), false};
+        }
+        return DecodedSteering{decodeRad(steering_raw), true};
     }
 
    private:

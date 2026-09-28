@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <geometry_msgs/msg/transform_stamped.hpp>
 #include <nav_msgs/msg/path.hpp>
 #include <rclcpp/rclcpp.hpp>
@@ -53,6 +54,9 @@ class SimulatorNode : public rclcpp::Node {
     common_msgs::vehicle::SteeringCalibration steering_calib_;
     // #15：指令→物理加速度 解码走共用执行器标定层（满量程从 max_accel/max_decel 参数派生）。
     common_msgs::vehicle::ActuatorCalibration actuator_calib_;
+    // #39：steering raw 不在标定量程内（损坏/异源/降级产物）的指令计数；
+    // 这类指令不送进被控对象，保持上一条有效转角。
+    uint64_t rejected_steering_cmds_{0};
     double sensor_rate_{20.0};
     double fov_deg_{120.0};
     double max_range_{15.0};

@@ -314,6 +314,9 @@ std::string KpiEvaluator::GenerateMarkdownReport(const KpiSummary& s) {
     ss << std::format(
         "| **安全合规** | 撞桶惩罚计数 (Cone Collisions) | **{} 次** | 比赛每撞一个罚 2 秒，0 犯规为佳 |\n",
         s.cone_collisions);
+    // #39：拒收的不可解释转角指令（只入 markdown，不入 fsac.benchmark.kpi/v1 JSON）。
+    ss << std::format("\n> ⚠️ *拒收指令：转角 raw 不在标定量程内共 **{}** 条，未计入转角/KPI 样本。*\n",
+                      static_cast<unsigned long long>(s.rejected_steering_cmds));
     ss << "\n> 💡 *提示：本基准数据可直接用于后续 MPC 与 Pure Pursuit 的量化性能对比！*\n";
     return ss.str();
 }

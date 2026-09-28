@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <nav_msgs/msg/path.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <visualization_msgs/msg/marker.hpp>
@@ -34,6 +35,11 @@ class BenchmarkNode : public rclcpp::Node {
 
     // 当前状态
     double current_steer_rad_{0.0};
+    // #39：评测侧转角标定也走 steering.* 参数（此前是 `static const SteeringCalibration{}`，
+    // 默认 90/1/±25°；接非默认协议的底盘时 KPI 的转角/抖动会静默按错误协议换算）。
+    common_msgs::vehicle::SteeringCalibration steering_calib_;
+    // 越界 raw（不可解释指令）计数：不计入 KPI 样本，仅报告与告警。
+    uint64_t rejected_steering_cmds_{0};
     std::string track_type_{"skidpad"};
     std::string controller_name_{"PurePursuit"};
     std::string report_file_{""};

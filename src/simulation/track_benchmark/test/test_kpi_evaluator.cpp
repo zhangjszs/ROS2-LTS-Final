@@ -310,3 +310,21 @@ TEST(KpiEvaluatorTest, JsonReportMachineReadableFields) {
     }
     EXPECT_EQ(open, close);
 }
+
+// #39：KpiSummary 加了 rejected_steering_cmds 字段，但它**不得**泄露到
+// fsac.benchmark.kpi/v1 的 JSON —— 那份 schema 是三条 v1 基线的口径，
+// 加字段属于口径变更（需显式重录基线）。本用例把这道边界固定下来。
+TEST(KpiEvaluatorTest, RejectedSteeringCounterMustNotLeakIntoBaselineSchema) {
+    KpiSummary s;
+    s.rejected_steering_cmds = 7;
+    const std::string json = KpiEvaluator::GenerateJsonReport(s);
+    EXPECT_EQ(json.find("rejected_steering"), std::string::npos);
+
+    // 但 markdown 报告必须体现它（否则拒收发生与否在报告层不可见）
+    const std::string md = KpiEvaluator::GenerateMarkdownReport(s);
+    EXPECT_NE(md.find("拒收指令"), std::string::npos);
+    EXPECT_NE(md.find("共 **7** 条"), std::string::npos) << md;
+
+    KpiSummary zero;
+    EXPECT_NE(KpiEvaluator::GenerateMarkdownReport(zero).find("共 **0** 条"), std::string::npos);
+}

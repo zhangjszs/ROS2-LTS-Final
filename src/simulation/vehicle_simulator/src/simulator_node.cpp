@@ -105,6 +105,14 @@ void SimulatorNode::LoadParameters() {
     get_parameter("steering.units_per_degree", steering_calib_.units_per_degree);
     get_parameter("steering.min_raw", steering_calib_.min_raw);
     get_parameter("steering.max_raw", steering_calib_.max_raw);
+    // #38/#39：解码侧同样不得默默接受误配标定（上下限写反、NaN、units<=0 等）。
+    if (!steering_calib_.isConfigValid()) {
+        RCLCPP_ERROR(get_logger(),
+                     "[simulator] steering 映射配置非法（需四字段有限、0<units、min_raw<=max_raw 且落在 "
+                     "[0,255]）: neutral=%g units_per_degree=%g min_raw=%g max_raw=%g；越界 raw 将被拒收",
+                     steering_calib_.neutral, steering_calib_.units_per_degree, steering_calib_.min_raw,
+                     steering_calib_.max_raw);
+    }
 
     bicycle_model_.set_params(p);
     bicycle_model_.Reset(init_x, init_y, init_theta, init_v);
@@ -157,8 +165,19 @@ void SimulatorNode::OnVehicleCommand(const common_msgs::msg::HuatVehicleCmd::Con
     if (stop_active_)
         return;
 
-    // 转向解码统一走 SteeringCalibration（零位/比例由 steering.* 参数配置，默认 90 居中）
-    current_cmd_.target_steering = steering_calib_.decodeRad(static_cast<int>(msg->steering));
+    // 转向解码统一走 SteeringCalibration（零位/比例由 steering.* 参数配置，默认 90 居中）。
+    // #39：raw 不在标定量程内 = 不可解释的指令（旧行为是夹到边界当 ±满舵跑），
+    // 现在拒收：保持上一条有效转角并计数（拒收不改变确定性：不读墙钟、不引入随机）。
+    const auto decoded = steering_calib_.decodeRadChecked(static_cast<int>(msg->steering));
+    if (!decoded.valid) {
+        ++rejected_steering_cmds_;
+        RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 2000,
+                             "[simulator] 拒收 steering raw=%d（不在 [%.0f,%.0f] 内），保持上一指令；累计拒收=%llu",
+                             static_cast<int>(msg->steering), steering_calib_.min_raw, steering_calib_.max_raw,
+                             static_cast<unsigned long long>(rejected_steering_cmds_));
+    } else {
+        current_cmd_.target_steering = decoded.rad;
+    }
 
     // #15：油门/制动 -> 加速度 解码统一走共用执行器标定层（与原 (raw/100)*满量程、制动优先语义一致）。
     current_cmd_.target_accel = actuator_calib_.decode(msg->pedal_ratio, msg->brake_force);

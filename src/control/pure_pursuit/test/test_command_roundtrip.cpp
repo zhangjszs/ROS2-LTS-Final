@@ -196,3 +196,36 @@ TEST(CommandRoundTrip, SafeStopFactoryCarriesBrakeBytes) {
     EXPECT_TRUE(verifyFrame(msg.head1, msg.head2, msg.length));
     EXPECT_TRUE(verifyChecksum(rawOf(msg), msg.checksum));
 }
+
+// #39：越界 raw 必须“可识别”，而不是被静默夹取成 ±满舵送进被控对象 / 计入 KPI。
+TEST(CommandRoundTrip, OutOfRangeSteeringRawIsIdentifiableNotSilentlyClamped) {
+    const auto steer = simSteering();
+
+    for (const int raw : {65, 90, 115}) {
+        const auto d = steer.decodeRadChecked(raw);
+        EXPECT_TRUE(d.valid) << "raw=" << raw;
+        EXPECT_DOUBLE_EQ(d.rad, steer.decodeRad(raw)) << "raw=" << raw;
+    }
+    for (const int raw : {0, 64, 116, 200, 250}) {
+        EXPECT_FALSE(steer.decodeRadChecked(raw).valid) << "raw=" << raw;
+    }
+
+    // 向后兼容：decodeRad 的夹取语义不变（既有用例与离线基线依赖它），
+    // 但同一 raw 经 decodeRadChecked 可被消费者拒收 —— 旧缺陷（raw 0 → -25° 满舵）由此可识。
+    EXPECT_NEAR(steer.decodeRad(0), -25.0 * (SteeringCalibration::kPi / 180.0), 1e-12);
+    EXPECT_FALSE(steer.decodeRadChecked(0).valid);
+
+    // 标定本身误配 ⇒ 任何解码都不可信
+    SteeringCalibration bad = steer;
+    bad.min_raw = 115.0;
+    bad.max_raw = 65.0;
+    EXPECT_FALSE(bad.decodeRadChecked(90).valid);
+
+    // 编码端产出的 raw 必然可被解码端接受（拒收只针对外来/损坏帧）
+    for (const double deg : {-25.0, -3.0, 0.0, 3.0, 25.0}) {
+        const int raw = steer.encodeRad(deg * (SteeringCalibration::kPi / 180.0));
+        EXPECT_TRUE(steer.decodeRadChecked(raw).valid) << "deg=" << deg;
+    }
+    // #38 的非有限降级产物是零位（合法指令，不该被拒收）
+    EXPECT_TRUE(steer.decodeRadChecked(steer.encodeRad(kNaN)).valid);
+}

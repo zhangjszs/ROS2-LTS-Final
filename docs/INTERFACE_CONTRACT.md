@@ -55,10 +55,19 @@ QoS 值即 `interface_contract.h` 中对应 `kQos*` 描述符；消费者据此�
   - 指令帧常量与 16 位累加和校验：`kCmdHead1/2`/`kCmdLength`/`checksumRaw`，由 PP/MPC/仿真共用，
     杜绝协议拼装在校验和/帧头/字节窄化处散落。帧头与 `length` **不参与**累加和，故消费者必须
     `verifyFrame(head1, head2, length) && verifyChecksum(raw, checksum)` 两者齐用才能排除整帧错位。
+  - **raw 取值域判定（#39）**：校验和只能证明“没抄错字节”，证明不了字节值本身合法。因此
+    `SteeringCalibration::decodeRadChecked(raw)` 区分两件事：标定合法且 `raw ∈ [min_raw, max_raw]`
+    才 `valid=true`；否则返回“估算值 + `valid=false`”。旧 `decodeRad()` 保留夹取语义
+    （既有往返用例与离线基线依赖它），但消费者不得再拿它做合法性判定：
+    **仿真器**拒收时保持上一条有效转角并计数（不读墙钟、不引入随机，确定性不变），
+    **评测节点**拒收时不计入转角/KPI 样本。两处的拒收数均仅入 markdown 报告，
+    **不入** `fsac.benchmark.kpi/v1` 的 JSON 字段集（加字段 = 基线口径变更，需显式重录）。
   - 制动分两档且各自标定：`emergency_brake_raw`（急停/非有限输入，默认 80）与
     `soft_brake_raw`（路径末端减速/路径缺失，默认 40）；PP 的 `InputGuard` 不再自带协议字面量，
     改为构造时由标定层注入。
-- 标定参数一律走 `actuator.*`（PP / MPC / 仿真器 / 仲裁节点同名）：`max_accel`、`max_decel`、
+- 标定参数一律走 `actuator.*`（PP / MPC / 仿真器 / 仲裁节点同名）；转角协议走 `steering.*`
+  （`neutral`/`units_per_degree`/`min_raw`/`max_raw`，默认 90/1/65/115；#39 起**评测节点也同此口径**，
+  不再是写死的默认标定）：`max_accel`、`max_decel`、
   `pedal_full_scale`、`emergency_brake_raw`、`soft_brake_raw`、`calibration_version`；
   部署基线集中在 `src/launch/huat_launch/config/vehicle_calibration.yaml`（作为 launch `parameters` 首项，
   值与代码默认一致，接入 0–255 满量程底盘只改参数不改代码）。

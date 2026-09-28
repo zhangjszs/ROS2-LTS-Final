@@ -46,6 +46,9 @@ BenchmarkNode::~BenchmarkNode() {
     auto summary = evaluator_.GetSummary();
     summary.track_name = current_track_.name;
     summary.controller_name = controller_name_;
+    // #39：拒收计数只进 markdown 报告，不进 fsac.benchmark.kpi/v1 的 JSON 字段集
+    // （那份 schema 是三条 v1 基线的口径，加字段属于口径变更，需显式重录基线才能做）。
+    summary.rejected_steering_cmds = rejected_steering_cmds_;
     // #17：把累计结果落成终态（finished/timed_out/run_status），使闭环报告与离线 runner 同口径，
     // 而不是永远停在默认的 "running"。
     ApplyTerminalStatus(summary, timed_out_, require_laps_);
@@ -85,12 +88,28 @@ void BenchmarkNode::LoadParameters() {
     // #17：闭环终态判定（见 kpi_evaluator.hpp::ApplyTerminalStatus 的语义）。
     declare_parameter<double>("max_runtime_s", 0.0);
     declare_parameter<int>("require_laps", 0);
+    // #39：转角解码标定与控制器/仿真器同名同默认值（steering.*），不再写死。
+    declare_parameter<double>("steering.neutral", 90.0);
+    declare_parameter<double>("steering.units_per_degree", 1.0);
+    declare_parameter<double>("steering.min_raw", 65.0);
+    declare_parameter<double>("steering.max_raw", 115.0);
 
     get_parameter("track_type", track_type_);
     get_parameter("controller_name", controller_name_);
     get_parameter("report_file", report_file_);
     get_parameter("max_runtime_s", max_runtime_s_);
     get_parameter("require_laps", require_laps_);
+    get_parameter("steering.neutral", steering_calib_.neutral);
+    get_parameter("steering.units_per_degree", steering_calib_.units_per_degree);
+    get_parameter("steering.min_raw", steering_calib_.min_raw);
+    get_parameter("steering.max_raw", steering_calib_.max_raw);
+    if (!steering_calib_.isConfigValid()) {
+        RCLCPP_ERROR(get_logger(),
+                     "[benchmark] steering 映射配置非法（需四字段有限、0<units、min_raw<=max_raw 且落在 "
+                     "[0,255]）: neutral=%g units_per_degree=%g min_raw=%g max_raw=%g；KPI 转角结果不可信",
+                     steering_calib_.neutral, steering_calib_.units_per_degree, steering_calib_.min_raw,
+                     steering_calib_.max_raw);
+    }
 }
 
 void BenchmarkNode::SetupSubscribersAndPublishers() {
@@ -110,9 +129,18 @@ void BenchmarkNode::SetupSubscribersAndPublishers() {
 }
 
 void BenchmarkNode::OnVehicleCommand(const common_msgs::msg::HuatVehicleCmd::ConstSharedPtr& msg) {
-    // 转向解码统一走 SteeringCalibration（issue #2）：零位 90、1 raw/度，与仿真器/控制器默认一致
-    static const common_msgs::vehicle::SteeringCalibration kSteeringCalib{};
-    current_steer_rad_ = kSteeringCalib.decodeRad(static_cast<int>(msg->steering));
+    // 转向解码统一走 SteeringCalibration（#39：标定改为 steering.* 参数可配，默认与旧写死值逐值一致）。
+    // raw 不在量程内的指令不再被静默夹取成 ±满舵计入 KPI，而是拒收并计数。
+    const auto decoded = steering_calib_.decodeRadChecked(static_cast<int>(msg->steering));
+    if (!decoded.valid) {
+        ++rejected_steering_cmds_;
+        RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 2000,
+                             "[benchmark] 拒收 steering raw=%d（不在 [%.0f,%.0f] 内），不计入转角样本；累计拒收=%llu",
+                             static_cast<int>(msg->steering), steering_calib_.min_raw, steering_calib_.max_raw,
+                             static_cast<unsigned long long>(rejected_steering_cmds_));
+        return;
+    }
+    current_steer_rad_ = decoded.rad;
 }
 
 void BenchmarkNode::OnVehicleState(const common_msgs::msg::HuatCarstate::ConstSharedPtr& msg) {
