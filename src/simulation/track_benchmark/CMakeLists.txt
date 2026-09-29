@@ -102,6 +102,12 @@ if(BUILD_TESTING)
   ament_add_gtest(test_controller_diag
     test/test_controller_diag.cpp
   )
+  # #47：诊断层引用 mpc::QpAcceptance（qp_solver.hpp，纯 std+Eigen 头，无 rclcpp），
+  # 跟 runner 同一老式变量接法取 include 路径（不新建库、不改依赖方向）。
+  target_include_directories(test_controller_diag PRIVATE
+    ${mpc_controller_INCLUDE_DIRS}
+    ${EIGEN3_INCLUDE_DIR}
+  )
   # #29：速度包络单一实现回归门（header-only 纯 std，链包内 lib 取 include 路径）
   ament_add_gtest(test_speed_envelope
     test/test_speed_envelope.cpp

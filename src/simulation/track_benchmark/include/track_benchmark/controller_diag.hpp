@@ -16,6 +16,12 @@
 //   holds            控制律没能给出新指令、沿用上一条的时点数（MPC 求解失败；
 //                    注入类开环接管）。不变式：command_updates + holds == control_ticks。
 //   solves/failures  仅 MPC 有（PP 是解析律，无求解过程）；failure_rate = failures/solves。
+//   converged/accepted_approx
+//                    #47：把 failures 以外的解分成"真收敛"与"落在兜底带内的欠收敛解"。
+//                    两者之和 + failures == solves。没有这两个计数时，"未收敛率 19%"会被
+//                    读成"其余 81% 都收敛了"。实测（trackdrive@0.9，k=50，725 拍）：
+//                    457 converged + 127 accepted_approx + 141 failures，即近 1/4 拍次拿的
+//                    是"没收敛但落在兜底带内"的解。
 //
 // 百分位定义（写死，避免实现者各自解释）：升序排序后取**最近秩**
 //   idx = ceil(q/100 · n)，1-based，结果一定是某个真实样本值（不做线性插值，
@@ -29,6 +35,8 @@
 #include <string>
 #include <vector>
 
+#include "mpc_controller/qp_solver.hpp"  // #47：QpAcceptance 定级（纯 std+Eigen 头，不引入 rclcpp）
+
 namespace benchmark {
 
 class ControllerDiagnostics {
@@ -40,6 +48,9 @@ class ControllerDiagnostics {
         std::uint64_t holds{0};
         std::uint64_t solves{0};
         std::uint64_t failures{0};
+        // #47：接受定级分解（新字段一律无尾注，避开 clang-format v18/v21 对齐分组漂移）
+        std::uint64_t converged{0};
+        std::uint64_t accepted_approx{0};
         std::uint64_t sample_count{0};
         double failure_rate{0.0};
         double mean_ms{0.0};
@@ -57,12 +68,19 @@ class ControllerDiagnostics {
      * @brief 记录一次求解（仅 MPC 类迭代求解器调用）
      * @param elapsed_ms  核内算出的求解耗时；非有限或为负则**不进入分布样本**，
      *                    但 solves/failures 仍计数（耗时不可信 ≠ 求解没发生）
-     * @param success       求解是否收敛（false 即一次未收敛）
+     * @param success     求解是否被接受（false 即一次未收敛/拒收）
+     * @param acceptance  #47：核给出的接受定级；默认 kRejected，故旧两参调用点行为不变
+     *                    （PP 臂不传：解析律没有求解过程，两个分解计数保持 0）
      */
-    void RecordSolve(double elapsed_ms, bool success) noexcept {
+    void RecordSolve(double elapsed_ms, bool success,
+                     mpc::QpAcceptance acceptance = mpc::QpAcceptance::kRejected) noexcept {
         ++solves_;
         if (!success) {
             ++failures_;
+        } else if (acceptance == mpc::QpAcceptance::kConverged) {
+            ++converged_;
+        } else if (acceptance == mpc::QpAcceptance::kAcceptedApproximation) {
+            ++accepted_approx_;
         }
         if (std::isfinite(elapsed_ms) && elapsed_ms >= 0.0) {
             samples_.push_back(elapsed_ms);
@@ -76,6 +94,8 @@ class ControllerDiagnostics {
         s.holds = holds_;
         s.solves = solves_;
         s.failures = failures_;
+        s.converged = converged_;
+        s.accepted_approx = accepted_approx_;
         s.sample_count = samples_.size();
         s.failure_rate = (solves_ > 0) ? static_cast<double>(failures_) / static_cast<double>(solves_) : 0.0;
         if (!samples_.empty()) {
@@ -125,6 +145,9 @@ class ControllerDiagnostics {
         j += "  \"holds\": " + std::to_string(s.holds) + ",\n";
         j += "  \"solves\": " + std::to_string(s.solves) + ",\n";
         j += "  \"failures\": " + std::to_string(s.failures) + ",\n";
+        // #47：接受定级分解（failures + converged + accepted_approx == solves）
+        j += "  \"converged\": " + std::to_string(s.converged) + ",\n";
+        j += "  \"accepted_approx\": " + std::to_string(s.accepted_approx) + ",\n";
         j += std::format("  \"failure_rate\": {:.6},\n", s.failure_rate);
         j += "  \"sample_count\": " + std::to_string(s.sample_count) + ",\n";
         j += std::format("  \"mean_solve_ms\": {:.6},\n", s.mean_ms);
@@ -158,6 +181,8 @@ class ControllerDiagnostics {
     std::uint64_t holds_{0};
     std::uint64_t solves_{0};
     std::uint64_t failures_{0};
+    std::uint64_t converged_{0};
+    std::uint64_t accepted_approx_{0};
     std::vector<double> samples_;
 };
 

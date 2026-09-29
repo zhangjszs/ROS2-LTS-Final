@@ -2,6 +2,7 @@
 
 #include <Eigen/Dense>
 #include <cmath>
+#include <cstddef>
 #include <numbers>
 #include <vector>
 
@@ -31,6 +32,17 @@ struct MpcSolution {
     std::vector<ReferencePoint> reference_horizon;     // 参考时域轨迹
     double solve_time_ms{0.0};                         // 解算耗时 (ms)
     bool success{false};                               // 是否成功解出有效控制量
+    // #47：`success` 不携带解质量信息，而兜底带（acceptable_*）接受的欠收敛解也算
+    // success。下面四个字段把"怎么被接受的"与残差原样透出，使评测/日志能区分
+    // "真收敛"与"兜底接受"（新字段一律无尾注，避开 clang-format v18/v21 对齐分组漂移）。
+    QpAcceptance qp_acceptance{QpAcceptance::kRejected};
+    std::size_t qp_iterations{0};
+    double qp_primal_residual{0.0};
+    double qp_dual_residual{0.0};
+    // 本次停止时实际生效的收敛目标（eps_abs + eps_rel * 对应范数），供调用方直接
+    // 回答"残差比自己的容差差几个量级"，不需要再反推 eps。
+    double qp_primal_tolerance{0.0};
+    double qp_dual_tolerance{0.0};
 };
 
 /**

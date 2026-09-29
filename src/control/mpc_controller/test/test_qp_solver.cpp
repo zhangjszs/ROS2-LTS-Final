@@ -139,3 +139,44 @@ TEST(BoxQpSolverTest, ResetDropsCarriedOverAdmmState) {
     EXPECT_NEAR(after.x(0), first.x(0), 1e-9);
     EXPECT_NEAR(after.x(1), first.x(1), 1e-9);
 }
+
+// #47：接受定级是唯一判定点的纯函数形式——把"什么算被接受"钉成表，
+// 避免判据在 MpcModel 与调用方两处各写一份而漂移（历史上兜底带只写在 Step 里）。
+namespace {
+
+[[nodiscard]] QpResult MakeResult(bool converged, size_t iterations, double primal, double dual) {
+    QpResult r;
+    r.converged = converged;
+    r.iterations = iterations;
+    r.primal_residual = primal;
+    r.dual_residual = dual;
+    return r;
+}
+
+}  // namespace
+
+TEST(QpAcceptanceClassification, ConvergedResultIsAlwaysKConverged) {
+    const QpSettings settings;  // max_iter=50, acceptable=0.25/0.01
+    EXPECT_EQ(ClassifyQpAcceptance(MakeResult(true, 7, 1e-9, 1e-9), settings), QpAcceptance::kConverged);
+    // 残差再大也已经是收敛事实（判据不改语义），定级仍按 converged 走
+    EXPECT_EQ(ClassifyQpAcceptance(MakeResult(true, 50, 0.9, 0.9), settings), QpAcceptance::kConverged);
+}
+
+TEST(QpAcceptanceClassification, ExhaustedIterationsWithinBandIsAcceptedApproximation) {
+    const QpSettings settings;
+    const auto in_band = MakeResult(false, settings.max_iter, 0.2, 0.005);
+    EXPECT_EQ(ClassifyQpAcceptance(in_band, settings), QpAcceptance::kAcceptedApproximation);
+    // 边界值本身算"在带内"（与既有 Step 判据的 <= 一致）
+    const auto on_band =
+        MakeResult(false, settings.max_iter, settings.acceptable_primal_residual, settings.acceptable_dual_residual);
+    EXPECT_EQ(ClassifyQpAcceptance(on_band, settings), QpAcceptance::kAcceptedApproximation);
+}
+
+TEST(QpAcceptanceClassification, OutOfBandOrPrematureStopIsRejected) {
+    const QpSettings settings;
+    EXPECT_EQ(ClassifyQpAcceptance(MakeResult(false, settings.max_iter, 0.3, 0.005), settings),
+              QpAcceptance::kRejected);
+    EXPECT_EQ(ClassifyQpAcceptance(MakeResult(false, settings.max_iter, 0.2, 0.02), settings), QpAcceptance::kRejected);
+    // 没用尽迭代预算（例如 Cholesky 失败提前返回 iterations=0）不得享受兜底带
+    EXPECT_EQ(ClassifyQpAcceptance(MakeResult(false, 0, 1e-12, 1e-12), settings), QpAcceptance::kRejected);
+}

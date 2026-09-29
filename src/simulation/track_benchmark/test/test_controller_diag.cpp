@@ -150,3 +150,39 @@ TEST(ControllerDiagTest, JsonIsStableSeparateSchemaAndDeterministic) {
     }
     EXPECT_EQ(open, close);
 }
+
+// #47：诊断必须能区分"真收敛"与"兜底带内接受的欠收敛解"。缺这两个计数时，
+// "未收敛率 19%"会被读成"其余 81% 都收敛了"——实测默认参数下真收敛只约 16%。
+TEST(ControllerDiagTest, AcceptanceBreakdownIsCountedAndSerialized) {
+    benchmark::ControllerDiagnostics diag;
+    using mpc::QpAcceptance;
+    diag.RecordSolve(1.0, true, QpAcceptance::kConverged);
+    diag.RecordSolve(2.0, true, QpAcceptance::kConverged);
+    diag.RecordSolve(3.0, true, QpAcceptance::kAcceptedApproximation);
+    diag.RecordSolve(4.0, false, QpAcceptance::kRejected);
+
+    const auto s = diag.GetSnapshot();
+    EXPECT_EQ(s.solves, 4u);
+    EXPECT_EQ(s.failures, 1u);
+    EXPECT_EQ(s.converged, 2u);
+    EXPECT_EQ(s.accepted_approx, 1u);
+    // 不变式：分解不重不漏
+    EXPECT_EQ(s.failures + s.converged + s.accepted_approx, s.solves);
+
+    const std::string json = diag.GenerateJson("trackdrive-loop/v1", "MPC", "curvature");
+    EXPECT_NE(json.find("\"converged\": 2"), std::string::npos);
+    EXPECT_NE(json.find("\"accepted_approx\": 1"), std::string::npos);
+}
+
+// 旧两参调用点（PP 臂/历史用例）行为不变：只计 failures，分解计数保持 0。
+TEST(ControllerDiagTest, LegacyTwoArgCallsLeaveBreakdownZero) {
+    benchmark::ControllerDiagnostics diag;
+    diag.RecordSolve(1.5, true);
+    diag.RecordSolve(2.5, false);
+
+    const auto s = diag.GetSnapshot();
+    EXPECT_EQ(s.solves, 2u);
+    EXPECT_EQ(s.failures, 1u);
+    EXPECT_EQ(s.converged, 0u);
+    EXPECT_EQ(s.accepted_approx, 0u);
+}

@@ -196,11 +196,20 @@ MpcSolution MpcModel::Step(double current_x, double current_y, double current_th
     qp_solver_.Reset();
     QpResult qp_res = qp_solver_.Solve(H, g, lb, ub);
 
-    const bool acceptable_approximation =
-        !qp_res.converged && qp_res.iterations >= qp_solver_.GetSettings().max_iter &&
-        qp_res.primal_residual <= qp_solver_.GetSettings().acceptable_primal_residual &&
-        qp_res.dual_residual <= qp_solver_.GetSettings().acceptable_dual_residual;
-    if ((!qp_res.converged && !acceptable_approximation) || qp_res.x.size() < 2 || !qp_res.x.allFinite()) {
+    // #47：接受定级收敛到 ClassifyQpAcceptance 单一判定点（判据表达式一字未改，
+    // 只是不再在两处手写）。判据本身在实例级对 max_iter 单调，实测非单调现象属
+    // 闭环级联（见 docs/MPC_TUNING_FREEZE.md #47 节）。
+    solution.qp_iterations = qp_res.iterations;
+    solution.qp_primal_residual = qp_res.primal_residual;
+    solution.qp_dual_residual = qp_res.dual_residual;
+    solution.qp_primal_tolerance = qp_res.primal_tolerance;
+    solution.qp_dual_tolerance = qp_res.dual_tolerance;
+    solution.qp_acceptance = ClassifyQpAcceptance(qp_res, qp_solver_.GetSettings());
+    const bool usable_solution =
+        solution.qp_acceptance != QpAcceptance::kRejected && qp_res.x.size() >= 2 && qp_res.x.allFinite();
+    if (!usable_solution) {
+        // 残差原样保留供诊断，但解不可用即为拒收（含尺寸/非有限这两道旧守卫）。
+        solution.qp_acceptance = QpAcceptance::kRejected;
         solution.success = false;
         return solution;
     }

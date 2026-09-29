@@ -324,7 +324,7 @@ RunResult run(const RunnerConfig& cfg) {
                 const auto sol = mpc_model.Step(s.x, s.y, s.theta, s.v, mpc_steer, mpc_accel, mpc_ref);
                 mpc_ticked = true;
                 mpc_ok = sol.success;
-                res.diag.RecordSolve(sol.solve_time_ms, sol.success);
+                res.diag.RecordSolve(sol.solve_time_ms, sol.success, sol.qp_acceptance);  // #47：带上接受定级
                 if (sol.success) {
                     mpc_steer = sol.steering_rad;
                     mpc_accel = sol.accel_mps2;
@@ -562,6 +562,7 @@ int main(int argc, char** argv) {
         }
         const auto snap = res.diag.GetSnapshot();
         std::cerr << "[benchmark_runner] diag: solves=" << snap.solves << " failures=" << snap.failures
+                  << " converged=" << snap.converged << " accepted_approx=" << snap.accepted_approx
                   << " holds=" << snap.holds << " ticks=" << snap.control_ticks << " p50/p95/p99_ms=" << snap.p50_ms
                   << "/" << snap.p95_ms << "/" << snap.p99_ms << "\n";
     }

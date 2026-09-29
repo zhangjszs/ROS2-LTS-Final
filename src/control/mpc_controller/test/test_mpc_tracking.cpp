@@ -1,5 +1,9 @@
 #include <gtest/gtest.h>
 
+#include <cmath>
+#include <utility>
+#include <vector>
+
 #include "mpc_controller/mpc_model.hpp"
 
 using namespace mpc;
@@ -213,4 +217,149 @@ TEST(MpcCoreContractTest, DegenerateReferenceYieldsIdentifiableFailure) {
     EXPECT_DOUBLE_EQ(sol_single.steering_rad, 0.0);
     EXPECT_DOUBLE_EQ(sol_single.accel_mps2, 0.0);
     EXPECT_TRUE(sol_single.predicted_trajectory.empty());
+}
+
+// ============================================================================
+// #47：接受判据的单调性与"怎么被接受的"可观测性。
+//
+// 起因：#46 在调参集上观测到 max_iter 50→150 使未收敛率 19.45%→41.39%，据此怀疑
+// 判据本身非单调。实测结论（见 docs/MPC_TUNING_FREEZE.md 的 #47 节）是：
+// **同一批 QP 实例上判据严格单调**（0 例反例），那个 19%→41% 是跨轨迹的闭环统计量
+// ——解得更准 ⇒ 车更快 ⇒ 更早冲出走廊 ⇒ 后续 QP 更难。本组用例把这条契约钉住，
+// 并把"success 不等于解收敛"这件事变成机器可读（否则未收敛率会被读成收敛率）。
+// ============================================================================
+namespace {
+
+// 固定（无随机）曲率参考路径：正弦复合曲率，够难、可复现。
+[[nodiscard]] std::vector<ReferencePoint> CurvedPath(size_t n = 900, double ds = 0.25) {
+    std::vector<ReferencePoint> path;
+    double x = 0.0;
+    double y = 0.0;
+    double th = 0.0;
+    for (size_t i = 0; i < n; ++i) {
+        const double t = static_cast<double>(i);
+        const double k = 0.20 * std::sin(2.0 * M_PI * t / 180.0) + 0.06 * std::sin(2.0 * M_PI * t / 47.0);
+        path.push_back({.x = x, .y = y, .theta = th, .curvature = k, .speed = 8.0, .speed_valid = true});
+        th += k * ds;
+        x += std::cos(th) * ds;
+        y += std::sin(th) * ds;
+    }
+    return path;
+}
+
+// 固定状态序列（开环，不随求解结果漂移）⇒ 三档 max_iter 看到的是同一批 QP 实例。
+struct ProbeState {
+    double idx_frac;
+    double lat_err;
+    double heading_err;
+    double speed;
+    double prev_steer;
+    double prev_accel;
+};
+
+[[nodiscard]] std::vector<ProbeState> HardInstanceSet() {
+    std::vector<ProbeState> set;
+    for (int t = 0; t < 60; ++t) {
+        const double f = static_cast<double>(t);
+        set.push_back({.idx_frac = std::fmod(f * 0.0137, 0.8),
+                       .lat_err = 0.35 * std::sin(2.0 * M_PI * f / 9.0),
+                       .heading_err = 0.08 * std::sin(2.0 * M_PI * f / 6.0),
+                       .speed = 8.0 + 3.5 * std::sin(2.0 * M_PI * f / 21.0),
+                       .prev_steer = 0.10 * std::sin(2.0 * M_PI * f / 8.0),
+                       .prev_accel = 1.0 * std::sin(2.0 * M_PI * f / 5.0)});
+    }
+    return set;
+}
+
+// 用给定 max_iter 逐个解同一批实例，返回逐实例的接受位图与接受总数。
+[[nodiscard]] std::pair<std::vector<int>, int> AcceptanceAt(const std::vector<ReferencePoint>& path, size_t max_iter) {
+    MpcModel model(OfflineConfig());
+    QpSettings qs = model.GetQpSettings();
+    qs.max_iter = max_iter;
+    model.SetQpSettings(qs);
+
+    std::vector<int> accepted;
+    int total = 0;
+    for (const auto& s : HardInstanceSet()) {
+        const size_t idx = static_cast<size_t>(s.idx_frac * static_cast<double>(path.size()));
+        const ReferencePoint& rp = path[idx];
+        const double cx = rp.x - s.lat_err * std::sin(rp.theta);
+        const double cy = rp.y + s.lat_err * std::cos(rp.theta);
+        const auto sol = model.Step(cx, cy, rp.theta + s.heading_err, s.speed, s.prev_steer, s.prev_accel, path);
+        accepted.push_back(sol.success ? 1 : 0);
+        total += sol.success ? 1 : 0;
+    }
+    return {std::move(accepted), total};
+}
+
+}  // namespace
+
+// 实例级单调性契约：同一批 QP 上，迭代预算变大只会让"接受"变多，绝不能把
+// 上一档能用的解判成不可用（#47 标题现象若不成立即由本用例守住）。
+TEST(MpcAcceptanceContract, LargerIterationBudgetNeverLosesAcceptance) {
+    const auto path = CurvedPath();
+    const auto [ok50, n50] = AcceptanceAt(path, 50);
+    const auto [ok150, n150] = AcceptanceAt(path, 150);
+    const auto [ok300, n300] = AcceptanceAt(path, 300);
+
+    ASSERT_EQ(ok50.size(), ok150.size());
+    ASSERT_EQ(ok150.size(), ok300.size());
+    for (size_t i = 0; i < ok50.size(); ++i) {
+        EXPECT_LE(ok50[i], ok150[i]) << "实例 " << i << "：max_iter 50→150 反而拒收";
+        EXPECT_LE(ok150[i], ok300[i]) << "实例 " << i << "：max_iter 150→300 反而拒收";
+    }
+    EXPECT_LE(n50, n150);
+    EXPECT_LE(n150, n300);
+    // 用例集合必须真的"难"：若三档全都接受，本用例形同空转（负样本自检）。
+    EXPECT_LT(n50, static_cast<int>(ok50.size()));
+}
+
+// success 必须能区分"真收敛"与"兜底带内接受"：判据的 acceptable_* 是绝对量
+// （primal 0.25 ≈ 满舵 0.40 的 62%），只看 success 会把欠收敛解当成解好了。
+TEST(MpcAcceptanceContract, SuccessReportsHowItWasAccepted) {
+    const auto path = CurvedPath();
+    const auto straight = StraightPath(50.0, 8.0);
+    const size_t idx = static_cast<size_t>(0.11 * static_cast<double>(path.size()));
+    const ReferencePoint& rp = path[idx];
+    const double cx = rp.x - 0.2 * std::sin(rp.theta);
+    const double cy = rp.y + 0.2 * std::cos(rp.theta);
+
+    // (a) 平凡情形（在参考线上、速度已达目标、无历史指令）：真收敛，且没花完迭代。
+    MpcModel easy_model(OfflineConfig());
+    const auto sol_easy = easy_model.Step(10.0, 0.0, 0.0, 8.0, 0.0, 0.0, straight);
+    ASSERT_TRUE(sol_easy.success);
+    EXPECT_EQ(sol_easy.qp_acceptance, QpAcceptance::kConverged);
+    EXPECT_LT(sol_easy.qp_iterations, easy_model.GetQpSettings().max_iter);
+
+    // (b) 默认参数下的"在弯道里偏 0.2 m"：仍 success，但定级必须是"兜底接受"。
+    //     实测残差 0.079，而它自己的收敛目标是 ~1.06e-4——差 ≈750 倍，且残差比
+    //     实际下发的转角（顶在速率边界 0.060）还大。实跑 trackdrive@0.9（k=50，725 拍）
+    //     的拆分是 457 converged + 127 accepted_approx + 141 failures——只看"未收敛率
+    //     19.45%"会把那 127 拍当成收敛解。
+    MpcModel model(OfflineConfig());
+    const auto sol_approx = model.Step(cx, cy, rp.theta, 8.0, 0.0, 0.0, path);
+    ASSERT_TRUE(sol_approx.success);
+    EXPECT_EQ(sol_approx.qp_acceptance, QpAcceptance::kAcceptedApproximation);
+    EXPECT_EQ(sol_approx.qp_iterations, model.GetQpSettings().max_iter);
+    EXPECT_LE(sol_approx.qp_primal_residual, model.GetQpSettings().acceptable_primal_residual);
+    EXPECT_GT(sol_approx.qp_primal_residual, 100.0 * sol_approx.qp_primal_tolerance);
+    EXPECT_GT(sol_approx.qp_primal_tolerance, 0.0);
+    // 残差比本拍指令本身还大：指令完全由箱约束投影决定，不是 QP 最优解的收敛结果。
+    EXPECT_GT(sol_approx.qp_primal_residual, std::abs(sol_approx.steering_rad));
+
+    // (c) 拒收也必须可辨：6m 横向误差超出收敛半径 ⇒ kRejected，且残差仍然透出
+    //     （诊断侧要能回答"差多少"，而不是只知道没成功）。
+    const auto sol_reject =
+        model.Step(rp.x - 6.0 * std::sin(rp.theta), rp.y + 6.0 * std::cos(rp.theta), rp.theta, 8.0, 0.0, 0.0, path);
+    ASSERT_FALSE(sol_reject.success);
+    EXPECT_EQ(sol_reject.qp_acceptance, QpAcceptance::kRejected);
+    EXPECT_TRUE(std::isfinite(sol_reject.qp_primal_residual));
+    EXPECT_TRUE(std::isfinite(sol_reject.qp_dual_residual));
+    EXPECT_GT(sol_reject.qp_primal_residual, model.GetQpSettings().acceptable_primal_residual);
+
+    // (d) 退化输入根本没解过：定级保持 kRejected，不得留下"曾收敛"的假象。
+    const auto sol_degenerate = model.Step(1.0, 0.0, 0.0, 8.0, 0.0, 0.0, {});
+    EXPECT_FALSE(sol_degenerate.success);
+    EXPECT_EQ(sol_degenerate.qp_acceptance, QpAcceptance::kRejected);
+    EXPECT_EQ(sol_degenerate.qp_iterations, 0u);
 }
