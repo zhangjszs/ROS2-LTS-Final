@@ -117,6 +117,9 @@ run_gate lint 1 bash -c 'bash scripts/lint_cpp.sh && bash scripts/lint_shell.sh'
 run_gate cpp20 1 bash scripts/check_cpp20.sh
 run_gate core-standalone 1 bash scripts/core_standalone_check.sh
 run_gate benchmark 1 bash scripts/benchmark_regression.sh
+# #48：调参声明机检——预检单测 + 文档/声明一致性 + 参考配置可满足性（实跑两场参考）。
+# 声明与准则只在调参轮使用，但它把“准则焊死/随手放宽”两类作弊在开跑前就卡住。
+run_gate tuning-precheck 1 bash -c 'python3 scripts/tuning_precheck.py selftest && python3 scripts/tuning_precheck.py check-doc && python3 scripts/tuning_precheck.py check'
 if [ "${QUICK:-0}" != 1 ]; then
     run_gate headless-smoke 1 bash scripts/headless_smoke.sh
     run_gate qos-contract 1 bash scripts/qos_contract_check.sh

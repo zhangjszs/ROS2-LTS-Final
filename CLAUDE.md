@@ -43,6 +43,8 @@ source /opt/ros/jazzy/setup.bash && source install/setup.bash   # runtime checks
 bash scripts/headless_smoke.sh        # #13: nodes actually register on graph (no GUI/hardware)
 bash scripts/qos_contract_check.sh    # #14: live pub/sub endpoints + QoS on stop/state topics
 bash scripts/benchmark_regression.sh  # #17: offline deterministic core + injected fault negatives + track-source/baseline drift
+bash scripts/tuning_precheck.py selftest   # #48: 预检单测（纯 stdlib，不跑 runner）；另有 check-doc / check / commands / evaluate
+bash scripts/tuning_driver.sh [--precheck-only|--dry-run]  # #48: 调参网格唯一执行入口，读 config/mpc_tuning_declaration.json；开跑前强制准则可满足性预检（drive_gates 的 tuning-precheck 硬门同此）
 
 # Tolerance-based integration gates (multi-node DDS/scheduling jitter → no bit-exact claims;
 # promoted from observing to hard CI gates after accumulating consecutive greens, see #17).

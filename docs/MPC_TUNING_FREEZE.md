@@ -169,3 +169,43 @@ stderr 已核对**无** `TUNING-KNOBS-USED` 标记），产物在 `build/cmp46/`
 2. **#48 之后重做调参腿**：迭代预算、`eps_*` 目标与兜底带三者必须**同一轮**扫（现在
    `eps=1e-4 / max_iter=50 / band=0.25` 三个数在物理量级上互相差 3–4 个数量级），
    且准则要先过"参考配置可满足性预检"。在此之前，任何单独的容差调整都是在噪声上爬山。
+
+---
+
+## 8. #48 结构化重声明（2026-09-30 预注册；§1–§7 一字未改）
+
+声明本体在 `config/mpc_tuning_declaration.json`（`fsac.tuning.declaration/v1`），唯一读取方是
+`scripts/tuning_precheck.py`（check / commands / evaluate）与 `scripts/tuning_driver.sh`；
+下方区段由 `tuning_precheck.py emit-doc --write` 生成，`check-doc` 为硬门禁（drive_gates
+`tuning-precheck` 门）——文档与声明漂移即红。按 §5 第 2 条本轮**重声明**准则：绝对门槛
+（旧①"两场都 finished"）改为"不劣于参考"，从而参考配置自身逐条可满足——这不是放宽
+判据去放行赢家，而是修正 #46 暴露的规格缺陷（参考自身不可满足 ⇒ 诚实执行必得"无可采纳"）；
+重声明先于任何新一轮候选运行写定，事后不得再改（改了 `check-doc` 当场红）。
+§1/§2 是 #46 轮历史记录，其中参考配置数值仍与声明对账（同一条机检）。
+
+<!-- BEGIN AUTO-DECLARATION（由 scripts/tuning_precheck.py emit-doc 从 config/mpc_tuning_declaration.json 生成，勿手改本区段） -->
+
+- 声明 schema：`fsac.tuning.declaration/v1` ｜ 轮次：r2-redeclared-2026-09-30 ｜ 预注册于（UTC）：2026-09-29T23:55:00Z ｜ 发现者：Agent qoder-20260929T231407Z（#48 机制落地轮；先于任何新一轮候选运行写定）
+- 政策：准则集必须先于第一个候选运行整体声明，事后不得放宽（#46 教训）；开跑前逐条在参考配置上求值，不成立且未显式 waived 即拒绝开跑；比较集只在参数冻结后评估一次且命令不含调参旋钮（#45 §8）。
+- 参考配置（= `qp_solver.hpp` 现值，预检逐字对账）：`eps_abs=1e-4, eps_rel=1e-4, rho=1.0, max_iter=50`
+- 调参集（2 场，先于开跑声明）：
+  - `acceleration`：`benchmark_runner --track acceleration --controller mpc --rmse-max 0.6 --timeout 400`
+  - `trackdrive_corridor_09`：`benchmark_runner --track trackdrive --controller mpc --corridor-scale 0.9 --require-laps 1 --rmse-max 0.6 --timeout 400`
+- 保留比较集（冻结后一次性评估，命令**不得**含调参旋钮，#45 §8）：
+  - `acceleration_v1`：`benchmark_runner --track acceleration --controller mpc`
+  - `skidpad_v1`：`benchmark_runner --track skidpad --controller mpc --require-laps 1 --rmse-max 0.6 --timeout 400`
+  - `trackdrive_v1`：`benchmark_runner --track trackdrive --controller mpc --require-laps 1 --rmse-max 0.6 --timeout 400`
+- 搜索空间（27 组）：`eps_abs ∈ {1e-4, 5e-4, 1e-3}` × `eps_rel ∈ {1e-4, 5e-4, 1e-3}` × `max_iter ∈ {50, 150, 300}`；固定 `rho=1.0`
+- 选择准则（先于第一个候选写定，事后不得放宽；`不劣于参考` ⇒ 参考配置自身逐条平凡满足，预检会机械证明这一点）：
+
+  | id | 类别 | 判据 | 范围 | 豁免 |
+  | --- | --- | --- | --- | --- |
+  | C1 | filter | `终态（finished>incomplete>failed）` 不劣于参考 | all_tuning | — |
+  | C2 | filter | `rmse (m)` 不劣于参考 | all_tuning | — |
+  | C3 | filter | `用时/圈速 (s)` 不劣于参考 | all_tuning | — |
+  | C4 | filter | `未收敛率（拒收拍占比）` 不劣于参考 | trackdrive_corridor_09 | — |
+  | C5 | filter | `兜底接受率` 不劣于参考 | trackdrive_corridor_09 | — |
+  | T1 | tiebreak | 平手取与默认改动最小者（改动旋钮数 → 相对改动量 → 组合号） | all_tuning | — |
+- 已知缺口：§7.6 要求 eps / max_iter / 兜底带 acceptable_primal_residual 三者同轮扫；`acceptable_*` 尚未暴露为 runner 旋钮（#50 后续），本轮网格仍是 3 维，兜底带固定为代码默认。选参结论只能解读为该二维响应面。
+
+<!-- END AUTO-DECLARATION -->

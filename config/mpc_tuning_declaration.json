@@ -1,0 +1,110 @@
+{
+  "schema": "fsac.tuning.declaration/v1",
+  "issue": "#48",
+  "round": "r2-redeclared-2026-09-30",
+  "declared_at_utc": "2026-09-29T23:55:00Z",
+  "declared_by": "Agent qoder-20260929T231407Z（#48 机制落地轮；先于任何新一轮候选运行写定）",
+  "policy": {
+    "precheck_required": true,
+    "comparison_set_single_evaluation": true,
+    "no_knobs_in_comparison_set": true,
+    "note": "准则集必须先于第一个候选运行整体声明，事后不得放宽（#46 教训）；开跑前逐条在参考配置上求值，不成立且未显式 waived 即拒绝开跑；比较集只在参数冻结后评估一次且命令不含调参旋钮（#45 §8）。"
+  },
+  "reference_config": {
+    "source": "src/control/mpc_controller/include/mpc_controller/qp_solver.hpp",
+    "fields": {
+      "eps_abs": { "value": "1e-4" },
+      "eps_rel": { "value": "1e-4" },
+      "rho": { "value": "1.0" },
+      "max_iter": { "value": "50" }
+    }
+  },
+  "knob_cli": {
+    "eps_abs": "--mpc-eps-abs",
+    "eps_rel": "--mpc-eps-rel",
+    "rho": "--mpc-rho",
+    "max_iter": "--mpc-max-iter"
+  },
+  "tuning_set": [
+    {
+      "key": "acceleration",
+      "args": ["--track", "acceleration", "--controller", "mpc", "--rmse-max", "0.6", "--timeout", "400"]
+    },
+    {
+      "key": "trackdrive_corridor_09",
+      "args": ["--track", "trackdrive", "--controller", "mpc", "--corridor-scale", "0.9", "--require-laps", "1", "--rmse-max", "0.6", "--timeout", "400"]
+    }
+  ],
+  "comparison_set": [
+    {
+      "key": "acceleration_v1",
+      "args": ["--track", "acceleration", "--controller", "mpc"]
+    },
+    {
+      "key": "skidpad_v1",
+      "args": ["--track", "skidpad", "--controller", "mpc", "--require-laps", "1", "--rmse-max", "0.6", "--timeout", "400"]
+    },
+    {
+      "key": "trackdrive_v1",
+      "args": ["--track", "trackdrive", "--controller", "mpc", "--require-laps", "1", "--rmse-max", "0.6", "--timeout", "400"]
+    }
+  ],
+  "search_space": {
+    "grid": {
+      "eps_abs": ["1e-4", "5e-4", "1e-3"],
+      "eps_rel": ["1e-4", "5e-4", "1e-3"],
+      "max_iter": ["50", "150", "300"]
+    },
+    "fixed": { "rho": "1.0" }
+  },
+  "criteria": [
+    {
+      "id": "C1",
+      "kind": "filter",
+      "name": "终态不劣于参考（调参集两场）",
+      "metric": "run_status_rank",
+      "op": "not_worse",
+      "scope": "all_tuning"
+    },
+    {
+      "id": "C2",
+      "kind": "filter",
+      "name": "rmse 不劣化（两场）",
+      "metric": "rmse_lateral_m",
+      "op": "not_worse",
+      "scope": "all_tuning"
+    },
+    {
+      "id": "C3",
+      "kind": "filter",
+      "name": "用时不劣化（两场）",
+      "metric": "lap_time_s",
+      "op": "not_worse",
+      "scope": "all_tuning"
+    },
+    {
+      "id": "C4",
+      "kind": "filter",
+      "name": "未收敛率（拒收拍占比）不高于参考（trackdrive 变体）",
+      "metric": "failure_rate",
+      "op": "not_worse",
+      "scope": "trackdrive_corridor_09"
+    },
+    {
+      "id": "C5",
+      "kind": "filter",
+      "name": "兜底接受率不高于参考（trackdrive 变体，§7.3：兜底带接受也是解质量代价）",
+      "metric": "accepted_approx_rate",
+      "op": "not_worse",
+      "scope": "trackdrive_corridor_09"
+    },
+    {
+      "id": "T1",
+      "kind": "tiebreak",
+      "name": "平手取与默认改动最小者（改动旋钮数 → 相对改动量 → 组合号）"
+    }
+  ],
+  "known_gaps": [
+    "§7.6 要求 eps / max_iter / 兜底带 acceptable_primal_residual 三者同轮扫；`acceptable_*` 尚未暴露为 runner 旋钮（#50 后续），本轮网格仍是 3 维，兜底带固定为代码默认。选参结论只能解读为该二维响应面。"
+  ]
+}
