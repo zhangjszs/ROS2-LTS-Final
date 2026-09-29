@@ -1,9 +1,9 @@
 # STATE.md — 时间流接力状态（当前活跃 Agent）
 
-> agent-id：`relay-2026-09-29-A`｜时间范围：2026-09-29T14:20Z – 16:35Z｜环境：本机 lyrical（CI 是 Jazzy）
+> agent-id：`relay-2026-09-29-A`｜时间范围：2026-09-29T14:20Z – 17:35Z｜环境：本机 lyrical（CI 是 Jazzy）
 > 上一棒台账：`.omc/unattended/{progress,plan,decisions}.md`（`.omc/` 被 gitignore；本文件入 git，是接力主状态源）。
 
-## 本轮（一次会话内三轮）做完的事
+## 本轮（一次会话内四轮）做完的事
 
 | 轮 | 任务 | commit / issue | CI |
 |---|---|---|---|
@@ -12,6 +12,7 @@
 | 2 | **#47 [P1]** 根因测量：前提**证伪**（判据在实例级严格单调），交付定级可观测性 + 单调性守护 + `docs/MPC_TUNING_FREEZE.md` §7 复盘 | `d0ecb52` | push 36591703745 success + 手动 nightly 36591912422 success → **#47 已关闭** |
 | 2 | 新建 **#50 [P2]**：MPC 持续拒解在运行期不可见（由 §7.4 对照实验暴露） | issue #50 | 待做 |
 | 3 | **#41 [P2]** 收尾：shellcheck-present 分支（CI 0.9.0 + 本机 0.11.0）与 `--strict` 两个分支都补了实测证据 | 已关闭 | — |
+| 4 | **#49 后续机检**：把“断言型 ros2 查询不得用 `--no-daemon`”做成 `lint_shell.sh` 的第 2 段必查项（只匹配真实执行行，注释/echo 不误报），并同步 CLAUDE.md | `ea66f17` | 本地 drive_gates 12/12 PASS（602s） |
 
 ## #47 的关键结论（**别再重复调查**）
 
@@ -26,18 +27,21 @@
    150/300 档 `max|lat|` 恶化到 33.9/45.1 m。兜底带现在是承重墙。
 5. `best-iterate`（历史最优残差）是死代码：冷启动单次运行里终端残差不劣化（0 反例），best == terminal。
 
-## 门禁状态（HEAD `d0ecb52`）
+## 门禁状态（round-4 收尾）
 
-- 本机全量：`lint_cpp` rc=0、`lint_shell` rc=0、`colcon build` rc=0（19 包）、
+- 本机全量（含新机检）：`lint_cpp` rc=0、`lint_shell` rc=0（三段：bash -n / --no-daemon 机检 /
+  shellcheck 建议层；注入违反行的负样本 rc=1）、`colcon build` rc=0（19 包）、
   `colcon test` **475 tests / 0 fail**、`core_standalone_check` 全绿（ASan+UBSan）、
   `benchmark_regression.sh` rc=0（三条 v1 基线 + profiler 第三臂基线**逐字节一致**）、
-  `drive_gates.sh` **12/12 PASS、hard_fail=0（558s）**。
+  `drive_gates.sh` **12/12 PASS、hard_fail=0（602s）**。
 - 三条容差型集成门禁（Closed-loop simulation smoke / Closed-loop fault samples / Fault injection smoke）
   **已经是硬阻断**（`d2ef36c feat(#17): 三条容差型集成门禁由观察期转正为 CI 硬阻断`，
   `ci.yml` 里已无 `continue-on-error`）。#49 因此不是“观察期假失败”而是**硬门假失败 = 主干红**；
-  现已修复，累计样本：ci.yml 连续 2 次 success（36586172764 @c56c0a4、36591703745 @d0ecb52），
-  nightly 1 次全绿（36591912422 @d0ecb52，drive_gates 12/12 PASS、hard_fail=0、562s）。
-  “转正”这件事没有待办了；剩下的只有**抗抖动：把“断言型查询不得用 --no-daemon”做成机检**（见 HANDOFF 二.4）。
+  现已修复，累计样本：**ci.yml 连续 3 次 success**（36586172764 @c56c0a4、36591703745 @d0ecb52、
+  36594654367 @9028aab），**nightly 1 次全绿**（36591912422 @d0ecb52，drive_gates 12/12 PASS、
+  hard_fail=0、562s）。
+  “转正”这件事没有待办了；而“把断言型查询不得用 `--no-daemon` 做成机检”已在本棒 round-4
+  落地（`lint_shell.sh` 第 2 段必查项），#49 同类复发会在 lint 门当场变红。
 
 ## 环境事实（本机 ≠ CI，踩过才写下来的）
 
