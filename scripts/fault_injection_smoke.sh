@@ -38,6 +38,13 @@ mkdir -p "$ROS_HOME"
 : "${TMPDIR:=$PWD/build/tmp}"
 export TMPDIR
 mkdir -p "$TMPDIR"
+# 节点判据必须走 ros2cli daemon（与 headless_smoke / qos_contract_check 同一契约）：
+# `ros2 node list --no-daemon` 每次在新进程里从零做 DDS 发现，短生命周期内常常还没收到
+# 周期性 SPDP 公告就返回 → 空表 → 判"未注册"。Jazzy CI 实测两次因此假失败
+# （nightly 36494908622、push 36582919764，均报 CHAIN=arbiter 节点未全部注册）。
+# 先停一次 daemon：残留/空转的 daemon 会让 node list 恒空；停掉后首次调用会按当前
+# ROS_HOME/TMPDIR 重建（CI 上本来就没有旧 daemon，等于空操作）。CI 契约，勿为迁就单机改回。
+timeout 20 ros2 daemon stop >/dev/null 2>&1 || true
 
 CHAIN="${CHAIN:-arbiter}"
 if [ "$CHAIN" != "arbiter" ] && [ "$CHAIN" != "direct" ]; then
@@ -99,7 +106,7 @@ fi
 
 miss=1
 for _ in $(seq 1 12); do
-    nodes="$(timeout 12 ros2 node list --no-daemon 2>/dev/null)"
+    nodes="$(timeout 12 ros2 node list 2>/dev/null)"
     miss=0
     for n in $EXPECT_NODES; do
         grep -q "$n" <<<"$nodes" || miss=1
@@ -108,7 +115,7 @@ for _ in $(seq 1 12); do
     sleep 2
 done
 if [ "$miss" -ne 0 ]; then
-    echo "FAIL: 故障注入拓扑节点未全部注册（CHAIN=$CHAIN）；ros2 node list --no-daemon 输出："
+    echo "FAIL: 故障注入拓扑节点未全部注册（CHAIN=$CHAIN）；最后一次 ros2 node list 输出："
     printf '%s\n' "$nodes"
     tail -n 3 "$OUT_DIR"/*.log
     exit 1

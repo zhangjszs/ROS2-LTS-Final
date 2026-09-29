@@ -38,6 +38,9 @@ mkdir -p "$ROS_HOME"
 : "${TMPDIR:=$PWD/build/tmp}"
 export TMPDIR
 mkdir -p "$TMPDIR"
+# 残留/空转的 ros2cli daemon 会让 `ros2 node list` 恒空（本机实测）；先停一次，后续
+# 调用按当前 ROS_HOME/TMPDIR 重建（CI 上无旧 daemon，等于空操作）。
+timeout 20 ros2 daemon stop >/dev/null 2>&1 || true
 
 OUT_DIR="${1:-build/closed_loop_fault}"
 mkdir -p "$OUT_DIR" || { echo "cannot create $OUT_DIR"; exit 1; }
@@ -246,11 +249,15 @@ for spec in "${SCENARIOS[@]}"; do
         -p require_laps:="${require_laps}" -p max_runtime_s:="${maxrt}" \
         -p report_file:="$OUT_DIR/${name}.md"
 
-    # 等节点上图（最多 ~15 轮，每轮自带超时）；用 --no-daemon 直接查图，避免 daemon 空表误判。
+    # 等节点上图（最多 ~15 轮，每轮自带超时）。走 daemon 持续维护的图（与
+    # headless_smoke / qos_contract_check 同一契约）：`ros2 node list --no-daemon` 在新进程
+    # 里立即查图，常常还没收到周期性 SPDP 公告 → 空表假失败（Jazzy CI：run 36494908622 /
+    # 36582919764）。代价是 daemon 缓存可能在场景间残留死节点名，因此每轮结束后先等图
+    # 排空（见循环末尾的排空等待），就绪判据才依旧精确。
     ready=0
     nodes=""
     for _ in $(seq 1 15); do
-        nodes="$(timeout 12 ros2 node list --no-daemon 2>/dev/null)"
+        nodes="$(timeout 12 ros2 node list 2>/dev/null)"
         missing=0
         for n in "${required_nodes[@]}"; do
             grep -q "$n" <<<"$nodes" || missing=1
@@ -272,6 +279,17 @@ for spec in "${SCENARIOS[@]}"; do
 
     python3 "$OUT_DIR/feeder.py" "$OUT_DIR" "$name" "$sim_dur" "$wall_cap" "$offset"
     cleanup   # 关停让 track_benchmark 析构落终态报告；同时清掉本轮全部 PID
+    # 等 daemon 图排空本轮节点名（下一场景的同名节点才能被“出现”而非“本来就在”）。
+    # 上限 ~8 轮 ×1.5s；排不空不判失败（下一轮的就绪等待仍能兑底）。
+    for _ in $(seq 1 8); do
+        gone=1
+        leftover="$(timeout 8 ros2 node list 2>/dev/null)"
+        for n in "${required_nodes[@]}"; do
+            grep -q "$n" <<<"$leftover" && gone=0
+        done
+        [ "$gone" -eq 1 ] && break
+        sleep 1.5
+    done
 done
 trap - EXIT
 

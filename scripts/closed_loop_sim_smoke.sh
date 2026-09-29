@@ -41,6 +41,9 @@ mkdir -p "$ROS_HOME"
 : "${TMPDIR:=$PWD/build/tmp}"
 export TMPDIR
 mkdir -p "$TMPDIR"
+# 残留/空转的 ros2cli daemon 会让 `ros2 node list` 恒空（本机实测）；先停一次，
+# 后续调用按当前 ROS_HOME/TMPDIR 重建（CI 上无旧 daemon，等于空操作）。
+timeout 20 ros2 daemon stop >/dev/null 2>&1 || true
 
 OUT_DIR="${1:-build/closed_loop_smoke}"
 mkdir -p "$OUT_DIR" || { echo "cannot create $OUT_DIR"; exit 1; }
@@ -104,13 +107,15 @@ start "$OUT_DIR/benchmark.log" ros2 run track_benchmark track_benchmark_node --r
     -p report_file:="$OUT_DIR/closed_loop_report.md"
 
 # 等节点上图（最多 ~12 轮，每轮自带超时）。
-# 用 `--no-daemon`：ros2cli daemon 在切换 ROS_HOME/有残留进程时会返回空列表
-# （本地实测：节点已上图但 `ros2 node list` 为空），直接查询图则确定。
+# 必须走 ros2cli daemon（与 headless_smoke / qos_contract_check / fault_injection_smoke 同一契约）：
+# `--no-daemon` 每次在新进程里从零做 DDS 发现，短生命周期内常常拿不到周期性 SPDP 公告
+# → 空表 → 判"未注册"（Jazzy CI 因此假失败：run 36494908622 / 36582919764）。
+# daemon 空表的本机真因是残留 daemon + 只读 /tmp，已在脚本头部用 TMPDIR + `ros2 daemon stop` 处理。
 required_nodes=(vehicle_simulator safety_monitor velocity_profiler pure_pursuit track_benchmark_node)
 ready=0
 nodes=""
 for _ in $(seq 1 12); do
-    nodes="$(timeout 12 ros2 node list --no-daemon 2>/dev/null)"
+    nodes="$(timeout 12 ros2 node list 2>/dev/null)"
     missing=0
     for n in "${required_nodes[@]}"; do
         grep -q "$n" <<<"$nodes" || missing=1
@@ -119,7 +124,7 @@ for _ in $(seq 1 12); do
     sleep 2
 done
 if [ "$ready" -ne 1 ]; then
-    echo "FAIL: 闭环节点未全部注册；最后一次 ros2 node list --no-daemon 输出："
+    echo "FAIL: 闭环节点未全部注册；最后一次 ros2 node list 输出："
     printf '%s\n' "$nodes" | sed 's/^/  /'
     echo "缺失判据节点：${required_nodes[*]}"
     echo "各节点日志尾部："
