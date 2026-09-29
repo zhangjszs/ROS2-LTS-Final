@@ -55,8 +55,15 @@ bash scripts/fault_injection_smoke.sh   # #16: 10 software fault cases judged fr
 工具缺失不得静默变绿（#41）：`lint_cpp.sh` 在 clang-format / cppcheck 缺失时**判失败**而不是
 跳过（否则“本地没装工具”会伪装成“格式干净”）；确实无法安装时可用 `ALLOW_MISSING_TOOLS=1`
 显式绕过，但需在评审说明。`lint_shell.sh` 里 `bash -n` 是必查项（包括“一个脚本都没找到”
-也判红），shellcheck 为建议性（`--strict` 才因告警判红）。两个 workflow 的 apt 步骤均已装
+也判红）；shellcheck 为建议性（`--strict` 才因告警判红）。两个 workflow 的 apt 步骤均已装
  clang-format / cppcheck / shellcheck。
+
+断言型 ros2 查询不得用 `--no-daemon`（#49，`lint_shell.sh` 的第 2 段必查项）：`ros2 node list
+--no-daemon` / `ros2 topic info --no-daemon` 在新进程里从零做 DDS 发现并立即查图，常在收到
+周期性 SPDP 公告之前就返回空表 → 门禁假失败（已因此在 Jazzy 判红过主干）。运行时门禁的
+节点/端点判据一律走 ros2cli daemon，脚本头部先 `timeout 20 ros2 daemon stop` 消掉残留 daemon，
+并把 `TMPDIR`/`ROS_HOME` 指到工作区（只读 /tmp 会让 daemon 起不来）。注释与 echo 里的
+`--no-daemon` 字样不算违规。
 
 新增共用层单测的约定（#40）：`src/**/test/test_*.cpp` 每一个都必须在
 `tests/core_standalone/CMakeLists.txt` 里“交代”——能脱 ROS 编译就 `add_core_test(...)`，
