@@ -67,7 +67,7 @@ FORBIDDEN_KNOB_FLAGS = {
     "--mpc-max-iter",
     "--corridor-scale",
 }
-VALID_OPS = {"not_worse", "equals", "at_most", "at_least"}
+VALID_OPS = {"not_worse", "equals", "at_most", "at_least", "strictly_better_some"}
 VALID_KINDS = {"filter", "tiebreak"}
 
 
@@ -116,14 +116,19 @@ def validate_declaration(decl: dict) -> None:
                  f"准则缺 id/kind：{crit}")
         if crit["kind"] != "filter":
             continue
-        _require(crit.get("metric") in METRIC_DIRECTIONS,
-                 f"准则 {crit['id']} 的 metric 不在确定性指标表：{crit.get('metric')!r}")
         _require(crit.get("op") in VALID_OPS,
                  f"准则 {crit['id']} 的 op 未知：{crit.get('op')!r}")
+        if crit.get("op") == "strictly_better_some":
+            ms = crit.get("metrics")
+            _require(isinstance(ms, list) and ms and all(x in METRIC_DIRECTIONS for x in ms),
+                     f"准则 {crit['id']} 的 metrics 必须是非空确定性指标列表：{ms!r}")
+        else:
+            _require(crit.get("metric") in METRIC_DIRECTIONS,
+                     f"准则 {crit['id']} 的 metric 不在确定性指标表：{crit.get('metric')!r}")
         scope = crit.get("scope", "all_tuning")
         _require(scope == "all_tuning" or scope in keys,
                  f"准则 {crit['id']} 的 scope 指向不存在的调参场景：{scope!r}")
-        if crit["op"] != "not_worse":
+        if crit["op"] not in ("not_worse", "strictly_better_some"):
             _require("value" in crit, f"绝对准则 {crit['id']} 缺 value")
         waived = crit.get("waived")
         _require(waived is None or (isinstance(waived, str) and waived.strip()),
@@ -137,8 +142,9 @@ def check_reference_matches_source(decl: dict, root: Path) -> None:
     _require(src.is_file(), f"参考配置声明的事实源不存在：{src_rel}")
     text = src.read_text(encoding="utf-8")
     for field, spec in decl["reference_config"]["fields"].items():
-        m = re.search(rf"\b{re.escape(field)}\s*\{{([^}}]*)\}}", text)
-        _require(m is not None, f"{src_rel} 里找不到成员 {field} 的默认值，声明与代码已脱节")
+        cpp_field = spec.get("cpp_field", field)  # 声明维度名与 C++ 成员名可解耦（如 acceptable_primal → *_residual）
+        m = re.search(rf"\b{re.escape(cpp_field)}\s*\{{([^}}]*)\}}", text)
+        _require(m is not None, f"{src_rel} 里找不到成员 {cpp_field} 的默认值，声明与代码已脱节")
         try:
             got = float(m.group(1))
             want = float(spec["value"])
@@ -234,9 +240,12 @@ def _metric_pair(crit: dict, ref_m: dict, cand_m: dict):
 
 def eval_filter_on_reference(crit: dict, ref_metrics: dict) -> tuple:
     """预检：准则在**参考配置自身**上成不成立。not_worse 自反必成立；
-    绝对 op 逐场景比对参考指标。返回 (satisfied, notes)。"""
+    strictly_better_some 对基线自身永不可满足（⇒ 声明必须带显式 waived，这是对
+    "改参数必须有收益"语义的诚实表达）；绝对 op 逐场景比对参考指标。"""
     if crit["op"] == "not_worse":
         return True, ["不劣于参考 ⇒ 参考配置平凡满足"]
+    if crit["op"] == "strictly_better_some":
+        return False, ["严格改进对参考基线自身定义上不可满足 ⇒ 需声明里显式 waived（豁免仅作用于预检）"]
     scopes = (crit.get("scope", "all_tuning"),)
     if scopes[0] == "all_tuning":
         scopes = tuple(ref_metrics.keys())
@@ -265,6 +274,21 @@ def eval_filter_on_candidate(crit: dict, ref_metrics: dict, cand_metrics: dict) 
     """正式判定：对候选产物逐场景求值一条 filter 准则。"""
     scope = crit.get("scope", "all_tuning")
     keys = tuple(ref_metrics.keys()) if scope == "all_tuning" else (scope,)
+    if crit["op"] == "strictly_better_some":
+        notes, hit_any = [], False
+        for key in keys:
+            for metric in crit["metrics"]:
+                ref_v, cand_v = ref_metrics[key].get(metric), cand_metrics[key].get(metric)
+                if ref_v is None or cand_v is None:
+                    continue
+                direction = METRIC_DIRECTIONS[metric]
+                better = cand_v < ref_v if direction == "min" else cand_v > ref_v
+                if better:
+                    notes.append(f"{key}: {METRIC_LABEL_ZH.get(metric, metric)} {cand_v} 严格优于参考 {ref_v}")
+                    hit_any = True
+        if not hit_any:
+            notes.append("无任何指标严格优于参考 ⇒ 改参数无收益，拒")
+        return hit_any, notes
     direction = METRIC_DIRECTIONS[crit["metric"]]
     notes, ok = [], True
     for key in keys:
@@ -363,9 +387,13 @@ def generate_doc_block(decl: dict, decl_rel: str) -> str:
     lines.append("  | --- | --- | --- | --- | --- |")
     for crit in decl["criteria"]:
         if crit["kind"] == "filter":
-            op_zh = {"not_worse": "不劣于参考", "equals": "==", "at_most": "<=",
-                     "at_least": ">="}[crit["op"]]
-            judge = f"`{METRIC_LABEL_ZH.get(crit['metric'], crit['metric'])}` {op_zh}"
+            op_zh = {"not_worse": "不劣于参考", "equals": "==", "at_most": "<=", "at_least": ">=",
+                     "strictly_better_some": "至少一项严格优于参考"}[crit["op"]]
+            if crit["op"] == "strictly_better_some":
+                items = "、".join(f"`{METRIC_LABEL_ZH.get(m, m)}`" for m in crit["metrics"])
+                judge = f"{items} 至少一项严格优于参考"
+            else:
+                judge = f"`{METRIC_LABEL_ZH.get(crit['metric'], crit['metric'])}` {op_zh}"
         else:
             judge = crit["name"]
         waived = crit.get("waived")
@@ -373,6 +401,9 @@ def generate_doc_block(decl: dict, decl_rel: str) -> str:
                      f"{crit.get('scope', 'all_tuning')} | {waived if waived else '—'} |")
     for gap in decl.get("known_gaps", []):
         lines.append(f"- 已知缺口：{gap}")
+    for crit in decl["criteria"]:
+        if crit.get("waived"):
+            lines.append(f"- 豁免说明（{crit['id']}）：{crit['waived']}")
     lines.append("")
     lines.append(MARK_END)
     return "\n".join(lines)
@@ -473,7 +504,7 @@ def cmd_check(argv) -> int:
             continue
         satisfied, notes = eval_filter_on_reference(crit, ref_metrics)
         tag = "成立" if satisfied else ("已豁免" if crit.get("waived") else "不成立")
-        print(f"  准则 {crit['id']}（{crit.get('name', crit['metric'])}）: {tag}")
+        print(f"  准则 {crit['id']}（{crit.get('name') or crit.get('metric', '')}）: {tag}")
         for n in notes:
             print(f"      - {n}")
         if satisfied:
@@ -789,6 +820,23 @@ class PrecheckTests(unittest.TestCase):
         assert_run_matches_scenario(sc, good, "x")
         none_sc = {"key": "b", "args": ["--track", "acceleration"]}
         assert_run_matches_scenario(none_sc, _metrics(), "y")  # 场景未指定 ⇒ 不检查
+
+    def test_strictly_better_some_semantics(self):
+        crit = {"id": "C6", "kind": "filter",
+                "metrics": ["rmse_lateral_m", "failure_rate"], "op": "strictly_better_some",
+                "scope": "all_tuning"}
+        ref = {"a": _metrics(rmse=0.5, failure_rate=0.1)}
+        ok, _ = eval_filter_on_reference(crit, ref)
+        self.assertFalse(ok)  # 对参考自身永远不成立 ⇒ 声明必须带 waived
+        equal = {"a": _metrics(rmse=0.5, failure_rate=0.1)}
+        hit, notes = eval_filter_on_candidate(crit, ref, equal)
+        self.assertFalse(hit)  # 平手拒（防止无收益漂移被采纳）
+        better = {"a": _metrics(rmse=0.4, failure_rate=0.1)}
+        hit, _ = eval_filter_on_candidate(crit, ref, better)
+        self.assertTrue(hit)   # 任一项严格优即过
+        worse = {"a": _metrics(rmse=0.9, failure_rate=0.2)}
+        hit, _ = eval_filter_on_candidate(crit, ref, worse)
+        self.assertFalse(hit)
 
     def test_validate_rejects_unknown_metric_and_op(self):
         decl = _minimal_decl()

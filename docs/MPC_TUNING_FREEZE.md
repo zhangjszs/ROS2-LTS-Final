@@ -185,9 +185,9 @@ stderr 已核对**无** `TUNING-KNOBS-USED` 标记），产物在 `build/cmp46/`
 
 <!-- BEGIN AUTO-DECLARATION（由 scripts/tuning_precheck.py emit-doc 从 config/mpc_tuning_declaration.json 生成，勿手改本区段） -->
 
-- 声明 schema：`fsac.tuning.declaration/v1` ｜ 轮次：r2-redeclared-2026-09-30 ｜ 预注册于（UTC）：2026-09-29T23:55:00Z ｜ 发现者：Agent qoder-20260929T231407Z（#48 机制落地轮；先于任何新一轮候选运行写定）
+- 声明 schema：`fsac.tuning.declaration/v1` ｜ 轮次：r3-scan-with-band ｜ 预注册于（UTC）：2026-09-30T01:10:00Z ｜ 发现者：Agent qoder-20260929T231407Z（轮 3 重声明：加入 acceptable_primal 维度与 C6 严格改进准则；先于本轮任何候选运行写定）
 - 政策：准则集必须先于第一个候选运行整体声明，事后不得放宽（#46 教训）；开跑前逐条在参考配置上求值，不成立且未显式 waived 即拒绝开跑；比较集只在参数冻结后评估一次且命令不含调参旋钮（#45 §8）。
-- 参考配置（= `qp_solver.hpp` 现值，预检逐字对账）：`eps_abs=1e-4, eps_rel=1e-4, rho=1.0, max_iter=50`
+- 参考配置（= `qp_solver.hpp` 现值，预检逐字对账）：`eps_abs=1e-4, eps_rel=1e-4, rho=1.0, max_iter=50, acceptable_primal=0.25, acceptable_dual=0.01`
 - 调参集（2 场，先于开跑声明）：
   - `acceleration`：`benchmark_runner --track acceleration --controller mpc --rmse-max 0.6 --timeout 400`
   - `trackdrive_corridor_09`：`benchmark_runner --track trackdrive --controller mpc --corridor-scale 0.9 --require-laps 1 --rmse-max 0.6 --timeout 400`
@@ -195,7 +195,7 @@ stderr 已核对**无** `TUNING-KNOBS-USED` 标记），产物在 `build/cmp46/`
   - `acceleration_v1`：`benchmark_runner --track acceleration --controller mpc`
   - `skidpad_v1`：`benchmark_runner --track skidpad --controller mpc --require-laps 1 --rmse-max 0.6 --timeout 400`
   - `trackdrive_v1`：`benchmark_runner --track trackdrive --controller mpc --require-laps 1 --rmse-max 0.6 --timeout 400`
-- 搜索空间（27 组）：`eps_abs ∈ {1e-4, 5e-4, 1e-3}` × `eps_rel ∈ {1e-4, 5e-4, 1e-3}` × `max_iter ∈ {50, 150, 300}`；固定 `rho=1.0`
+- 搜索空间（81 组）：`eps_abs ∈ {1e-4, 5e-4, 1e-3}` × `eps_rel ∈ {1e-4, 5e-4, 1e-3}` × `max_iter ∈ {50, 150, 300}` × `acceptable_primal ∈ {0.05, 0.15, 0.25}`；固定 `rho=1.0`
 - 选择准则（先于第一个候选写定，事后不得放宽；`不劣于参考` ⇒ 参考配置自身逐条平凡满足，预检会机械证明这一点）：
 
   | id | 类别 | 判据 | 范围 | 豁免 |
@@ -205,7 +205,61 @@ stderr 已核对**无** `TUNING-KNOBS-USED` 标记），产物在 `build/cmp46/`
   | C3 | filter | `用时/圈速 (s)` 不劣于参考 | all_tuning | — |
   | C4 | filter | `未收敛率（拒收拍占比）` 不劣于参考 | trackdrive_corridor_09 | — |
   | C5 | filter | `兜底接受率` 不劣于参考 | trackdrive_corridor_09 | — |
+  | C6 | filter | `rmse (m)`、`未收敛率（拒收拍占比）`、`兜底接受率`、`用时/圈速 (s)` 至少一项严格优于参考 | all_tuning | 严格改进对参考基线自身定义上不可满足，这是准则语义而非规格缺陷（与 #46 准则①那种「把不存在的门槛当硬门」不同）；豁免仅作用于预检，对候选照常过滤——它的作用是反方向保证：防止「平手参数被采纳」造成无收益漂移。 |
   | T1 | tiebreak | 平手取与默认改动最小者（改动旋钮数 → 相对改动量 → 组合号） | all_tuning | — |
-- 已知缺口：§7.6 要求 eps / max_iter / 兜底带 acceptable_primal_residual 三者同轮扫；`acceptable_*` 尚未暴露为 runner 旋钮（#50 后续），本轮网格仍是 3 维，兜底带固定为代码默认。选参结论只能解读为该二维响应面。
+- 已知缺口：acceptable_dual 固定为代码默认 0.01：本轮只扫 primal（控制向量 ∞-范数的主代价项），双维同扫的组合爆炸留给下一轮若有信号再做。
+- 豁免说明（C6）：严格改进对参考基线自身定义上不可满足，这是准则语义而非规格缺陷（与 #46 准则①那种「把不存在的门槛当硬门」不同）；豁免仅作用于预检，对候选照常过滤——它的作用是反方向保证：防止「平手参数被采纳」造成无收益漂移。
 
 <!-- END AUTO-DECLARATION -->
+
+---
+
+## 9. r3 调参腿执行记录（2026-09-30，qoder 棒；§1–§8 一字未改，§8 声明区段与 config 由机检同步）
+
+按 §5 第 2/3 步在 §8 声明（r3-scan-with-band：eps_abs×eps_rel×max_iter×acceptable_primal
+= 81 组，准则 C1–C6+T1）下执行了**调参集全流程**：`tuning_driver.sh` 预检（C6 走显式豁免
+通道——预检机制第一次在真实语义豁免上工作）→ 162 次 runner 运行 → `evaluate` 逐条判定。
+产物：`build/tuning_run/`（report.md + 81 组 kpi/diag JSON，不入库）。
+
+### 9.1 结果分布（首要拒绝准则）
+
+| 结局 | 组数 | 说明 |
+| --- | --- | --- |
+| 拒于 C2（rmse 劣化） | 62 | 含 **全部** `max_iter∈{150,300}` 与 `band∈{0.05,0.15}` 排——与 §7.2（闭环混沌）和 §7.4（收紧兜底带不可行）一致 |
+| 拒于 C3（圈速劣化） | 10 | 主要是 rmse 未爆的 `max_iter=300` 组：解更准→车更快→更早出走廊→圈速 15.4–16.2s > 14.5s |
+| 拒于 C6（平手无收益） | 1 | **c01 = 参考配置本身**——防"无收益漂移被采纳"按设计生效 |
+| 通过 C1–C6 | 8 | eps 松绑 + `max_iter=50` + `band=0.25`（c12/c21/c30/c39/c48/c57/c66/c75） |
+
+### 9.2 为什么 8 组"通过"仍然**不采纳任何参数**（本轮的关键判断）
+
+八组的"严格改进"全部只发生在**定级标签**上：`accepted_approx` 127→107..123
+（`converged` 相应上升），而物理指标平手到噪声位——trackdrive@0.9 `rmse`
+2.63062→2.6302..2.6306（第 4 位小数）、`failures` 141→141、圈速 14.5→14.5、
+acceleration 两场输出逐字节同参考。机制：放宽 `eps_*` 使同解更易被判 `converged`，
+**尺子松了，布没有变好**。采纳 c12（平手排序第一名）等于用协议背书一次定级注水，
+故本轮结论 = **不冻结任何参数变更**，比较集的那一次正式评估权**未消费**（没有值得
+冻结的赢家）。这是对 §2 教训的双向遵守：既不"事后放宽准则放行赢家"，也不"明知判据
+字面放行了伪改进还照本宣科地执行"——分歧如实记录，缺口另立 issue。
+
+该机制缺口已登记为 **#51 [P2]**（C6 改进集混入定级类指标 ⇒ 松绑伪改进假阳性；
+修复方向：改进集只留物理指标，定级指标保留 `not_worse` 约束），其验收要求用
+r3 产物**重放**判定（无需重跑 runner），下一轮重声明在任何候选运行之前完成。
+
+### 9.3 本轮真正测出来的东西（比"选没选出参数"更有价值）
+
+1. **band 不是自由变量**：0.05/0.15 两档在 81 组里全军覆没于 C2（rmse 爆到 8–33 m 量级），
+   §7.4 的"承重墙"结论从对照实验升级为**参数响应面证据**——收紧兜底带在当前
+   eps/max_iter 组合下系统性不可行，任何下一轮扫描不得再把"只收带"当候选策略。
+2. **eps 维度在本任务集上是定级噪声**：三维物理指标（rmse/fail/lap）对 eps 松绑不敏感
+   （噪声位内），只有定级计数敏感——这解释了 §7.3 的读数分歧，也是 #51 的直接证据。
+3. **max_iter 单调性在实例级仍成立**（§7.1 未被本轮动摇）：150/300 排的劣化路径与 §7.2
+   的"更快→更早出走廊→更难"机制链一致，不是求解器回归。
+4. 81 组 × 2 场的扫描（162 runs）全程 <5 分钟、逐拍确定——调参腿从此可以每轮重声明后
+   低成本重放。
+
+### 9.4 本轮没做的事
+
+- 未改任何 MPC 权重/容差/时域/兜底带数值（`qp_solver.hpp` 与 YAML 一字未动）；
+- 未做比较集正式评估（无冻结赢家，评估权保留给真正的候选）；
+- 未动 `benchmarks/baseline/`、门禁阈值、`fsac.benchmark.kpi/v1`；
+- 未事后修改 §8 准则文本（C6 缺口走 #51 + 下一轮重声明，不在本轮"看过结果再改判据"）。

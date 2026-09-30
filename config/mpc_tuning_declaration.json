@@ -1,9 +1,9 @@
 {
   "schema": "fsac.tuning.declaration/v1",
   "issue": "#48",
-  "round": "r2-redeclared-2026-09-30",
-  "declared_at_utc": "2026-09-29T23:55:00Z",
-  "declared_by": "Agent qoder-20260929T231407Z（#48 机制落地轮；先于任何新一轮候选运行写定）",
+  "round": "r3-scan-with-band",
+  "declared_at_utc": "2026-09-30T01:10:00Z",
+  "declared_by": "Agent qoder-20260929T231407Z（轮 3 重声明：加入 acceptable_primal 维度与 C6 严格改进准则；先于本轮任何候选运行写定）",
   "policy": {
     "precheck_required": true,
     "comparison_set_single_evaluation": true,
@@ -16,14 +16,17 @@
       "eps_abs": { "value": "1e-4" },
       "eps_rel": { "value": "1e-4" },
       "rho": { "value": "1.0" },
-      "max_iter": { "value": "50" }
+      "max_iter": { "value": "50" },
+      "acceptable_primal": { "cpp_field": "acceptable_primal_residual", "value": "0.25" },
+      "acceptable_dual": { "cpp_field": "acceptable_dual_residual", "value": "0.01" }
     }
   },
   "knob_cli": {
     "eps_abs": "--mpc-eps-abs",
     "eps_rel": "--mpc-eps-rel",
     "rho": "--mpc-rho",
-    "max_iter": "--mpc-max-iter"
+    "max_iter": "--mpc-max-iter",
+    "acceptable_primal": "--mpc-acceptable-primal"
   },
   "tuning_set": [
     {
@@ -53,7 +56,8 @@
     "grid": {
       "eps_abs": ["1e-4", "5e-4", "1e-3"],
       "eps_rel": ["1e-4", "5e-4", "1e-3"],
-      "max_iter": ["50", "150", "300"]
+      "max_iter": ["50", "150", "300"],
+      "acceptable_primal": ["0.05", "0.15", "0.25"]
     },
     "fixed": { "rho": "1.0" }
   },
@@ -99,12 +103,21 @@
       "scope": "trackdrive_corridor_09"
     },
     {
+      "id": "C6",
+      "kind": "filter",
+      "name": "改参数必须有收益：至少一项解质量指标严格优于参考",
+      "metrics": ["rmse_lateral_m", "failure_rate", "accepted_approx_rate", "lap_time_s"],
+      "op": "strictly_better_some",
+      "scope": "all_tuning",
+      "waived": "严格改进对参考基线自身定义上不可满足，这是准则语义而非规格缺陷（与 #46 准则①那种「把不存在的门槛当硬门」不同）；豁免仅作用于预检，对候选照常过滤——它的作用是反方向保证：防止「平手参数被采纳」造成无收益漂移。"
+    },
+    {
       "id": "T1",
       "kind": "tiebreak",
       "name": "平手取与默认改动最小者（改动旋钮数 → 相对改动量 → 组合号）"
     }
   ],
   "known_gaps": [
-    "§7.6 要求 eps / max_iter / 兜底带 acceptable_primal_residual 三者同轮扫；`acceptable_*` 尚未暴露为 runner 旋钮（#50 后续），本轮网格仍是 3 维，兜底带固定为代码默认。选参结论只能解读为该二维响应面。"
+    "acceptable_dual 固定为代码默认 0.01：本轮只扫 primal（控制向量 ∞-范数的主代价项），双维同扫的组合爆炸留给下一轮若有信号再做。"
   ]
 }

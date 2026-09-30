@@ -77,6 +77,10 @@ struct RunnerConfig {
     double mpc_eps_rel = -1.0;
     double mpc_rho = -1.0;
     int mpc_max_iter = -1;
+    // #48/§7.6：兜底带（acceptable_*）也必须能同轮扫——单独收紧它已被 §7.4 实测否掉，
+    // 所以调参声明的网格必须把 eps/max_iter/band 三维一起覆盖（-1 = 沿用代码默认值）。
+    double mpc_acceptable_primal = -1.0;
+    double mpc_acceptable_dual = -1.0;
 };
 
 // 开环固定舵角 (rad)：取单一侧的小角度，使车辆持续向走廊外推进。
@@ -281,6 +285,14 @@ RunResult run(const RunnerConfig& cfg) {
             qs.max_iter = static_cast<size_t>(cfg.mpc_max_iter);
             overridden = true;
         }
+        if (cfg.mpc_acceptable_primal >= 0.0) {
+            qs.acceptable_primal_residual = cfg.mpc_acceptable_primal;
+            overridden = true;
+        }
+        if (cfg.mpc_acceptable_dual >= 0.0) {
+            qs.acceptable_dual_residual = cfg.mpc_acceptable_dual;
+            overridden = true;
+        }
         if (overridden) {
             mpc_model.SetQpSettings(qs);
         }
@@ -447,6 +459,7 @@ void print_usage() {
               << "       [--diag-out FILE.json]   # #44 控制器诊断独立产物，不写则一律行为不变\n"
               << "       [--corridor-scale S]     # #45 调参集变体（仅缩放越界走廊；比较集必须用 1.0）\n"
               << "       [--mpc-eps-abs V] [--mpc-eps-rel V] [--mpc-rho V] [--mpc-max-iter N]\n"
+              << "       [--mpc-acceptable-primal V] [--mpc-acceptable-dual V]\n"  // #48/§7.6 兜底带同轮扫
               << "                                  # #45 QP 调参旋钮（缺省=沿用代码默认值，零漂移）\n"
               << "       [--out FILE.json]\n"
               << "       [--export-tracks DIR]   # 导出唯一赛道来源（CSV + tracks.json）后退出\n"
@@ -521,6 +534,10 @@ int main(int argc, char** argv) {
             cfg.mpc_rho = std::stod(next("-1"));
         else if (a == "--mpc-max-iter")
             cfg.mpc_max_iter = std::stoi(next("-1"));
+        else if (a == "--mpc-acceptable-primal")
+            cfg.mpc_acceptable_primal = std::stod(next("-1"));
+        else if (a == "--mpc-acceptable-dual")
+            cfg.mpc_acceptable_dual = std::stod(next("-1"));
         else if (a == "--const-speed")
             cfg.const_speed_mps = std::stod(next("5"));
         else if (a == "--out")
@@ -538,10 +555,11 @@ int main(int argc, char** argv) {
     // #45：只要用了调参旋钮就显式标记，使“这一跑不是比较集口径”无法被事后忽略
     // （KPI JSON 不能加字段，所以审计信息走 stderr + 驱动脚本的产物目录命名）。
     if (cfg.corridor_scale != 1.0 || cfg.mpc_eps_abs >= 0.0 || cfg.mpc_eps_rel >= 0.0 || cfg.mpc_rho >= 0.0 ||
-        cfg.mpc_max_iter > 0) {
+        cfg.mpc_max_iter > 0 || cfg.mpc_acceptable_primal >= 0.0 || cfg.mpc_acceptable_dual >= 0.0) {
         std::cerr << "[benchmark_runner] TUNING-KNOBS-USED corridor_scale=" << cfg.corridor_scale
                   << " eps_abs=" << cfg.mpc_eps_abs << " eps_rel=" << cfg.mpc_eps_rel << " rho=" << cfg.mpc_rho
-                  << " max_iter=" << cfg.mpc_max_iter << "  (结果不得用作 v1 基线对账)\n";
+                  << " max_iter=" << cfg.mpc_max_iter << " acceptable_primal=" << cfg.mpc_acceptable_primal
+                  << " acceptable_dual=" << cfg.mpc_acceptable_dual << "  (结果不得用作 v1 基线对账)\n";
     }
     const std::string json = KpiEvaluator::GenerateJsonReport(res.summary);
     std::cout << json;
