@@ -69,6 +69,9 @@ FORBIDDEN_KNOB_FLAGS = {
 }
 VALID_OPS = {"not_worse", "equals", "at_most", "at_least", "strictly_better_some"}
 VALID_KINDS = {"filter", "tiebreak"}
+# #51：定级类指标的数值由 eps/带宽阈值定义直接决定（放松尺子就能"改进"），
+# 不得进入 strictly_better_some 的改进集；它们只允许作 not_worse 约束。
+GRADING_METRICS = {"failure_rate", "converged_rate", "accepted_approx_rate"}
 
 
 class DeclError(Exception):
@@ -122,6 +125,13 @@ def validate_declaration(decl: dict) -> None:
             ms = crit.get("metrics")
             _require(isinstance(ms, list) and ms and all(x in METRIC_DIRECTIONS for x in ms),
                      f"准则 {crit['id']} 的 metrics 必须是非空确定性指标列表：{ms!r}")
+            graded = [x for x in ms if x in GRADING_METRICS]
+            _require(not graded,
+                     f"准则 {crit['id']} 的改进集含定级类指标 {graded}（受 eps/带宽阈值定义直接影响，"
+                     "松绑即伪改进 #51）；只允许物理指标，定级指标请用 not_worse")
+            if "min_rel_gain" in crit:
+                _require(float(crit["min_rel_gain"]) >= 0.0,
+                         f"准则 {crit['id']} 的 min_rel_gain 必须 ≥ 0")
         else:
             _require(crit.get("metric") in METRIC_DIRECTIONS,
                      f"准则 {crit['id']} 的 metric 不在确定性指标表：{crit.get('metric')!r}")
@@ -276,6 +286,7 @@ def eval_filter_on_candidate(crit: dict, ref_metrics: dict, cand_metrics: dict) 
     keys = tuple(ref_metrics.keys()) if scope == "all_tuning" else (scope,)
     if crit["op"] == "strictly_better_some":
         notes, hit_any = [], False
+        min_rel = float(crit.get("min_rel_gain", 0.0))
         for key in keys:
             for metric in crit["metrics"]:
                 ref_v, cand_v = ref_metrics[key].get(metric), cand_metrics[key].get(metric)
@@ -283,11 +294,19 @@ def eval_filter_on_candidate(crit: dict, ref_metrics: dict, cand_metrics: dict) 
                     continue
                 direction = METRIC_DIRECTIONS[metric]
                 better = cand_v < ref_v if direction == "min" else cand_v > ref_v
+                if better and min_rel > 0.0:
+                    # #51：噪声位的"严格优于"不算收益——要求相对改善达到 min_rel_gain
+                    rel = (ref_v - cand_v) / abs(ref_v) if direction == "min" else (cand_v - ref_v) / max(abs(ref_v), 1e-12)
+                    better = rel >= min_rel
+                    if not better:
+                        notes.append(f"{key}: {METRIC_LABEL_ZH.get(metric, metric)} {cand_v} vs 参考 {ref_v}"
+                                     f"——相对改善 {rel:.4%} < 实质性门槛 {min_rel:.2%}，噪声不计作收益")
+                        continue
                 if better:
                     notes.append(f"{key}: {METRIC_LABEL_ZH.get(metric, metric)} {cand_v} 严格优于参考 {ref_v}")
                     hit_any = True
         if not hit_any:
-            notes.append("无任何指标严格优于参考 ⇒ 改参数无收益，拒")
+            notes.append("无达门槛的物理改进 ⇒ 改参数无收益，拒")
         return hit_any, notes
     direction = METRIC_DIRECTIONS[crit["metric"]]
     notes, ok = [], True
@@ -391,7 +410,9 @@ def generate_doc_block(decl: dict, decl_rel: str) -> str:
                      "strictly_better_some": "至少一项严格优于参考"}[crit["op"]]
             if crit["op"] == "strictly_better_some":
                 items = "、".join(f"`{METRIC_LABEL_ZH.get(m, m)}`" for m in crit["metrics"])
-                judge = f"{items} 至少一项严格优于参考"
+                thr = crit.get("min_rel_gain")
+                suffix = f"相对改善 ≥ {float(thr):.0%}" if thr else "严格优于参考"
+                judge = f"{items} 至少一项{suffix}"
             else:
                 judge = f"`{METRIC_LABEL_ZH.get(crit['metric'], crit['metric'])}` {op_zh}"
         else:
@@ -576,7 +597,8 @@ def cmd_evaluate(argv) -> int:
             verdicts.append(f"{crit['id']}:{'OK' if hit else 'FAIL'}")
             if not hit:
                 ok = False
-                reason = "; ".join(n for n in notes if "FAIL" in n or "缺失" in n)
+                reason = "; ".join(n for n in notes if ("FAIL" in n or "缺失" in n or "拒" in n or "门槛" in n)) \
+                    or "; ".join(notes)  # strictly_better_some 的 notes 无 FAIL 字样，兜底全量展示
                 rows.append((cid, label, f"拒（{crit['id']}）", reason))
                 break
         if ok:
@@ -823,7 +845,7 @@ class PrecheckTests(unittest.TestCase):
 
     def test_strictly_better_some_semantics(self):
         crit = {"id": "C6", "kind": "filter",
-                "metrics": ["rmse_lateral_m", "failure_rate"], "op": "strictly_better_some",
+                "metrics": ["rmse_lateral_m", "lap_time_s"], "op": "strictly_better_some",
                 "scope": "all_tuning"}
         ref = {"a": _metrics(rmse=0.5, failure_rate=0.1)}
         ok, _ = eval_filter_on_reference(crit, ref)
@@ -837,6 +859,29 @@ class PrecheckTests(unittest.TestCase):
         worse = {"a": _metrics(rmse=0.9, failure_rate=0.2)}
         hit, _ = eval_filter_on_candidate(crit, ref, worse)
         self.assertFalse(hit)
+
+    def test_min_rel_gain_rejects_noise_improvement(self):
+        # #51：1% 实质性门槛——rmse 4 位小数的"严格优于"是噪声，不计作收益
+        crit = {"id": "C6", "kind": "filter", "metrics": ["rmse_lateral_m"],
+                "op": "strictly_better_some", "scope": "all_tuning", "min_rel_gain": 0.01}
+        ref = {"a": _metrics(rmse=2.63062)}
+        noise = {"a": _metrics(rmse=2.6302)}   # 相对改善 0.016% < 1%
+        hit, notes = eval_filter_on_candidate(crit, ref, noise)
+        self.assertFalse(hit)
+        self.assertTrue(any("实质性门槛" in n for n in notes))
+        real = {"a": _metrics(rmse=0.6666)}    # 74% 改善 ≥ 1%
+        hit, _ = eval_filter_on_candidate(crit, ref, real)
+        self.assertTrue(hit)
+
+    def test_validate_rejects_grading_metrics_in_improvement_set(self):
+        # #51 机检：定级指标进改进集 = 声明不合法，当场拒绝
+        decl = _minimal_decl()
+        decl["criteria"].append({"id": "C6", "kind": "filter",
+                                 "metrics": ["accepted_approx_rate"],
+                                 "op": "strictly_better_some", "scope": "all_tuning"})
+        with self.assertRaises(DeclError) as ctx:
+            validate_declaration(decl)
+        self.assertIn("定级类指标", str(ctx.exception))
 
     def test_validate_rejects_unknown_metric_and_op(self):
         decl = _minimal_decl()

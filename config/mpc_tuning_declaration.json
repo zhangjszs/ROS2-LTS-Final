@@ -1,9 +1,9 @@
 {
   "schema": "fsac.tuning.declaration/v1",
   "issue": "#48",
-  "round": "r3-scan-with-band",
-  "declared_at_utc": "2026-09-30T01:10:00Z",
-  "declared_by": "Agent qoder-20260929T231407Z（轮 3 重声明：加入 acceptable_primal 维度与 C6 严格改进准则；先于本轮任何候选运行写定）",
+  "round": "r4-c6-physical-only",
+  "declared_at_utc": "2026-09-30T02:10:00Z",
+  "declared_by": "Agent qoder-20260929T231407Z（#51 重声明：C6 改进集收紧为物理指标 + 1% 实质性门槛；先于任何新一轮候选运行，r3 实测证据见冻结文档 §9.2）",
   "policy": {
     "precheck_required": true,
     "comparison_set_single_evaluation": true,
@@ -105,8 +105,9 @@
     {
       "id": "C6",
       "kind": "filter",
-      "name": "改参数必须有收益：至少一项解质量指标严格优于参考",
-      "metrics": ["rmse_lateral_m", "failure_rate", "accepted_approx_rate", "lap_time_s"],
+      "name": "改参数必须有收益：至少一项物理指标相对改善 ≥ 1%（#51 收紧：定级指标退出改进集）",
+      "metrics": ["rmse_lateral_m", "lap_time_s"],
+      "min_rel_gain": 0.01,
       "op": "strictly_better_some",
       "scope": "all_tuning",
       "waived": "严格改进对参考基线自身定义上不可满足，这是准则语义而非规格缺陷（与 #46 准则①那种「把不存在的门槛当硬门」不同）；豁免仅作用于预检，对候选照常过滤——它的作用是反方向保证：防止「平手参数被采纳」造成无收益漂移。"
@@ -118,6 +119,7 @@
     }
   ],
   "known_gaps": [
-    "acceptable_dual 固定为代码默认 0.01：本轮只扫 primal（控制向量 ∞-范数的主代价项），双维同扫的组合爆炸留给下一轮若有信号再做。"
+    "acceptable_dual 固定为代码默认 0.01：本轮只扫 primal（控制向量 ∞-范数的主代价项），双维同扫的组合爆炸留给下一轮若有信号再做。",
+    "#51：r3 实测——旧 C6 改进集含定级指标（failure_rate/accepted_approx_rate）导致 8 组松绑伪改进字面通过（冻结文档 §9.2）；本 r4 重声明在任何新候选运行之前完成，并用 r3 产物重放验证新判据把 8 组全拒。"
   ]
 }
