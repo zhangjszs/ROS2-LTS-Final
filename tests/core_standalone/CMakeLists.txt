@@ -110,6 +110,10 @@ add_core_test(test_cone_tracker_differential
 add_core_test(test_freshness_lease
     SOURCES
         "${REPO_ROOT}/src/safety/safety_monitor/test/test_freshness_lease.cpp")
+# #50：连续拒解看门狗（纯 std 头；colcon 侧注册同一文件）
+add_core_test(test_reject_watchdog
+    SOURCES
+        "${REPO_ROOT}/src/control/mpc_controller/test/test_reject_watchdog.cpp")
 
 # ===================== #40：把剩下的纯 std 单测拉进 ASan+UBSan 门 =====================
 # 原则：能脱 ROS 编译的全部注册；确实不行的写进下方“排除清单”，不允许默默漏着。

@@ -80,6 +80,16 @@ void MpcControllerNode::LoadParameters() {
     declare_parameter<std::string>("topics.predicted_path", "/control/mpc_predicted_path");
     declare_parameter<std::string>("topics.reference_path", "/control/mpc_reference_path");
 
+    // #50：QP 求解设置与拒解看门狗。四个 qp 参数的默认值必须与 qp_solver.hpp 的 QpSettings
+    // 现值逐字一致（test_param_consistency 机检）；不调参时行为零漂移，暴露它们的目的：
+    // 故障注入冒烟用入制造"持续拒解"（eps=1e-14 + max_iter=1），不碰接受判据本身。
+    declare_parameter<double>("mpc.qp_eps_abs", 1e-4);
+    declare_parameter<double>("mpc.qp_eps_rel", 1e-4);
+    declare_parameter<double>("mpc.qp_rho", 1.0);
+    declare_parameter<int>("mpc.qp_max_iter", 50);
+    declare_parameter<int>("diagnostics.reject_threshold", 50);  // 连续 50 拍 @50Hz = 1s（#50 实现建议）
+    declare_parameter<std::string>("topics.health", "/controller/mpc/health");
+
     get_parameter("system.control_rate", config_.system.control_rate);
     get_parameter("system.startup_delay", config_.system.startup_delay);
     get_parameter("system.racing_num", config_.system.racing_num);
@@ -139,6 +149,28 @@ void MpcControllerNode::LoadParameters() {
     get_parameter("topics.vehicle_command", config_.topics.vehicle_command);
     get_parameter("topics.predicted_path", config_.topics.predicted_path);
     get_parameter("topics.reference_path", config_.topics.reference_path);
+
+    // #50：把四个 QP 旋钮写回模型（默认值=qp_solver.hpp 现值 ⇒ 不调参时零漂移）；
+    // acceptable_*/warm_start 不在本次范围（#50 非目标：不改判据/参数），沿用结构体默认。
+    QpSettings qp{};
+    double eps_abs = 1e-4;
+    double eps_rel = 1e-4;
+    double rho = 1.0;
+    int max_iter = 50;
+    get_parameter("mpc.qp_eps_abs", eps_abs);
+    get_parameter("mpc.qp_eps_rel", eps_rel);
+    get_parameter("mpc.qp_rho", rho);
+    get_parameter("mpc.qp_max_iter", max_iter);
+    qp.eps_abs = eps_abs;
+    qp.eps_rel = eps_rel;
+    qp.rho = rho;
+    qp.max_iter = static_cast<size_t>(std::max(1, max_iter));
+    mpc_model_.SetQpSettings(qp);
+
+    int reject_threshold = 50;
+    get_parameter("diagnostics.reject_threshold", reject_threshold);
+    reject_watchdog_.SetThreshold(static_cast<std::uint64_t>(std::max(0, reject_threshold)));
+    get_parameter("topics.health", health_topic_);
 }
 
 void MpcControllerNode::SetupSubscribersAndPublishers() {
@@ -154,6 +186,7 @@ void MpcControllerNode::SetupSubscribersAndPublishers() {
         config_.topics.stop, stop_qos, [this](const common_msgs::msg::HuatStop::ConstSharedPtr msg) { OnStop(msg); });
 
     cmd_pub_ = create_publisher<common_msgs::msg::HuatVehicleCmd>(config_.topics.vehicle_command, 1);
+    health_pub_ = create_publisher<common_msgs::msg::HuatControllerHealth>(health_topic_, 10);
     pred_path_pub_ = create_publisher<nav_msgs::msg::Path>(config_.topics.predicted_path, 1);
     ref_path_pub_ = create_publisher<nav_msgs::msg::Path>(config_.topics.reference_path, 1);
 }
@@ -244,6 +277,8 @@ void MpcControllerNode::ControlLoop() {
                                     reference_path_);
 
     if (solution.success) {
+        reject_watchdog_.Record(true);  // #50：成功拍清零连续拒解计数
+        ++total_accepts_;
         prev_steer_rad_ = solution.steering_rad;
         prev_accel_mps2_ = solution.accel_mps2;
         last_solve_time_ms_ = solution.solve_time_ms;
@@ -252,10 +287,23 @@ void MpcControllerNode::ControlLoop() {
         PublishPredictedPath(solution.predicted_trajectory);
         PublishReferencePath(solution.reference_horizon);
     } else {
-        RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 1000,
-                             "[MPC] Optimization did not converge, executing safety hold");
-        PublishVehicleCommand(prev_steer_rad_ * 0.9, -1.0);
+        reject_watchdog_.Record(false);
+        if (reject_watchdog_.rejecting()) {
+            // #50 上限行为（安全侧）：连续拒解达阈值后不再下发"看起来在动"的衰减指令，
+            // 改为中性转角 + 满制动保持，直到重新解出；原因由 throttled WARN + health 话题双出口。
+            RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 1000,
+                                 "[MPC] continuous QP rejects: %lu in a row >= threshold %lu; holding safe stop "
+                                 "(neutral steer + full brake) until a solve succeeds again",
+                                 static_cast<unsigned long>(reject_watchdog_.consecutive_failures()),
+                                 static_cast<unsigned long>(reject_watchdog_.threshold()));
+            PublishEmergencyBrake();
+        } else {
+            RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 1000,
+                                 "[MPC] Optimization did not converge, executing safety hold");
+            PublishVehicleCommand(prev_steer_rad_ * 0.9, -1.0);
+        }
     }
+    PublishHealth();
 }
 
 void MpcControllerNode::PublishVehicleCommand(double steering_rad, double accel_mps2) {
@@ -287,6 +335,20 @@ void MpcControllerNode::PublishEmergencyBrake() {
     raw.pedal_ratio = 0;
     raw.brake_force = actuator_calib_.emergencyBrakeRaw();
     cmd_pub_->publish(common_msgs::vehicle::toMsg(raw));
+}
+
+void MpcControllerNode::PublishHealth() {
+    // #50：每拍发布（depth 10）；语义是"求解拍"的计数与锁存，不是输入新鲜度（那是 /system/state）。
+    common_msgs::msg::HuatControllerHealth h;
+    h.header.stamp = now();
+    h.header.frame_id = "";
+    h.controller = "mpc";
+    h.rejecting = reject_watchdog_.rejecting();
+    h.consecutive_rejects = reject_watchdog_.consecutive_failures();
+    h.total_rejects = reject_watchdog_.total_failures();
+    h.total_accepts = total_accepts_;
+    h.threshold = reject_watchdog_.threshold();
+    health_pub_->publish(h);
 }
 
 void MpcControllerNode::PublishPredictedPath(const std::vector<PredictedPoint>& trajectory) {

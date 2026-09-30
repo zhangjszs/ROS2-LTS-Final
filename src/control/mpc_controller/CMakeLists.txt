@@ -109,6 +109,11 @@ if(BUILD_TESTING)
     test/test_param_consistency.cpp
   )
   target_compile_definitions(test_param_consistency PRIVATE FSAC_REPO_ROOT="${FSAC_REPO_ROOT_DIR}")
+
+  # #50：连续拒解看门狗（纯 std 头，无 ROS/无时间源）
+  ament_add_gtest(test_reject_watchdog
+    test/test_reject_watchdog.cpp
+  )
 endif()
 
 ament_export_include_directories(include)

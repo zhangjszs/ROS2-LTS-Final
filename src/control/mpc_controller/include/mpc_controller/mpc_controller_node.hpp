@@ -5,10 +5,14 @@
 #include <rclcpp/rclcpp.hpp>
 
 #include "common_msgs/msg/huat_carstate.hpp"
+// #50：持续拒解的机读状态出口（契约外的控制器健康度话题消息）
+#include "common_msgs/msg/huat_controller_health.hpp"
 #include "common_msgs/msg/huat_path_limits.hpp"
 #include "common_msgs/msg/huat_stop.hpp"
 #include "common_msgs/msg/huat_vehicle_cmd.hpp"
 #include "freshness_lease.h"  // #30：到达活性租约（来源年龄门 + 控制循环看门狗统一语义）
+// #50：RejectWatchdog（纯 std 连续拒解看门狗）
+#include "mpc_controller/controller_health.hpp"
 #include "mpc_controller/mpc_model.hpp"
 #include "mpc_controller/mpc_params.hpp"
 #include "steering_calibration.h"   // 仓库约定：common_msgs 手写头不带前缀（同 cone_types.h）
@@ -32,6 +36,7 @@ class MpcControllerNode : public rclcpp::Node {
 
     void PublishVehicleCommand(double steering_rad, double accel_mps2);
     void PublishEmergencyBrake();
+    void PublishHealth();  // #50：按求解拍发布控制器健康度（rejecting/计数/阈值）
     void PublishPredictedPath(const std::vector<PredictedPoint>& trajectory);
     void PublishReferencePath(const std::vector<ReferencePoint>& reference);
 
@@ -57,6 +62,10 @@ class MpcControllerNode : public rclcpp::Node {
     rclcpp::Time last_state_time_;
     rclcpp::Time last_path_time_;
     double last_solve_time_ms_{0.0};
+    // #50：连续拒解看门狗（阈值由 diagnostics.reject_threshold 参数设；0=禁用）与成功拍计数。
+    RejectWatchdog reject_watchdog_{};
+    std::uint64_t total_accepts_{0};
+    std::string health_topic_{"/controller/mpc/health"};
     // #30：到达活性租约（与 last_*/has_* 双轨：租约做判定，老成员保留供遥测/诊断读取）。
     common_msgs::vehicle::FreshnessLease state_arrival_{common_msgs::vehicle::LeaseConfig{0.5, 0.0}};
     common_msgs::vehicle::FreshnessLease path_arrival_{common_msgs::vehicle::LeaseConfig{1.0, 0.0}};
@@ -79,6 +88,7 @@ class MpcControllerNode : public rclcpp::Node {
     rclcpp::Subscription<common_msgs::msg::HuatStop>::SharedPtr stop_sub_;
 
     rclcpp::Publisher<common_msgs::msg::HuatVehicleCmd>::SharedPtr cmd_pub_;
+    rclcpp::Publisher<common_msgs::msg::HuatControllerHealth>::SharedPtr health_pub_;
     rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr pred_path_pub_;
     rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr ref_path_pub_;
 

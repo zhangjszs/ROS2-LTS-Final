@@ -126,6 +126,8 @@ if [ "${QUICK:-0}" != 1 ]; then
     run_gate closed-loop 1 bash scripts/closed_loop_sim_smoke.sh
     run_gate closed-loop-fault 1 bash scripts/closed_loop_fault_smoke.sh
     run_gate fault-injection 1 bash scripts/fault_injection_smoke.sh
+    # #50：MPC 持续拒解出口冒烟（两臂：注入必点亮+安全侧保持；默认参数必不点亮）。
+    run_gate mpc-reject-smoke 1 bash -c 'bash scripts/mpc_reject_smoke.sh build/mpc_reject reject && bash scripts/mpc_reject_smoke.sh build/mpc_reject normal'
 fi
 
 elapsed=$(( $(date +%s) - t0 ))

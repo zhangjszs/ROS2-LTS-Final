@@ -70,9 +70,37 @@ constexpr double kTol = 1e-9;
     return std::string(FSAC_REPO_ROOT) + "/" + rel;
 }
 
+/// 从节点源文件里取 declare_parameter<...>("<param>", <value>) 的字面默认值（#50）。
+[[nodiscard]] std::optional<double> ScanDeclareParameter(const std::string& path, const std::string& param) {
+    std::ifstream in(path);
+    if (!in.is_open()) {
+        return std::nullopt;
+    }
+    std::string line;
+    while (std::getline(in, line)) {
+        const auto c = line.find("\"" + param + "\"");
+        if (c == std::string::npos || line.find("declare_parameter") == std::string::npos) {
+            continue;
+        }
+        const auto comma = line.find(',', c + param.size() + 2);
+        if (comma == std::string::npos) {
+            continue;
+        }
+        std::istringstream ss(line.substr(comma + 1));
+        double v = 0.0;
+        if (ss >> v) {
+            return v;
+        }
+    }
+    return std::nullopt;
+}
+
 constexpr const char* kSimulatorYaml = "src/simulation/vehicle_simulator/config/simulator_params.yaml";
 constexpr const char* kBicycleHeader = "src/simulation/vehicle_simulator/include/vehicle_simulator/bicycle_model.hpp";
 constexpr const char* kMpcYaml = "src/control/mpc_controller/config/mpc_params.yaml";
+// #50：新暴露的 QP 节点参数的默认值必须等于 qp_solver.hpp 现值（"看起来可配其实已漂移"不算零漂移）。
+constexpr const char* kMpcNodeCpp = "src/control/mpc_controller/src/mpc_controller_node.cpp";
+constexpr const char* kQpSolverHpp = "src/control/mpc_controller/include/mpc_controller/qp_solver.hpp";
 
 }  // namespace
 
@@ -148,4 +176,23 @@ TEST(ParamConsistency, HorizonPhysicalLengthIsConserved) {
     EXPECT_NEAR(*np * *ts, 0.76, 5e-3) << "预测时域物理长度偏离 D9 的 0.76s 换算";
     EXPECT_NEAR(*nc * *ts, 0.50, 5e-3) << "控制时域物理长度偏离 D9 的 0.50s 换算";
     EXPECT_LE(cfg.horizon.Nc, cfg.horizon.Np) << "控制时域不得长于预测时域";
+}
+
+// #50：节点 QP 旋钮默认值 ↔ qp_solver.hpp 现值逐字段对账。
+// 背景：#50 把 eps_abs/eps_rel/rho/max_iter 暴露为节点参数（故障注入冒烟需要）。
+// 若声明的默认值与结构体现值不同，"不调参时零漂移"就是假话，且 #48 预检的
+// "参考配置=代码默认值"链条在 ROS 面断裂——所以这是一致性事实，不是风格问题。
+TEST(ParamConsistency, QpParamDefaultsMatchSolverHeader) {
+    struct Pair {
+        const char* param;
+        const char* field;
+    };
+    for (const Pair& p : {Pair{"mpc.qp_eps_abs", "eps_abs"}, Pair{"mpc.qp_eps_rel", "eps_rel"},
+                          Pair{"mpc.qp_rho", "rho"}, Pair{"mpc.qp_max_iter", "max_iter"}}) {
+        const auto decl = ScanDeclareParameter(RepoFile(kMpcNodeCpp), p.param);
+        ASSERT_TRUE(decl.has_value()) << "节点源里找不到 " << p.param << " 的 declare_parameter 默认值";
+        const auto cur = ScanNumber(RepoFile(kQpSolverHpp), p.field);
+        ASSERT_TRUE(cur.has_value()) << "qp_solver.hpp 里找不到 " << p.field << " 默认值";
+        ASSERT_NEAR(*decl, *cur, kTol) << p.param << " 的节点默认值已偏离 qp_solver.hpp 现值（零漂移是假话）";
+    }
 }
