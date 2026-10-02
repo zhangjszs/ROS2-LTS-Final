@@ -1,38 +1,32 @@
 # HANDOFF.md — 给下一棒（relay 交接快照）
 
-当前棒：`exec-20261002T1509Z`（2026-10-02，执行 PLAN ready 队列 #53 → #52 → #54）。
+当前棒：`exec-20261002T1509Z`（2026-10-02）——消费 PLAN ready 队列 **#53 → #52 → #54，三项全部完成**。
 上一棒 `plan-20261002T141500Z` 建立 PLAN/DECISIONS 与 ready 队列（`06ce1d6`）。
 **先读 `.agent/STATE.md`、`.agent/PLAN.md`、`.agent/DECISIONS.md`、`.agent/ENV.md`。**
 
-## 一、本棒进度（进行中）
+## 一、本棒成果（三项 ready 全部完成，待 Planning 验收）
 
-| 序 | Issue | 状态 | 代码 commit | 验证 |
-|---|---|---|---|---|
-| 1 | #53 拆 bicycle_model 纯 std 单测进 #40 sanitizer 门 | **完成**（待 Planning 验收） | `eb75d08` | core_standalone 24/24；colcon 484/0 fail；lint 通过 |
-| 2 | #52 `QpSettings::warm_start` 死配置生效 + 单测 | **完成**（待 Planning 验收） | `fe2d97b` | core_standalone 24/24；colcon 486/0 fail；lint 通过 |
-| 3 | #54 sensor_simulator 感知核下沉纯 std core | **进行中** | — | — |
+| 序 | Issue | 代码 commit | 验证 |
+|---|---|---|---|
+| 1 | #53 vehicle_simulator 拆 bicycle_model 纯 std 单测进 #40 sanitizer 门 | `eb75d08` | core_standalone 24/24；colcon 484/0 fail；lint 通过 |
+| 2 | #52 `QpSettings::warm_start` 死配置生效 + 单测 | `fe2d97b` | core_standalone 24/24；colcon 486/0 fail；lint 通过 |
+| 3 | #54 sensor_simulator 感知几何核下沉纯 std core | `dbb77c0` | core_standalone 25/25；colcon 492/0 fail；lint 通过 |
 
-- 结构化执行结果已挂 #53、#52 评论（`build/issue_comments/c5{2,3}.md`，不入库）。
-- 本棒**未关闭任何 issue**（关闭由 Planning 验收裁定）。
+- 三条结构化执行结果已挂 issue 评论：`build/issue_comments/c5{2,3,4}.md`（不入库）。
+- **本棒未关闭任何 issue**（按规则由 Planning 按验收裁定）。
 
-**若本棒异常中断：** 看 `.agent/LOCK` 与本表——#53(`eb75d08`)/#52(`fe2d97b`) 均已 push；#54 尚未完成，从 #54 续做即可。
+## 二、下一棒的第一步
 
-## 二、下一棒的选题顺序
+1. **Planning 验收**：复核 #53/#52/#54 的 issue 评论 + 代码 commit + 本轮 CI，逐条对照验收标准后裁定关闭；关闭 #53 会自动解除 #54 的原生依赖 `blocked_by #53`。
+2. 若继续执行：重拉 `gh issue list --label ready-for-agent --state open`——
+   - 若为空：软件侧已扫尽，剩余路线图条目卡仓库外输入，见 PLAN 第三/六/七节；不臆造。
+   - 若 Planning 新增 ready：按 PLAN 第四节顺序消费。
 
-1. 若本棒未完成：#54 续做（要点见下）。
-2. 若本棒三项均完成：重拉 `gh issue list --label ready-for-agent --state open`；若为空见 PLAN 第三节/第七节（软件侧已扫尽，剩余卡仓库外输入，不臆造）。
+## 三、本棒实现的三个任务要点（复现/续做）
 
-## 三、剩余任务要点
-
-### #54（进行中）：sensor_simulator 感知几何核下沉
-- 目标：把 `GeneratePerceivedCones` 的**纯数学**（平移/旋转到 base_link、FOV 与距离过滤、可选高斯噪声，`sensor_simulator.cpp:53-107`）抽成纯 std core 头；`SensorSimulator` 只做中性类型→`common_msgs` 消息组装；新增 core 单测进 `tests/core_standalone`。
-- 约束：公共 API 与行为**逐位一致**（默认 `fov=120/range=15/noise=0`；`noise<=0` 不采样；默认种子 42；`dist_sq<0.25` 与 `x_base<=0.2` 过滤；`confidence=95`）；core 头不得 include `common_msgs`/`rclcpp`。
-- 同步更新 `tests/core_standalone/CMakeLists.txt` 排除清单与 `docs/CORE_ROS_BOUNDARY_ADR.md` 的"仍依赖中间件的模块"条目。
-- 验收：既有 `SensorSimulatorTest` 仍绿 + 新 core 单测（同种子输出可复现且与改前一致）+ `core_standalone_check.sh` 与 `colcon test` 全绿 + lint。
-
-### 已完成任务（复现用）
-- #53：新 `test_bicycle_model_core.cpp`（5 用例，无 ROS/msgs），`test_bicycle_model.cpp` 只留 `SensorSimulatorTest`；两轨注册（`vehicle_simulator/CMakeLists.txt` + `tests/core_standalone/CMakeLists.txt`）。
-- #52：`BoxQpSolver::Solve` 读 `warm_start`（false ⇒ 忽略并清空 `z_/y_`、盒中心冷启动、不写回；`warm_x` 不受影响）；2 个新单测。
+- **#53**：新 `test_bicycle_model_core.cpp`（`BicycleModel` 5 用例，无 ROS/msgs）；`test_bicycle_model.cpp` 只留适配层测试；两轨注册（`vehicle_simulator/CMakeLists.txt` + `tests/core_standalone/CMakeLists.txt`）。
+- **#52**：`BoxQpSolver::Solve` 读 `settings_.warm_start`——`false` ⇒ 忽略并清空内部 `z_/y_`、盒中心冷启动、返回前不写回；显式 `warm_x` 不受影响；2 个新纯 std 单测。
+- **#54**：新增 header-only `sensor_model_core.hpp`（`TrackCone`/`DetectedCone`/`PredictVisibleCones`）；`SensorSimulator::GeneratePerceivedCones` 退化为 msg 组装（行为逐位一致）；新 `test_sensor_model_core.cpp`（5 用例）；`test_bicycle_model.cpp` 收敛为适配层测试；同步 ADR 与 #40 排除清单。
 
 ## 四、红线（仍然有效）
 
@@ -46,7 +40,7 @@
 ## 五、复现本棒验证
 
 ```bash
-bash scripts/core_standalone_check.sh                 # 24/24（含 test_bicycle_model_core / test_qp_solver 新测）
+bash scripts/core_standalone_check.sh                 # 25/25（含 test_bicycle_model_core / test_sensor_model_core / test_qp_solver 新测）
 bash scripts/lint_cpp.sh
 source /opt/ros/lyrical/setup.bash && source install/setup.bash
 MAKEFLAGS=-j4 colcon build --packages-select vehicle_simulator mpc_controller --symlink-install \
@@ -55,4 +49,4 @@ MAKEFLAGS=-j4 colcon build --packages-select vehicle_simulator mpc_controller --
 colcon test --packages-select vehicle_simulator mpc_controller && colcon test-result --verbose
 ```
 
-- 本棒起点：`06ce1d6`；#53 `eb75d08`、#52 `fe2d97b`（均已 push 到 origin/main）。
+- 本棒起点：`06ce1d6`；产出代码 commit：`eb75d08`、`fe2d97b`、`dbb77c0`（均已 push 到 origin/main）。
