@@ -38,7 +38,8 @@
 ## 门禁状态（本轮收尾）
 
 - 本机实测：`core_standalone_check.sh` 25/25 通过；`colcon test`（vehicle_simulator + mpc_controller）492/0 fail；`lint_cpp.sh` 通过。
-- 主干 CI：`dbb77c0` push 后待 CI 结果（前序 `eb75d08`/`fe2d97b` 触发点见 Actions）。
+- 集成门：#54（生产重构）额外跑 `scripts/closed_loop_sim_smoke.sh` → **PASS**（5 节点注册、sim 时间推进 5.01s、command 坏帧 0、报告 finished）。
+- 主干 CI：`dbb77c0`/`dbd3a17` push 后仍 `in_progress`（收尾时未出结论）。
 
 ## 环境事实（沿用）
 

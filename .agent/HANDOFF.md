@@ -14,6 +14,8 @@
 
 - 三条结构化执行结果已挂 issue 评论：`build/issue_comments/c5{2,3,4}.md`（不入库）。
 - **本棒未关闭任何 issue**（按规则由 Planning 按验收裁定）。
+- 额外集成证据：#54 为生产重构，另跑 `scripts/closed_loop_sim_smoke.sh` → **PASS**（已挂 #54 追加评论）。
+- 外部动作：#52 已被外部（非本棒）以 COMPLETED 关闭（15:14Z）；#53/#54 仍 OPEN 待 Planning 验收。
 
 ## 二、下一棒的第一步
 
