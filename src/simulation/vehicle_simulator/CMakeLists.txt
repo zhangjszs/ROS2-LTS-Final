@@ -82,6 +82,14 @@ if(BUILD_TESTING)
   target_link_libraries(test_bicycle_model
     vehicle_simulator_lib
   )
+  # #53：BicycleModel 纯 std 单测（脱 ROS/msgs）。与 tests/core_standalone 注册同一份文件，
+  # 以便在无 ROS 的 ASan+UBSan 门里运行。
+  ament_add_gtest(test_bicycle_model_core
+    test/test_bicycle_model_core.cpp
+  )
+  target_link_libraries(test_bicycle_model_core
+    vehicle_simulator_lib
+  )
 endif()
 
 ament_export_include_directories(include)

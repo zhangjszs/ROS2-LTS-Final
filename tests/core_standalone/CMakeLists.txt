@@ -160,15 +160,21 @@ add_core_test(test_race_director
         "${REPO_ROOT}/src/planning/urinay/test/test_race_director.cpp"
         "${REPO_ROOT}/src/planning/urinay/src/race/race_director.cpp")
 
+# #53：仿真运动学核（纯 std）——此前被 test_bicycle_model 的文件级排除掩盖
+add_core_test(test_bicycle_model_core
+    SOURCES
+        "${REPO_ROOT}/src/simulation/vehicle_simulator/test/test_bicycle_model_core.cpp"
+        "${REPO_ROOT}/src/simulation/vehicle_simulator/src/bicycle_model.cpp")
+
 # 排除清单（#40 逐个数过，不靠“碰巧没加”）——这些测试文件本身零 rclcpp，
 # 但传递依赖 ROS 生成消息头或 PCL，无法在“不 source ROS”的入口里编译：
 #   test_command_roundtrip      → pure_pursuit/vehicle_command_encoder.h 组的是
 #                                common_msgs::msg::HuatVehicleCmd（需生成消息）
 #   test_vehicle_state_estimator → vehicle_state_estimator.h 直接 include rclcpp + msgs
-#   test_bicycle_model          → 测试文件自己 include sensor_simulator.hpp
-#                                （后者拉 common_msgs/msg/huat_cone.hpp）；
-#                                同文件里的 bicycle_model.cpp 本身是纯 std，
-#                                要进本门需先把传感器仿真部分拆出 core（#22 风格）
+#   test_bicycle_model          → 现只剩 SensorSimulatorTest，因 sensor_simulator.hpp
+#                                拉 common_msgs/msg/huat_cone.hpp 而排除；纯 std 的
+#                                BicycleModel 用例已移入 test_bicycle_model_core
+#                                （见上方 add_core_test，故本行不再掩盖 bicycle 核）
 #   test_icp_apf_planner         → icp_apf_planner.hpp include common_msgs/geometry msgs
 #   test_way / test_kdtree_concepts / test_point_concepts
 #                                → Way/delaunay/kdtree 链路 include msgs 与 PCL
