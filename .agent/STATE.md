@@ -1,42 +1,45 @@
 # STATE.md — 时间流接力状态（当前活跃 Agent）
 
-> agent-id：`glm-20261002T111615Z`｜时间范围：2026-10-02T11:16Z –（进行中）｜环境：本机 lyrical（CI 是 Jazzy）
-> 上一棒：`qoder-20260929T231407Z`（轮 1–3 见 git 历史 a36ebb2 收尾；其轮 3 后追加了 `0c24c11` 修复 #51 并关闭，但未及写台账即中断）。
+> agent-id：`glm-20261002T120930Z`｜时间范围：2026-10-02T12:09Z –（进行中）｜环境：本机 lyrical（CI 是 Jazzy）
+> 上一棒：`glm-20261002T111615Z`（Nightly 假红根因修复，`2c9a4e6`+`a79fe83`）。
 > 环境探测缓存见 `.agent/ENV.md`（人工可编辑覆盖）。
 
 ## 当前活跃
 
-- 无（本轮收尾中，时间范围 2026-10-02T11:16Z – 2026-10-02T12:05Z）。下一棒序 1 = **修后正式选参**（见下）。
+- 无（本轮收尾中）。调参腿已收口，下一棒回到 #17/#19/#15/#16 软件侧收口。
 
-## 本轮（glm-20261002T111615Z）已完成
+## 本轮（glm-20261002T120930Z）已完成
 
 | 轮 | 任务 | commit / issue | CI |
 |---|---|---|---|
-| 1 | **Nightly 36933923349 假红根因修复**：①`safeStopResult` 手写停车帧漏设 `racing_status`（默认 0 上线，违反 makeSafeStopRaw"禁止手写停车帧"契约）→ 补 =4 + 单测钉住；②fault_injection 重启的仲裁器成孤儿、污染下道门禁出口 → `start_new_session`+killpg 整组清理 + pidfile 兜底；③mpc_reject_smoke 采样前新增 `/vehicle_command` 发布者数=1 纯度预检。本机：safety_monitor 61 测全绿、两臂冒烟 PASS、fault_injection 10/10 无残留、drive_gates 14/14（505s） | `2c9a4e6` | push CI 37002942307 **success**（Nightly 假红消除，待 10-02 晚 schedule 复证） |
+| 1 | **修后正式选参（r5 重扫）**：r4 判据（C6 物理化 + 1% 门槛）下 81 组网格全新实跑 162 runs（88s，`--workdir build/tuning_run_r5` 强制非缓存）——0 通过（62 C2 / 10 C3 / 9 C6：参考自身 + r3 的 8 组伪改进全被 1% 门槛机械拒绝）；全新实跑与 r3 产物重放逐行一致（确定性复证）；结论 = 维持参考配置、比较集评估权继续未消费；docs §11 如实记录 + 声明"本搜索空间已扫尽，再扫须先改 §8" | `eb308fe` | push 待观察 |
+
+## 执行备注（下一棒注意）
+
+- `tuning_driver.sh` 有**续跑语义**：workdir 里已有产物会跳过实跑（只复算判定）。
+  本轮首跑就踩过——2 秒"完成"实为消费 r3 旧产物。强制重跑用 `--workdir` 指向新目录。
+- docs-only 变更无需全量 drive_gates；`check-doc`（§8 一致性机检）必须复验。
 
 ## 历史摘要（详情见 git 历史 HANDOFF/STATE 版本）
 
-- `qoder-20260929T231407Z`：#48 关闭（`1e70583`）、#50 关闭（`466c8ff`）、调参腿 r3 不采纳（`746e9e6`）、#51 关闭（`0c24c11`，C6 收紧为物理指标+1% 门槛；issue 已 CLOSED 但无证据评论）。
+- `glm-20261002T111615Z`：Nightly 36933923349 假红根因修复（safeStopResult 补 racing_status=4、fault_injection 孤儿清理、出口纯度预检），`2c9a4e6`，CI 37002942307 success。
+- `qoder-20260929T231407Z`：#48/#50 关闭、调参腿 r3 不采纳、#51 关闭（`0c24c11`）。
 - `relay-2026-09-29-A`：#17 ③④（afbfa65/8d94444/69aec5b）。**#17 不得用仿真证据关闭**。
 
 ## 活跃任务 / 待办（按优先级）
 
-1. **修后正式选参**：#51 收紧已落地，重扫网格（`bash scripts/tuning_driver.sh`，<5min）→ 有真实赢家才动参数（qp_solver.hpp 默认 + mpc 节点 declare + test_param_consistency 同步 + 全门 + 比较集一次、命令禁旋钮）；无赢家则 docs §9 追加记录。比较集评估权仍未消费。
-2. #17/#19/#15/#16 软件侧收口（缺标定/台架，不为关闭跳过硬验收）。
-3. #23/#24/#18/#25/#26/#27：需人工输入，无输入不臆造。
-4. #37（needs-triage → 按规则跳过，需人工）。
+1. **#17/#19/#15/#16 软件侧收口**（缺标定/台架，不为关闭跳过硬验收；#17 尤其不许仿真证据关闭）。
+2. #23/#24/#18/#25/#26/#27：需人工输入，无输入不臆造。
+3. #37（needs-triage → 按规则跳过，需人工）。
+4. 调参腿：**已收口**（r5，docs §11.3）——新扫描须先改 §8 声明（新 round + 预注册，先于候选）+ 新维度动机；比较集评估权保留给未来真实候选。
 
 ## 门禁状态（轮 1 收尾）
 
-- 本机全量 drive_gates：**14/14 PASS、hard_fail=0、505s**。
-- colcon test：safety_monitor 61/61（新增 racing_status 钉子）；全仓 test-run/test-enforce 门 PASS。
-- `benchmarks/baseline/` 未触碰；改共用层后 benchmark 门 PASS（benchmark_regression 含其中）。
+- 预检三连绿（selftest / check-doc / check，C6 豁免按设计）；docs-only 提交，代码零改动。
+- 主干绿：CI 37002942307 @2c9a4e6 success（上一棒）。
 
-## 环境事实（沿用上棒，本轮复验成立）
+## 环境事实（沿用，本轮复验成立）
 
 - 多节点脚本前 `export FASTDDS_BUILTIN_TRANSPORTS=SHM`、`ROS_HOME=$PWD/build/.ros`；跑 scripts 前 source ROS **与** install/setup.bash。
-- 清理只按 PID/PGID；**严禁 `pkill -f <节点名>`**。注意 `pgrep -x` 对 >15 字符进程名（如 command_arbiter_node）恒空 → 用 comm 截断名（command_arbiter）。
-- 断言型 ros2 查询走 daemon（`ros2 topic info` 不可 --no-daemon）。
-- shellcheck 在 `build/sc_root/usr/bin`，PATH 前缀后跑 lint_shell。
-- 沙箱 /tmp 受限 → 临时产物写 `build/`。
-- gh `run watch --interval` 不存在 → 轮询 `gh run view --json status`。
+- 清理只按 PID/PGID；严禁 `pkill -f <节点名>`；`pgrep -x` 对 >15 字符进程名恒空（用 comm 截断名）。
+- 沙箱 /tmp 受限 → 临时产物写 `build/`。gh `run watch --interval` 不存在 → 轮询 `gh run view --json status`。
