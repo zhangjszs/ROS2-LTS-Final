@@ -1,7 +1,7 @@
 # PLAN.md — 路线、当前阶段与可执行队列
 
-> 维护者：Planning Agent（时间流接力）｜最后更新：2026-10-02T14:15Z（`plan-20261002T141500Z`）
-> 事实基线：main `c72bb67`（CI run 37018219748 success）；环境事实见 `.agent/ENV.md`。
+> 维护者：Planning Agent（时间流接力）｜最后更新：2026-10-02T15:40Z（`plan-20261002T1538Z`）
+> 事实基线：main `ed81634`（ready 批 #52/#53/#54 已合入并经 Planning 验收关闭）；环境事实见 `.agent/ENV.md`。
 > 本文件首次建立（此前接力轮次无 PLAN）。所有内容均据仓库现状与 Issue 核实填写。
 
 ## 一、当前阶段
@@ -28,22 +28,21 @@
 
 本轮改从**真实、可独立验证的软件侧缺口**中补出 3 个任务（1 个 bug + 1 个测试覆盖 + 1 个 ADR 已声明的架构残余）。
 
-## 四、当前 ready 队列（Executor 按序消费）
+## 四、当前 ready 队列
 
-| 序 | Issue | 优先级 | 类型 / 区域 | 内容 | 依赖 |
-|---|---|---|---|---|---|
-| 1 | **#53** | P2 | test / simulation+ci | vehicle_simulator：拆出 `bicycle_model` 纯 std 单测，纳入 #40 sanitizer 门 | 无 |
-| 2 | **#52** | P3 | bug / actuator | `QpSettings::warm_start` 死配置：让字段真正生效 + 纯 std 单测 | 无 |
-| 3 | **#54** | P3 | chore / simulation | sensor_simulator 感知几何核下沉为纯 std core（ADR 残余，#22/#40 路径） | **blocked_by #53** |
-
-建议执行顺序：#53 → #52 → #54（#53 与 #54 都改同一测试文件，故 #53 先行；已设 GitHub 原生依赖）。
-
-> 队列规模说明：按"有限且连续"原则给出 3 个高质量任务；不追求 3–8 上限而灌水。
+- **空**。上一批 ready（#53 → #52 → #54）已由 Executor 全部完成、经 Planning 独立复核后以 COMPLETED 关闭（见第五节）。
+- 软件侧缺口已扫尽（见第三节）；新的 ready 需等仓库外输入到位，或由 Planning 下一轮从**真实、可验证**的新缺口再造（不灌水）。
+- 下一棒 Executor：`gh issue list --label ready-for-agent --state open` 为空时应按第三节/第七节等待，不臆造任务。
 
 ## 五、已完成（软件侧摘要）
 
 - 已关闭：S0 全部（#13/#14）、#22/#30/#31/#32/#33/#34/#35/#36/#38/#39/#40/#41/#42/#43/#44/#45/#46/#47/#48/#49/#50/#51 等。
 - #17 ③④、#15/#16/#19 软件侧、#24 合成夹具已合入并附证据（见各 issue 评论与 git 历史）。
+- **2026-10-02 ready 批（本里程碑软件侧最后一批）**：
+  - `#53` vehicle_simulator 拆 `bicycle_model` 纯 std 单测进 #40 sanitizer 门 — 代码 `eb75d08`，**CLOSED**。
+  - `#52` `QpSettings::warm_start` 死配置生效 + 单测（auto-discovered 提升）— 代码 `fe2d97b`，**CLOSED**。
+  - `#54` `sensor_simulator` 感知几何核下沉纯 std core（ADR 残余）— 代码 `dbb77c0`，**CLOSED**。
+  - 关闭依据：Planning 独立复核（自跑 `core_standalone_check.sh` 25/25 ASan+UBSan、`colcon test` 492/0 fail、逐条代码级核对）+ #53 的 Jazzy CI 全关键步骤 success（#54 的 CI run 排队中，本机已独立复现其 build/test/sanitizer 门；若转红按流程重开）。
 
 ## 六、阻塞项与原因（均有证据）
 
@@ -71,5 +70,6 @@
 
 ## 九、Decision Gate 状态
 
-- **当前无阻断性 Decision Gate**：ready 队列非空，Executor 可连续工作。
-- 非阻断的待决问题（展示范围 #25/#26、S3 启动条件）已记录于第七节，**不需要立刻回答**。
+- **当前无阻断性 Decision Gate，但 ready 队列已空**：软件侧可推进项已扫尽（本节前的三批任务全部关闭）。
+- 下一步取决于仓库外输入或用户决定（第七节）：实车/台架/真实 bag/ROS1 环境 → 可重启 #15/#16/#17/#18/#19/#23/#24 的对应子项；展示范围（#25/#26）需用户拍板。
+- 在无新输入/新缺口前，Planning 不制造 ready 任务；若 Executor 需要工作，仅做轻量维护（依赖/文档一致性/CI 样本）或等价等待。
