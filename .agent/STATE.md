@@ -1,50 +1,50 @@
 # STATE.md — 时间流接力状态（当前活跃 Agent）
 
-> agent-id：`glm-20261002T125512Z`｜时间范围：2026-10-02T12:55Z –（进行中）｜环境：本机 lyrical（CI 是 Jazzy）
-> 上一棒：`glm-20261002T120930Z`（r5 重扫收口调参腿，`eb308fe`+`0f96dc8`）。
+> agent-id：`exec-20261002T141121Z`｜时间范围：2026-10-02T14:11Z –（收尾中）｜环境：本机 lyrical（CI 是 Jazzy）
+> 上一棒：`glm-20261002T125512Z`（#15/#16/#17/#19 证据映射审计，`b0a8cfe`）。
 > 环境探测缓存见 `.agent/ENV.md`（人工可编辑覆盖）。
 
 ## 当前活跃
 
-- 无（本轮收尾中）。四个路线图 issue 均已挂证据映射评论、**保持 OPEN**，剩余阻塞全在实车/台架/人工输入侧。
+- 无（本轮为 ready-issue 扫描 + 台账，无代码任务）。
 
-## 本轮（glm-20261002T125512Z）已完成
+## 本轮（exec-20261002T141121Z）已完成
 
-| 轮 | 任务 | commit / issue | CI |
+| 轮 | 任务 | 结论 | 证据 |
 |---|---|---|---|
-| 1 | **#15/#16/#17/#19 软件侧收口审计**：逐项对照 main `361c478` 盘点交付证据（commit 号 + 单测 + 门禁名），四条证据映射评论已挂 issue（15: #issuecomment-5953555040 / 16: …55810 / 17: …5593 / 19: …7397）。结论：软件侧子项全部有证可查；#15 缺 VCU 协议/实车标定，#16 缺硬件急停链路/实车停车预算，#17 缺 ①模型速度范围实测 ②感知扰动量化（#18 数据），#19 缺 B 阶段完整公平对比——**均不可用仿真证据关闭**，保持 OPEN 并写明关闭条件 | 本轮无代码改动 | 不触发（docs-only 台账） |
+| 1 | **ready-issue 扫描**：全仓 `gh issue list -L 100 --state all`，按 `ready-for-agent` 过滤 | **0 个 ready issue**；唯一带标签的 open issue 是 #37（needs-triage，规则跳过），其余为路线图/待人工输入 | 本轮 `gh issue list` 输出 |
+| 2 | **auto-discovered（规则上限 1 条）**：确认 `QpSettings::warm_start` 死配置 | 建 **#52**（挂 `needs-triage`，普通 open，**未定级/未 ready**） | #52；源码 `qp_solver.hpp:20` vs `qp_solver.cpp:34-45` |
 
 ## 执行备注（下一棒注意）
 
-- 沙箱分类器可能长时间不可用（本轮 30+ 分钟），写类 Bash 会被卡；先把内容写成文件（Write 可用）、只读命令可跑，恢复后一次性提交。
-- issue 评论用 `--body-file`（评论正文已留 `build/issue_comments/c{15,16,17,19}.md`，不入库）。
+- 本轮结论：**无 ready issue 可执行**，软件侧待办延续上棒判断（全部卡人工/硬件输入）。按规则不臆造代码任务。
+- 沙箱写类 Bash 本轮可用（`gh issue create` / commit / push 均正常）。
+- 别重复 #15/#16/#17/#19 的软件侧审计；按各 issue 评论里的关闭条件等人工/硬件输入。
+- 新建 tracked 项 #52（`warm_start` 死配置）**未 ready**：不得直接开修，须等 Planning Agent 定级/定范围。
 
 ## 历史摘要（详情见 git 历史 HANDOFF/STATE 版本）
 
-- `glm-20261002T120930Z`：r5 重扫 0/81 通过、调参腿收口（docs §11.3），比较集评估权未消费。
-- `glm-20261002T111615Z`：Nightly 假红根因修复（safeStopResult racing_status=4、fault_injection 孤儿清理、出口纯度预检），CI 37002942307 success。
-- `qoder-20260929T231407Z`：#48/#50 关闭、r3 不采纳、#51 关闭（`0c24c11`）。
+- `glm-20261002T125512Z`：#15/#16/#17/#19 证据映射审计（`b0a8cfe`），四条保持 OPEN。
+- `glm-20261002T120930Z`：r5 重扫 0/81 通过、调参腿收口（docs §11.3）。
+- `glm-20261002T111615Z`：Nightly 假红根因修复，CI 37002942307 success。
+- `qoder-20260929T231407Z`：#48/#50/#51 关闭（`0c24c11`）。
 - `relay-2026-09-29-A`：#17 ③④（afbfa65/8d94444/69aec5b）。
 
 ## 活跃任务 / 待办（按优先级）
 
-1. **等待人工/硬件输入**（四条 issue 的剩余阻塞都 here）：
-   - #15：VCU 协议资料、台架标定实值（模板已备 BENCH_CALIBRATION_TEMPLATE.md）；
-   - #16：硬件急停链路接入验证、实车停车预算；
-   - #17：①模型速度范围实测 ②感知扰动幅值/判据实车量化（数据 → #18）；
-   - #19：B 阶段完整公平对比（依赖 #17 扰动场景）。
-2. #23/#24/#18/#25/#26/#27：需人工输入（真实 bag、ROS1 环境、外部驱动确认），无输入不臆造。
-3. #37（needs-triage → 按规则跳过，需人工）。
-4. 调参腿已收口（docs §11.3）：新扫描须先改 §8 声明（新 round + 预注册，先于候选）+ 新维度动机。
+1. **等待人工/硬件输入**：`#15`（VCU 协议 + 台架标定）、`#16`（硬件急停 + 停车预算）、`#17`（模型速度范围实测 + 感知扰动量化）、`#19`（B 阶段完整公平对比）。
+2. `#23/#24/#18/#25/#26/#27`：需真实 bag / ROS1 环境 / 外部驱动 / 人工决定展示范围。
+3. `#37`（needs-triage）：规则跳过，需人工。
+4. `#52`（本轮新建，needs-triage）：`QpSettings::warm_start` 死配置——待 Planning Agent 定级；未定级前不得开修。
 
-## 门禁状态（轮 1 收尾）
+## 门禁状态（本轮）
 
-- 主干绿：CI 37005963746 @`0f96dc8` success；本轮零代码改动。
-- 本机 colcon test 基线：483+（上棒实测）/ 0 fail；四条 issue 证据引用的单测/门禁名均已在库核实存在。
+- 主干绿：CI 37005963746 @`0f96dc8` success；本轮起点 HEAD `b0a8cfe`。
+- 本轮零代码改动，未触发 build/test（无变更可验）。
 
 ## 环境事实（沿用，本轮复验成立）
 
-- 多节点脚本前 `export FASTDDS_BUILTIN_TRANSPORTS=SHM`、`ROS_HOME=$PWD/build/.ros`；跑 scripts 前 source ROS **与** install/setup.bash。
-- 清理只按 PID/PGID；严禁 `pkill -f <节点名>`；`pgrep -x` 对 >15 字符进程名恒空（用 comm 截断名）。
+- 多节点脚本前 `export FASTDDS_BUILTIN_TRANSPORTS=SHM`、`ROS_HOME=$PWD/build/.ros`；跑 scripts 前 source ROS 与 install/setup.bash。
+- 清理只按 PID/PGID；严禁 `pkill -f <节点名>`；`pgrep -x` 对 >15 字符进程名恒空。
 - 沙箱 /tmp 受限 → 临时产物写 `build/`。gh `run watch --interval` 不存在 → 轮询 `gh run view --json status`。
 - `tuning_driver.sh` 续跑语义：旧 workdir 有产物会跳过实跑，强制重跑须换 `--workdir`。
