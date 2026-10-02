@@ -1,45 +1,42 @@
 # STATE.md — 时间流接力状态（当前活跃 Agent）
 
-> agent-id：`qoder-20260929T231407Z`｜时间范围：2026-09-29T23:14Z –（进行中）｜环境：本机 lyrical（CI 是 Jazzy）
-> 上一棒台账：`relay-2026-09-29-A`（其叙述在 git 历史的 HANDOFF 版本里；本文件是事实账本）。
-> 环境探测缓存见 `.agent/ENV.md`（首轮已生成，人工可编辑覆盖）。
+> agent-id：`glm-20261002T111615Z`｜时间范围：2026-10-02T11:16Z –（进行中）｜环境：本机 lyrical（CI 是 Jazzy）
+> 上一棒：`qoder-20260929T231407Z`（轮 1–3 见 git 历史 a36ebb2 收尾；其轮 3 后追加了 `0c24c11` 修复 #51 并关闭，但未及写台账即中断）。
+> 环境探测缓存见 `.agent/ENV.md`（人工可编辑覆盖）。
 
 ## 当前活跃
 
-- 轮 4 候选：**#51 [P2]**（C6 改进集混入定级指标⇒松绑伪改进；用 r3 产物重放验证，不重跑 runner）。
+- 无（本轮收尾中，时间范围 2026-10-02T11:16Z – 2026-10-02T12:05Z）。下一棒序 1 = **修后正式选参**（见下）。
 
-## 本轮（qoder-20260929T231407Z）已完成
+## 本轮（glm-20261002T111615Z）已完成
 
 | 轮 | 任务 | commit / issue | CI |
 |---|---|---|---|
-| 1 | **#48 [P2]** 调参准则可满足性预检落地：结构化声明 `config/mpc_tuning_declaration.json` + `tuning_precheck.py`（check/commands/evaluate/emit-doc/check-doc/selftest，15 例单测）+ `tuning_driver.sh` + drive_gates 硬门 `tuning-precheck` + 冻结文档 §8 自动区段；负样本 rc=1 指名 C9 / waived 后 rc=0；端到端 1 组合小网格通过并顺带抓到"产物口径混用"缺口（已加守卫） | `1e70583` | push 36646546721 **success** → **#48 已关闭**（评论 `#issuecomment-5901299200`） |
-| 2 | **#50 [P2]** MPC 持续拒解运行期出口：RejectWatchdog 纯 std 核 + HuatControllerHealth.msg（/controller/mpc/health）+ 节点接线（拒解锁存后安全侧保持；新参数 reject_threshold/qp 四旋钮，默认=现值有单测钉住）+ 两臂冒烟 mpc_reject_smoke.sh + drive_gates 新硬门；6+1 单测双注册；偏差（独立脚本非 fault_injection 场景）已评论 | `466c8ff` | push 36651547804 **success** → **#50 已关闭**（评论 `#issuecomment-5901922909`） |
-| 3 | **调参腿 r3 执行**（§7.6 同轮扫）：runner 加 acceptable_* 旋钮 + C6 strictly_better_some + 声明 81 组扫描（162 runs <5min）；**不采纳任何参数**——8 组"通过"全是指级松绑伪改进（rmse/fail/lap 平手到噪声位），§9 如实记录；缺口另立 **#51 [P2]**（本棒新建） | `746e9e6` | push CI 见下方（本棒轮 3） |
+| 1 | **Nightly 36933923349 假红根因修复**：①`safeStopResult` 手写停车帧漏设 `racing_status`（默认 0 上线，违反 makeSafeStopRaw"禁止手写停车帧"契约）→ 补 =4 + 单测钉住；②fault_injection 重启的仲裁器成孤儿、污染下道门禁出口 → `start_new_session`+killpg 整组清理 + pidfile 兜底；③mpc_reject_smoke 采样前新增 `/vehicle_command` 发布者数=1 纯度预检。本机：safety_monitor 61 测全绿、两臂冒烟 PASS、fault_injection 10/10 无残留、drive_gates 14/14（505s） | `2c9a4e6` | push CI 37002942307 **success**（Nightly 假红消除，待 10-02 晚 schedule 复证） |
+
+## 历史摘要（详情见 git 历史 HANDOFF/STATE 版本）
+
+- `qoder-20260929T231407Z`：#48 关闭（`1e70583`）、#50 关闭（`466c8ff`）、调参腿 r3 不采纳（`746e9e6`）、#51 关闭（`0c24c11`，C6 收紧为物理指标+1% 门槛；issue 已 CLOSED 但无证据评论）。
+- `relay-2026-09-29-A`：#17 ③④（afbfa65/8d94444/69aec5b）。**#17 不得用仿真证据关闭**。
 
 ## 活跃任务 / 待办（按优先级）
 
-1. **#51 [P2]**：C6 改进集收紧为物理指标（rmse/lap）+ 指级指标白名单机检 + r3 产物重放
-   （evaluate 不需重跑 runner）；重声明必须在任何新候选运行之前。
-2. **#17 / #19 / #15 / #16** 软件侧收口（缺标定/台架，不许为关闭跳过硬验收）。
-3. #23/#24/#18/#25/#26/#27：需人工输入（真实 bag、ROS1 环境），无输入不臆造。
-4. #37（needs-triage 标签 → 按规则跳过，需人工）。
-5. r3 后的正式选参：等 #51 修复后重声明再扫（本轮无真实赢家；比较集评估权**未消费**）。
+1. **修后正式选参**：#51 收紧已落地，重扫网格（`bash scripts/tuning_driver.sh`，<5min）→ 有真实赢家才动参数（qp_solver.hpp 默认 + mpc 节点 declare + test_param_consistency 同步 + 全门 + 比较集一次、命令禁旋钮）；无赢家则 docs §9 追加记录。比较集评估权仍未消费。
+2. #17/#19/#15/#16 软件侧收口（缺标定/台架，不为关闭跳过硬验收）。
+3. #23/#24/#18/#25/#26/#27：需人工输入，无输入不臆造。
+4. #37（needs-triage → 按规则跳过，需人工）。
 
-## 门禁状态（轮 3 收尾）
+## 门禁状态（轮 1 收尾）
 
-- 本机全量 drive_gates：**14/14 PASS、hard_fail=0、599s**（门名清单见 last.json：build/test-run/
-  test-enforce/lint/cpp20/core-standalone/benchmark/tuning-precheck/headless-smoke/qos-contract/
-  closed-loop/closed-loop-fault/fault-injection/mpc-reject-smoke）。
-- 三条 v1 基线与第三臂基线：benchmark 门 PASS（未触碰 `benchmarks/baseline/`）。
-- 主干绿：push run 36651547804 @466c8ff success；本棒累计 CI 样本：36646546721、36651547804 均 success。
-- `colcon test` **483 tests / 0 fail**（#50 新增 6+1 例）；core_standalone 23 项全绿。
+- 本机全量 drive_gates：**14/14 PASS、hard_fail=0、505s**。
+- colcon test：safety_monitor 61/61（新增 racing_status 钉子）；全仓 test-run/test-enforce 门 PASS。
+- `benchmarks/baseline/` 未触碰；改共用层后 benchmark 门 PASS（benchmark_regression 含其中）。
 
-## 环境事实（沿用上棒实测，本轮验证仍成立）
+## 环境事实（沿用上棒，本轮复验成立）
 
-- 本机 lyrical，UDP 组播被 VPN 挡 → 多节点脚本前 `export FASTDDS_BUILTIN_TRANSPORTS=SHM`。
-- 断言型 ros2 查询走 daemon（lint_shell 第 2 段机检）。
-- shellcheck：`build/sc_root/usr/bin`（apt 下载解包），PATH 前缀后跑 lint_shell。
-- `colcon test --packages-ignore hello_world`；跑 scripts 前必须 source ROS **与 install/setup.bash**
-  （本棒轮 2 又踩过一次：漏 source install → "Package not found" 假失败）。
-- 沙箱 /tmp 只读 → 临时产物写 `build/`（本轮负样本 `build/neg_decl*.json`、e2e 在 `build/e2e_run/`，都不入库）。
-- gh `run watch --interval` 参数不存在（本机版本）→ 轮询 `gh run view --json status` 等 CI。
+- 多节点脚本前 `export FASTDDS_BUILTIN_TRANSPORTS=SHM`、`ROS_HOME=$PWD/build/.ros`；跑 scripts 前 source ROS **与** install/setup.bash。
+- 清理只按 PID/PGID；**严禁 `pkill -f <节点名>`**。注意 `pgrep -x` 对 >15 字符进程名（如 command_arbiter_node）恒空 → 用 comm 截断名（command_arbiter）。
+- 断言型 ros2 查询走 daemon（`ros2 topic info` 不可 --no-daemon）。
+- shellcheck 在 `build/sc_root/usr/bin`，PATH 前缀后跑 lint_shell。
+- 沙箱 /tmp 受限 → 临时产物写 `build/`。
+- gh `run watch --interval` 不存在 → 轮询 `gh run view --json status`。
