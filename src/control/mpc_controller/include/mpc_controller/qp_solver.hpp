@@ -13,11 +13,12 @@ namespace mpc {
  * @brief QP 求解设置选项
  */
 struct QpSettings {
-    double rho{1.0};        // ADMM 惩罚参数
-    double eps_abs{1e-4};   // 绝对收敛容差
-    double eps_rel{1e-4};   // 相对收敛容差
-    size_t max_iter{50};    // 最大迭代步数
-    bool warm_start{true};  // 是否启用热启动
+    double rho{1.0};       // ADMM 惩罚参数
+    double eps_abs{1e-4};  // 绝对收敛容差
+    double eps_rel{1e-4};  // 相对收敛容差
+    size_t max_iter{50};   // 最大迭代步数
+    // #52：只门控内部跨调用状态 z_/y_ 的复用；显式入参 warm_x 不受此开关影响。
+    bool warm_start{true};  // 是否复用内部跨调用状态（关掉则每次从盒中心冷启动）
     double acceptable_primal_residual{0.25};
     double acceptable_dual_residual{0.01};
 };

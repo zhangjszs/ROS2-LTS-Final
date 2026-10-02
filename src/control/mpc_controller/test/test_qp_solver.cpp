@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <cmath>
+
 #include "mpc_controller/qp_solver.hpp"
 
 using namespace mpc;
@@ -138,6 +140,65 @@ TEST(BoxQpSolverTest, ResetDropsCarriedOverAdmmState) {
     ASSERT_TRUE(after.converged);
     EXPECT_NEAR(after.x(0), first.x(0), 1e-9);
     EXPECT_NEAR(after.x(1), first.x(1), 1e-9);
+}
+
+// #52：warm_start=false 必须忽略并清空内部 z_/y_——同一实例上即便此前（warm_start=true）
+// 留下了非零残留，也应从盒中心冷启动，等价于"每次调用前 Reset()"。用 max_iter=1 放大初始
+// 状态对结果的影响，使"是否复用残留"可被逐位区分。
+TEST(BoxQpSolverTest, WarmStartDisabledIgnoresAndClearsCarriedState) {
+    const Eigen::MatrixXd H = 2.0 * Eigen::MatrixXd::Identity(2, 2);
+    Eigen::VectorXd g(2);
+    g << -4.0, -6.0;
+    const Eigen::VectorXd lb = Eigen::VectorXd::Constant(2, -10.0);
+    const Eigen::VectorXd ub = Eigen::VectorXd::Constant(2, 10.0);
+
+    QpSettings warm_on;
+    warm_on.max_iter = 1;  // warm_start 默认 true
+    BoxQpSolver solver(warm_on);
+    Eigen::VectorXd g_seed(2);
+    g_seed << 7.0, -3.0;
+    [[maybe_unused]] const auto seeded = solver.Solve(H, g_seed, lb, ub);  // 制造并留存内部 z_/y_ 残留
+
+    QpSettings warm_off = warm_on;
+    warm_off.warm_start = false;
+    solver.SetSettings(warm_off);
+    const auto off = solver.Solve(H, g, lb, ub);
+
+    // 参照：全新实例、同样 warm_start=false（等价于每次调用前 Reset 的冷启动）
+    BoxQpSolver fresh(warm_off);
+    const auto ref = fresh.Solve(H, g, lb, ub);
+
+    EXPECT_EQ(off.iterations, ref.iterations);
+    EXPECT_NEAR(off.x(0), ref.x(0), 1e-12);
+    EXPECT_NEAR(off.x(1), ref.x(1), 1e-12);
+
+    // 反证非空：保持 warm_start=true 时复用残留会得到明显不同的结果
+    BoxQpSolver reuse(warm_on);
+    [[maybe_unused]] const auto reused_seed = reuse.Solve(H, g_seed, lb, ub);
+    const auto on = reuse.Solve(H, g, lb, ub);
+    EXPECT_GT(std::abs(on.x(0) - ref.x(0)) + std::abs(on.x(1) - ref.x(1)), 1e-9);
+}
+
+// #52：显式 warm_x 是"调用方当次初值"，不随 warm_start 被关掉而失效。
+TEST(BoxQpSolverTest, WarmStartDisabledStillHonorsExplicitWarmX) {
+    const Eigen::MatrixXd H = 2.0 * Eigen::MatrixXd::Identity(2, 2);
+    Eigen::VectorXd g(2);
+    g << -4.0, -6.0;
+    const Eigen::VectorXd lb = Eigen::VectorXd::Constant(2, -10.0);
+    const Eigen::VectorXd ub = Eigen::VectorXd::Constant(2, 10.0);
+
+    QpSettings settings;
+    settings.warm_start = false;
+    settings.max_iter = 1;  // 放大初值对结果的影响
+    BoxQpSolver solver(settings);
+
+    const auto cold = solver.Solve(H, g, lb, ub);
+
+    Eigen::VectorXd warm_x(2);
+    warm_x << 5.0, -5.0;  // 与盒中心 (0,0) 明显不同
+    const auto warm = solver.Solve(H, g, lb, ub, warm_x);
+
+    EXPECT_GT(std::abs(warm.x(0) - cold.x(0)) + std::abs(warm.x(1) - cold.x(1)), 1e-9);
 }
 
 // #47：接受定级是唯一判定点的纯函数形式——把"什么算被接受"钉成表，

@@ -32,17 +32,20 @@ QpResult BoxQpSolver::Solve(const Eigen::MatrixXd& H, const Eigen::VectorXd& g, 
     }
 
     // 3. 状态变量与热启动初始化
+    // #52：warm_start 只门控"内部跨调用状态 z_/y_"；显式入参 warm_x 是调用方当次初值，
+    // 不受 warm_start 影响。
+    const bool reuse_carried_state = settings_.warm_start;
     Eigen::VectorXd u = Eigen::VectorXd::Zero(m);
     Eigen::VectorXd z = Eigen::VectorXd::Zero(m);
     if (warm_x && warm_x->size() == m) {
         z = warm_x->cwiseMax(lb).cwiseMin(ub);
-    } else if (z_.size() == m) {
+    } else if (reuse_carried_state && z_.size() == m) {
         z = z_.cwiseMax(lb).cwiseMin(ub);
     } else {
         z = (0.5 * (lb + ub)).eval();
     }
 
-    Eigen::VectorXd y = (y_.size() == m) ? y_ : Eigen::VectorXd::Zero(m);
+    Eigen::VectorXd y = (reuse_carried_state && y_.size() == m) ? y_ : Eigen::VectorXd::Zero(m);
 
     // 4. ADMM 迭代循环
     bool converged = false;
@@ -84,8 +87,14 @@ QpResult BoxQpSolver::Solve(const Eigen::MatrixXd& H, const Eigen::VectorXd& g, 
     }
 
     // 5. 保存对偶状态用于下个控制周期的 Warm-Start
-    z_ = z;
-    y_ = y;
+    // #52：warm_start=false 时不保存，并清空残留，保证后续调用同样从盒中心冷启动。
+    if (settings_.warm_start) {
+        z_ = z;
+        y_ = y;
+    } else {
+        z_ = Eigen::VectorXd();
+        y_ = Eigen::VectorXd();
+    }
 
     result.x = z;
     result.iterations = iter;
