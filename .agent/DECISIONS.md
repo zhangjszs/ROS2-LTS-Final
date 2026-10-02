@@ -1,0 +1,45 @@
+# DECISIONS.md — 长期决策台账
+
+> 维护者：Planning Agent（时间流接力）｜最后更新：2026-10-02T14:15Z（`plan-20261002T141500Z`）
+> 规则：具有长期影响的用户/项目决定在此登记，每条含 编号 / 日期 / 问题 / 决定 / 理由 / 影响范围。
+> 后续 Planning 必须把本表当作长期约束，不得重复询问已决事项，除非出现**新事实**导致旧决定不再成立（此时须写明"什么变了"）。
+>
+> **本轮（plan-20261002T141500Z）无新增用户决定。** D-001..D-006 为仓库中**已生效**的长期约束汇总（来源均标注，非本轮新造），用于让后续 Planning 有单一权威清单。
+
+## D-001 Core/ROS 适配边界（2026-09-25）
+
+- 问题：算法逻辑与 ROS 中间件强耦合，无法脱 ROS 构建、回放与单测。
+- 决定：**已采纳**（来源 `docs/CORE_ROS_BOUNDARY_ADR.md`，相关 #22）。单向依赖 ROS 适配层 → Core；Core 不 include 任何 ROS 头（`rclcpp`、生成消息头等），仅依赖 C++20 标准库；Core 以 header-only 提供，参数/QoS/时钟/日志/消息构造留在适配层；双轨构建（colcon 轨 + `tests/core_standalone/` 独立 CMake/CTest 轨）复用同一批测试源（单一事实来源）；Core 头以本仓库为唯一权威源，**不跨仓库手工复制**。
+- 理由：回归成本低、边界清晰、可 ASan+UBSan 验证。
+- 影响范围：新增算法逻辑须落在 Core；ADR 列出的"仍依赖中间件的模块"是下沉候选；用 `concept` 鸭子类型解耦，不搬运 ROS 消息类型。
+
+## D-002 接口契约单一来源（来源 `docs/INTERFACE_CONTRACT.md` + #14）
+
+- 问题：话题/QoS/坐标系/单位/速度语义分散易漂移。
+- 决定：以 `docs/INTERFACE_CONTRACT.md` + `common_msgs/include/common_msgs/interface_contract.h` 为契约话题（vehicle_state / pathlimits / vehicle_command / stop / #16 system-state）的**唯一权威**；所有契约话题 pub/sub 必须经 `contract::makeQoS(kQos*)`。
+- 影响范围：增改契约话题须同步更新 spec 与 `scripts/qos_contract_check.sh`；向 latched 话题用默认（volatile）QoS 会**静默不投递**。
+
+## D-003 调参协议：判据不可回改（来源 `docs/MPC_TUNING_FREEZE.md` + #48/#51）
+
+- 问题：调参集/比较集不分、判据可被"看过结果后松绑"，产生伪改进。
+- 决定：执行"调参集选参 → 冻结 → 比较集单次评估"；判据（C6 物理指标白名单 + 1% 实质性门槛）变更须走"**重声明（新 round + 预注册）→ 重放/重扫**"，不得看过结果后改判据。
+- 现状：r5 在 r4 判据下 81 组 0 通过 → **不冻结参数**，维持参考配置。
+- 影响范围：新扫描须先改 §8 声明并给出新维度动机；`benchmarks/baseline/` 不得私动。
+
+## D-004 实车/台架证据不可用仿真替代（来源 #15/#16/#17/#19 关闭条件）
+
+- 问题：仿真绿可能掩盖实车才暴露的问题。
+- 决定：依赖实车/台架/硬件的验收项**不得以仅仿真证据关闭**；软件侧完成 ≠ issue 关闭。各 issue 评论已写明其关闭条件。
+- 影响范围：Planning 验收时须区分"软件侧已交付"与"issue 可关闭"；#17/#15/#16/#19 保持 OPEN 直至拿到实车锚点。
+
+## D-005 门禁工具缺失不得静默变绿（来源 #41 / CLAUDE.md）
+
+- 问题：本地缺工具会伪装成"检查通过"。
+- 决定：`lint_cpp.sh` 在 clang-format/cppcheck 缺失时**判失败**（须 `ALLOW_MISSING_TOOLS=1` 显式绕过并在评审说明）；`lint_shell.sh` 的 `bash -n` 为必查项；**断言型 ros2 查询禁止 `--no-daemon`**（走 ros2cli daemon）。
+- 影响范围：新增/修改门禁脚本必须遵守；CI 与 Nightly 同此。
+
+## D-006 接力纪律：不破坏、不越界、分离提交（来源 AGENTS.md / 接力规则）
+
+- 问题：多 Agent 接力易互相覆盖或误关 issue。
+- 决定：不 `force push` / 不 `reset --hard` / 不 `clean -fd`；代码提交与 `.agent` 状态提交**分离**（状态统一 `chore(agent): ...`）；Executor 不关闭 issue（由 Planning 按验收结果裁定）；Planning 不改 Executor 的工作状态（STATE/HANDOFF 与源码）。
+- 影响范围：所有接力轮次的默认操作约束。
