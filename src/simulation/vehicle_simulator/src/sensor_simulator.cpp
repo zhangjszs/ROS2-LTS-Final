@@ -1,19 +1,10 @@
 #include "vehicle_simulator/sensor_simulator.hpp"
 
-#include <cmath>
 #include <fstream>
 #include <iostream>
-#include <numbers>
 #include <sstream>
 
 namespace simulation {
-
-namespace {
-
-constexpr double kPi = std::numbers::pi_v<double>;
-constexpr double kDegToRad = kPi / 180.0;
-
-}  // namespace
 
 bool SensorSimulator::LoadTrackFromCSV(const std::string& csv_path) {
     std::ifstream file(csv_path);
@@ -52,52 +43,20 @@ bool SensorSimulator::LoadTrackFromCSV(const std::string& csv_path) {
 
 common_msgs::msg::HuatMap SensorSimulator::GeneratePerceivedCones(const VehicleState& state, double fov_deg,
                                                                   double max_range, double noise_stddev) {
+    // #54：几何全部交给纯 std core（PredictVisibleCones），本层只做中性类型 → ROS 消息组装。
     common_msgs::msg::HuatMap map_msg;
-    const double half_fov_rad = (fov_deg * 0.5) * kDegToRad;
-    const double max_range_sq = max_range * max_range;
-    std::normal_distribution<double> dist(0.0, (noise_stddev > 0.0) ? noise_stddev : 1.0);
-
-    const double cos_th = std::cos(state.theta);
-    const double sin_th = std::sin(state.theta);
-
-    for (const auto& cone : global_cones_) {
-        // 1. 全局坐标平移到车辆质心
-        const double dx = cone.x - state.x;
-        const double dy = cone.y - state.y;
-        const double dist_sq = dx * dx + dy * dy;
-
-        // 距离粗筛
-        if (dist_sq > max_range_sq || dist_sq < 0.25)
-            continue;
-
-        // 2. 旋转到车体坐标系 (base_link: X 朝前, Y 朝左)
-        const double x_base = dx * cos_th + dy * sin_th;
-        const double y_base = -dx * sin_th + dy * cos_th;
-
-        // 必须在车体前方
-        if (x_base <= 0.2)
-            continue;
-
-        // 3. 水平视场角 (FOV) 判定
-        const double angle = std::atan2(y_base, x_base);
-        if (std::abs(angle) > half_fov_rad)
-            continue;
-
-        // 4. 生成探测结果并加入测距高斯噪声
+    for (const auto& d : PredictVisibleCones(global_cones_, state, fov_deg, max_range, noise_stddev, rng_)) {
         common_msgs::msg::HuatCone detected;
-        detected.id = cone.id;
-        detected.type = cone.type;
-        detected.confidence = 95;
+        detected.id = d.id;
+        detected.type = d.type;
+        detected.confidence = d.confidence;
 
-        double n_x = (noise_stddev > 0.0) ? dist(rng_) : 0.0;
-        double n_y = (noise_stddev > 0.0) ? dist(rng_) : 0.0;
-
-        detected.position_base_link.x = static_cast<float>(x_base + n_x);
-        detected.position_base_link.y = static_cast<float>(y_base + n_y);
+        detected.position_base_link.x = d.x_base;
+        detected.position_base_link.y = d.y_base;
         detected.position_base_link.z = 0.0f;
 
-        detected.position_global.x = static_cast<float>(cone.x + n_x);
-        detected.position_global.y = static_cast<float>(cone.y + n_y);
+        detected.position_global.x = d.x_global;
+        detected.position_global.y = d.y_global;
         detected.position_global.z = 0.0f;
 
         map_msg.cone.push_back(detected);

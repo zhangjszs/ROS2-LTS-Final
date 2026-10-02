@@ -90,6 +90,14 @@ if(BUILD_TESTING)
   target_link_libraries(test_bicycle_model_core
     vehicle_simulator_lib
   )
+  # #54：感知几何核纯 std 单测（header-only）。与 tests/core_standalone 同源；
+  # 仅需 common_msgs 的手写纯头（cone_types.h）包含路径，故链接 common_msgs。
+  ament_add_gtest(test_sensor_model_core
+    test/test_sensor_model_core.cpp
+  )
+  target_link_libraries(test_sensor_model_core
+    common_msgs::common_msgs
+  )
 endif()
 
 ament_export_include_directories(include)

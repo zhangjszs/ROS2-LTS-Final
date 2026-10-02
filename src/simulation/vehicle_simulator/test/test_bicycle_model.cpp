@@ -1,6 +1,6 @@
-// #53：本文件现只保留 SensorSimulatorTest（依赖 common_msgs/msgs，colcon 侧运行）。
-// BicycleModel 的纯 std 用例已移入 test_bicycle_model_core.cpp，并在
-// tests/core_standalone 注册以进入 #40 的 ASan+UBSan 门。
+// #54：本文件只校验 SensorSimulator 的**适配层**——纯 std 感知几何核（FOV/距离/坐标/噪声）
+// 的断言已移至 test_sensor_model_core.cpp（进 #40 的 ASan+UBSan 门）。本文件依赖 ROS 生成
+// 消息（HuatMap/HuatCone），故仅由 colcon 轨运行。
 #include <gtest/gtest.h>
 
 #include <vector>
@@ -9,30 +9,24 @@
 
 using namespace simulation;
 
-TEST(SensorSimulatorTest, FOVAndDistanceFiltering) {
+// 只验证"中性核结果 → HuatMap 消息"的组装是否正确（过滤/几何由 test_sensor_model_core 覆盖）。
+TEST(SensorSimulatorTest, AssemblesDetectedConesIntoHuatMap) {
     SensorSimulator sim;
-    std::vector<TrackCone> cones = {
-        TrackCone{.x = 5.0, .y = 0.0, .type = 0, .id = 1},   // 正前方 5m: 应可见
-        TrackCone{.x = 10.0, .y = 2.0, .type = 1, .id = 2},  // 前方偏左在 120 度内: 应可见
-        TrackCone{.x = -5.0, .y = 0.0, .type = 0, .id = 3},  // 车身正后方: 应过滤
-        TrackCone{.x = 25.0, .y = 0.0, .type = 1, .id = 4},  // 超出 15m 测距: 应过滤
-        TrackCone{.x = 2.0, .y = 10.0, .type = 0, .id = 5}   // 偏角超过 60 度 (FOV/2): 应过滤
-    };
-    sim.SetTrackCones(cones);
+    sim.SetTrackCones({
+        TrackCone{.x = 5.0, .y = 0.0, .type = 0, .id = 1},   // 应可见
+        TrackCone{.x = 25.0, .y = 0.0, .type = 1, .id = 4},  // 超距，应被过滤
+    });
 
-    VehicleState car{.x = 0.0, .y = 0.0, .theta = 0.0, .v = 0.0};
-    auto detected = sim.GeneratePerceivedCones(car, 120.0, 15.0, 0.0);
+    const VehicleState car{.x = 0.0, .y = 0.0, .theta = 0.0, .v = 0.0};
+    const auto detected = sim.GeneratePerceivedCones(car, 120.0, 15.0, 0.0);
 
-    EXPECT_EQ(detected.cone.size(), 2u);
-
-    // 验证探测到的坐标正确映射到 base_link
-    for (const auto& c : detected.cone) {
-        if (c.id == 1) {
-            EXPECT_NEAR(c.position_base_link.x, 5.0f, 1e-3);
-            EXPECT_NEAR(c.position_base_link.y, 0.0f, 1e-3);
-        } else if (c.id == 2) {
-            EXPECT_NEAR(c.position_base_link.x, 10.0f, 1e-3);
-            EXPECT_NEAR(c.position_base_link.y, 2.0f, 1e-3);
-        }
-    }
+    ASSERT_EQ(detected.cone.size(), 1u);
+    EXPECT_EQ(detected.cone[0].id, 1u);
+    EXPECT_EQ(detected.cone[0].type, 0u);
+    EXPECT_EQ(detected.cone[0].confidence, 95u);
+    EXPECT_NEAR(detected.cone[0].position_base_link.x, 5.0f, 1e-3);
+    EXPECT_NEAR(detected.cone[0].position_base_link.y, 0.0f, 1e-3);
+    EXPECT_FLOAT_EQ(detected.cone[0].position_base_link.z, 0.0f);
+    EXPECT_NEAR(detected.cone[0].position_global.x, 5.0f, 1e-3);
+    EXPECT_FLOAT_EQ(detected.cone[0].position_global.z, 0.0f);
 }

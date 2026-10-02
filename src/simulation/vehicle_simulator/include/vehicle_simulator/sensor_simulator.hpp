@@ -1,7 +1,5 @@
 #pragma once
 
-#include <cone_types.h>
-
 #include <common_msgs/msg/huat_cone.hpp>
 #include <common_msgs/msg/huat_map.hpp>
 #include <random>
@@ -9,18 +7,10 @@
 #include <vector>
 
 #include "vehicle_simulator/bicycle_model.hpp"
+// #54：感知几何核（TrackCone/DetectedCone/PredictVisibleCones）已下沉为纯 std core。
+#include "vehicle_simulator/sensor_model_core.hpp"
 
 namespace simulation {
-
-/**
- * @brief 赛道锥桶定义
- */
-struct TrackCone {
-    double x{0.0};
-    double y{0.0};
-    uint32_t type{huat_cone::BLUE};  // huat_cone::Color
-    uint32_t id{0};
-};
 
 /**
  * @brief 传感器模拟器 (LiDAR & Camera 感知模拟)

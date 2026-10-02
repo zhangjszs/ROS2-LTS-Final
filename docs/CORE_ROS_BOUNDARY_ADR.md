@@ -51,11 +51,11 @@ ROS 1 基线的算法逻辑与中间件强耦合（catkin 构建、节点内联�
 | `mpc_controller/path_reference_builder.h`（+ `mpc_types.hpp`） | #22-2 path→ReferencePoint（航向/曲率/速度选择） | MPC 节点 | `test_path_reference_builder` |
 | `straight_line_planner/cone_boundary.h` | #22-3 锥桶左右分离与边界宽度判定 | line_detector、straight_line_planner 节点 | `test_cone_boundary` |
 | `track_benchmark/kpi_evaluator.hpp`（+ `track_generator.hpp`） | #17 KPI 判定/赛道生成 | 离线 benchmark runner | `test_kpi_evaluator` |
+| `vehicle_simulator/sensor_model_core.hpp` | #54 感知几何核（FOV/距离过滤/坐标变换/测距噪声，header-only） | `SensorSimulator`（仅做中性类型→`HuatMap`/`HuatCone` 组装） | `test_sensor_model_core` |
 
 ## 仍依赖中间件的模块
 
 - 各 `*_node.cpp` 适配层（参数/QoS/时钟/发布/日志），属设计内边界，不视为残留耦合。
-- `vehicle_simulator/sensor_simulator.hpp` 直接引用消息类型（传感器注入），尚未下沉。
 - 后续候选（各自独立、行为可证等价后再动）：velocity_profiler 梯形规划、safety_monitor 看门狗计时、lidar_cluster 几何核、skidpad_planner `IcpApfPlanner::ClusterCones`。
 
 ## 后果与边界
