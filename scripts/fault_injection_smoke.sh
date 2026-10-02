@@ -61,6 +61,7 @@ NODE_PIDS=() # wrapper 的直接子进程 = 真实节点（按启动顺序）
 
 cleanup() {
     local p c alive
+    kill_restarted_arbiter
     NODE_PIDS=()
     for p in "${PIDS[@]}"; do
         while read -r c; do NODE_PIDS+=("$c"); done < <(pgrep -P "$p" 2>/dev/null || true)
@@ -78,6 +79,18 @@ cleanup() {
     wait 2>/dev/null || true
 }
 trap cleanup EXIT
+
+# 重启型仲裁器的兜底清理：harness 中途崩溃时 python 端 killpg 执行不到，
+# 这里按 pidfile 对进程组补刀（只按捕获到的 PID/PGID 清理，绝不做名字匹配）。
+kill_restarted_arbiter() {
+    local pf="$OUT_DIR/arbiter_restart.pid" rp
+    [ -f "$pf" ] || return 0
+    rp="$(cat "$pf" 2>/dev/null || true)"
+    if [ -n "$rp" ] && kill -0 "$rp" 2>/dev/null; then
+        kill -KILL -- "-$rp" 2>/dev/null || kill -KILL "$rp" 2>/dev/null || true
+    fi
+    rm -f "$pf"
+}
 
 start() {
     local log="$1"
@@ -271,10 +284,17 @@ class Harness(Node):
             pass
 
     def restart_arbiter(self):
+        # start_new_session：重启的仲裁器独立成进程组，退出时 killpg 连 wrapper+节点一起清；
+        # 只 terminate wrapper（ros2 run）时节点可能存活成孤儿，污染下一道门禁的
+        # /vehicle_command（Nightly 36933923349 的 mpc-reject-smoke 假红即此因）。
+        # pidfile 供 shell 端 EXIT 兜底（harness 中途异常退出时 python 端清理执行不到）。
         p = subprocess.Popen(
             ["ros2", "run", "safety_monitor", "command_arbiter_node", "--ros-args",
              "-p", "use_sim_time:=true", "-p", "arbitration.source_timeout_sec:=0.5"],
-            stdout=open(f"{out_dir}/arbiter_restart.log", "w"), stderr=subprocess.STDOUT)
+            stdout=open(f"{out_dir}/arbiter_restart.log", "w"), stderr=subprocess.STDOUT,
+            start_new_session=True)
+        with open(f"{out_dir}/arbiter_restart.pid", "w") as f:
+            f.write(str(p.pid))
         return p
 
 
@@ -579,8 +599,9 @@ for name, drive, check in TABLE:
 with open(f"{out_dir}/summary.json", "w") as fp:
     json.dump(summary, fp, ensure_ascii=False, indent=2)
 try:
-    h.proc.terminate()
-except AttributeError:
+    os.killpg(os.getpgid(h.proc.pid), signal.SIGKILL)  # 进程组整组清，节点不残留
+    os.remove(f"{out_dir}/arbiter_restart.pid")
+except (AttributeError, OSError):
     pass
 rclpy.shutdown()
 sys.exit(overall)

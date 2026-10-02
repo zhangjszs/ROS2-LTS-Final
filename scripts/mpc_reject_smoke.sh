@@ -112,6 +112,18 @@ if [ "$ready" -ne 1 ]; then
 fi
 echo "OK   拓扑就绪，开始 [$ARM] 采样断言"
 
+# 出口纯度预检：/vehicle_command 的发布者必须恰好 1 个（本臂 MPC）。
+# 前序门禁泄漏的 command_arbiter_node 会向本话题发 safeStop 帧，直接污染
+# last_cmd_after_rejecting 判据（Nightly 36933923349 假红；断言查询走 daemon，#49）。
+pub_info="$(timeout 12 ros2 topic info /vehicle_command 2>/dev/null || true)"
+pub_count="$(sed -n 's/^Publisher count: \([0-9]*\)$/\1/p' <<<"$pub_info" | head -1)"
+if [ "${pub_count:-0}" != "1" ]; then
+    echo "FAIL: /vehicle_command 发布者数=${pub_count:-未知}（应为 1）；疑似跨门禁泄漏进程污染，当前节点："
+    timeout 12 ros2 node list 2>/dev/null | sed 's/^/  /'
+    exit 1
+fi
+echo "OK   出口纯度（/vehicle_command 发布者=1）"
+
 python3 - "$OUT_DIR" "$ARM" "$BUDGET_SEC" "$REJECT_THRESHOLD" <<'PY'
 import json
 import math

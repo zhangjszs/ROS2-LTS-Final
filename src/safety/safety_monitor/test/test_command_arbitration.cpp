@@ -152,6 +152,8 @@ TEST(CommandArbitration, SafeFallbackIsDeterministicAndValid) {
     auto r = arb.decide(true, true, none, ArbitrationConfig{});
     EXPECT_EQ(r.checksum, checksumRaw(r.cmd));  // 校验和与指令同源
     EXPECT_EQ(r.cmd.steering, kNeutral);
+    EXPECT_EQ(r.cmd.pedal_ratio, 0);
+    EXPECT_EQ(r.cmd.racing_status, 4);  // 停车状态字=急停语义；漏写则以默认 0 上线（Nightly 36933923349）
     EXPECT_LE(r.cmd.brake_force, 255);
     EXPECT_GE(r.cmd.brake_force, 1);
 }

@@ -104,6 +104,9 @@ class CommandArbitrator {
         raw.brake_force = cal_.emergencyBrakeRaw();
         raw.gear_position = 1;
         raw.working_mode = 1;
+        // 停车状态字必须显式置急停语义（与 makeSafeStopRaw 同契约）：VehicleCommandRaw
+        // 默认初始化为 0，漏写会让"急停帧"以 0 上线（Nightly 36933923349 实测捕获）。
+        raw.racing_status = 4;
         ArbitrationResult r;
         r.winner = ControlSource::NONE;
         r.cmd = raw;
