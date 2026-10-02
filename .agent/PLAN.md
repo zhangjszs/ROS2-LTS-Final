@@ -42,7 +42,7 @@
   - `#53` vehicle_simulator 拆 `bicycle_model` 纯 std 单测进 #40 sanitizer 门 — 代码 `eb75d08`，**CLOSED**。
   - `#52` `QpSettings::warm_start` 死配置生效 + 单测（auto-discovered 提升）— 代码 `fe2d97b`，**CLOSED**。
   - `#54` `sensor_simulator` 感知几何核下沉纯 std core（ADR 残余）— 代码 `dbb77c0`，**CLOSED**。
-  - 关闭依据：Planning 独立复核（自跑 `core_standalone_check.sh` 25/25 ASan+UBSan、`colcon test` 492/0 fail、逐条代码级核对）+ #53 的 Jazzy CI 全关键步骤 success（#54 的 CI run 排队中，本机已独立复现其 build/test/sanitizer 门；若转红按流程重开）。
+  - 关闭依据：Planning 独立复核（自跑 `core_standalone_check.sh` 25/25 ASan+UBSan、`colcon test` 492/0 fail、逐条代码级核对）；CI：#53 的 run 37025171399 全关键步骤 success，#54 经其后继提交 `dbd3a17` 的 run 37026081026 success（Jazzy，代码树等同 `dbb77c0`，已核实祖先关系）。
 
 ## 六、阻塞项与原因（均有证据）
 
