@@ -1,7 +1,7 @@
 # STATE
-- 更新时间：2026-10-06T09:07Z
-- 当前 Issue：#56（blocked，ccache 已装、mold 缺失待用户安装；验收 1/3 通过）
-- 分支：main（零文件变更，无临时分支；`build/` 缓存未动，他人 `AGENTS.md` 脏改动未碰）
-- 未完成工作：#56 恢复点 = 用户手动 `sudo apt-get install -y mold` 后 Planner 打回 ready/in-progress，下一棒直接重跑 `bash scripts/check_cpp20.sh` → `SKIP_BUILD=1 drive_gates.sh`（cpp20 门 + 附带 mpc-reject-smoke 门）；#55 待 2 次 post-fix Nightly（下一次约今日 20:xxZ）
-- 最近提交：无代码提交（本轮仅 2 条 #56 comment + 标签流转 + `.agent/` 状态提交）
-- 已知环境限制：ccache 4.12.3 已就绪；mold 缺失（`which` 空，stale CMakeCache 要求 `CMAKE_LINKER_TYPE=MOLD`）；无免密 sudo；本机 ROS=lyrical（CI Jazzy），多节点脚本前 `export FASTDDS_BUILTIN_TRANSPORTS=SHM`
+- 更新时间：2026-10-07T00:05Z
+- 当前 Issue：#56（in-review，三条验收全绿；#55 in-review 待 Nightly，无动作）
+- 分支：main（零文件变更，无临时分支；开工时 `M AGENTS.md` 外部脏改动仍在，全程未碰）
+- 未完成工作：无（#56 已完成验证+报告+转 in-review；ready 队列空）
+- 最近提交：无代码提交（本轮仅 #56 执行报告 comment + in-progress→in-review，无 .agent/ 之外的变更）
+- 已知环境限制：agent 非交互 shell PATH 缺 `~/.local/bin`（mold/ccache 本体在，login shell 命中；详见 ENV.md）；本机 ROS=lyrical（CI Jazzy），多节点脚本前 `export FASTDDS_BUILTIN_TRANSPORTS=SHM`

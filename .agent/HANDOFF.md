@@ -1,29 +1,26 @@
 # HANDOFF
 ## 本轮概要
-- `exec-20261006T0855Z`：用户手动安装 ccache 后恢复 #56（blocked→in-progress），结论**再次阻塞**（新的同类环境缺口：mold 缺失）。验收 1/3 通过；执行报告（第 2 轮）已留 #56 评论，标签已转回 `blocked`。
+- `exec-20261006T2329Z`：接管过期 LOCK（原 `executor-20261006T0915Z`，heartbeat 停于 09:35Z，已过期 ~14h），恢复 #56（in-progress）一次做完：三条验收全绿 → 执行报告（第 3 轮）已留 → 转 `in-review`。ready 队列空，正常收尾。
 
 ## 已完成
-- #56 验收 1：`which ccache` → `/usr/bin/ccache` 4.12.3，用户安装生效。原 Error 127（ccache 缺失）签名已消除。
-- #55 未动——post-fix Nightly 仍未产生（最新仍为 10-05 `37389535363`），无新证据。
+- #56：三验收全绿（`which ccache/mold` 非空、`check_cpp20.sh` rc=0、`SKIP_BUILD=1 drive_gates.sh` 12 门全 PASS 370s 含 mpc-reject-smoke）· 零代码变更 · comment `6027474062`
+- 前一棒遗留诊断被证实：mold 缺失是 PATH 误判（`~/.local/bin/mold` 2.42.0 本体一直在；`export PATH=$HOME/.local/bin:$PATH` 即解），未装包、未改脚本、未清 `build/` 缓存
 
 ## 未完成 / 进行中（下一棒最优先看这里）
-- #56（blocked）：停在验收 2 `bash scripts/check_cpp20.sh`（rc=2）。精确位置：`build/track_benchmark/CMakeCache.txt` 内 `CMAKE_LINKER_TYPE:UNINITIALIZED=MOLD` vs 本机无 mold → `collect2: fatal error: cannot find 'ld'` → `Failed <<< track_benchmark`。对照证据：`g++` 直连系统默认 ld 链接正常（`GPP_OK`），`/usr/bin/ld.bfd` 存在——缺的只是 mold 本体；`colcon_defaults.yaml:29` 要求 MOLD，故未清 `build/` 缓存绕过（治标不治本，且动用户构建产物有风险）。
-- 从哪继续：用户手动 `sudo apt-get install -y mold` 后，Planner 将 #56 打回 ready/in-progress；下一棒**不要重装、不要清缓存**，直接 `bash scripts/check_cpp20.sh`（约 2 分钟）→ 通过后跑 `SKIP_BUILD=1 bash scripts/drive_gates.sh` 记录 cpp20 门 + mpc-reject-smoke 门状态。
+- 无 in-progress。#56 / #55 均为 `in-review`，等 Planner 验收（#55 另待 post-fix 2 次 Nightly，首个观察点为 10-06 20:xxZ 之后的那次——本轮 23:xxZ 未查 Nightly，有需要下一棒顺手看一眼即可）。
 
 ## 验证情况
-- 跑了：`which ccache`（rc=0）、`which mold`（空）、`bash scripts/check_cpp20.sh`（rc=2，尾部 15 行已记报告）、`grep mold build/.../CMakeCache.txt`（命中 1 行）、`g++` 最小链接对照（OK）、`gh issue` 标签/comment 操作（均成功）。
-- 没跑：验收 3 drive_gates（前置未过，复跑不增信息）；Nightly（待时间产生）。
+- 跑了：`which ccache/mold`（rc=0）、`check_cpp20.sh`（rc=0，19 pkgs）、`SKIP_BUILD=1 drive_gates.sh`（rc=0，12/12 PASS，`build/drive_gates/last.json`）；`git status` 确认零文件变更（仅外部预存 `M AGENTS.md`，未碰）。
+- 没跑：push CI（无代码变更，无可验对象）；Nightly（时间性证据，属 Planner/#55 验收侧）。
 
 ## 风险与注意事项
-- 开工时 `M AGENTS.md` 脏改动仍在（非本棒产生），继续绕开；`git pull --rebase` 未做（避免碰他人改动）。
-- 本轮未创建 auto-discovered Issue（mold 缺失是 #56 同一缺口的第二表现，非独立问题，不占配额）。
-- 若 mold 装完后 check_cpp20 仍红：先看是否同一签名再定性，勿直接归为代码回归（基线对照方法见 #56 正文 stash 实验）。
+- `M AGENTS.md` 脏改动开工即在（非本棒产生），`git fetch` 显示 main 与 origin/main 同步故未 pull；全程未碰该文件。
+- ENV.md 已增 PATH 条目：后续任何 build/验证前先 `export PATH="$HOME/.local/bin:$PATH"`，否则复现 mold/ccache"缺失"误判。
 
 ## 给下一棒的第一步建议
-1. `which mold` 非空确认后再开工，否则直接收尾。
-2. 先跑 `bash scripts/check_cpp20.sh`，绿了再跑 drive_gates（记得 source lyrical + install/setup.bash，`export FASTDDS_BUILTIN_TRANSPORTS=SHM`）。
-3. 全绿 → #56 按模板留完成报告转 `in-review`；仍红 → 贴新签名转 `blocked`。
+1. 若 Planner 新立 ready Issue，按 2.3 顺序领取（记得先 export PATH 再验证）。
+2. 否则仅观察：查一次 post-fix Nightly 是否产生（`gh run list --workflow drive_gates` 之类），有新证据就在 #55 留言，无则收尾。
 
 ## 给 Planner 的信号
-- 需要用户决策（同选项 1 延续）：再手动装一个包 `sudo apt-get install -y mold`；或明确改验收口径（接受本机 cpp20 环境阻塞，#55 标准4 改以 CI 证据验收）。
-- #55 待验收（in-review，待 2 次 Nightly）；ready 队列除 #56 外为空。
+- #56 可验收关闭（三标准全满足）；关闭后 #55 标准4 前置消除，仅剩标准5（2 次 post-fix Nightly）。
+- ready 队列空，无阻塞、无新增 auto-discovered（本轮未发现独立新问题，配额 0/3）。
