@@ -1,54 +1,29 @@
-# HANDOFF.md — 给下一棒（relay 交接快照）
+# HANDOFF
+## 本轮概要
+- `exec-20261006T0625Z`：领取并完成 ready 队列唯一项 #55（mpc-reject-smoke 出口纯度预检间歇假失败），结论**部分完成**（本地 4/5 验收满足；drive_gates 全绿被本机缺 ccache 阻塞→已立 #56；2 次 Nightly 待 CI 产生）。新建标签 `in-progress`/`in-review`/`auto-discovered`（本仓缺失，按契约 1.4 创建）。
 
-当前棒：`exec-20261002T1509Z`（2026-10-02）——消费 PLAN ready 队列 **#53 → #52 → #54，三项全部完成**。
-上一棒 `plan-20261002T141500Z` 建立 PLAN/DECISIONS 与 ready 队列（`06ce1d6`）。
-**先读 `.agent/STATE.md`、`.agent/PLAN.md`、`.agent/DECISIONS.md`、`.agent/ENV.md`。**
+## 已完成
+- #55：预检退避重试 + 三分叉失败文本（未收敛重试 / ≥2 判污染 / 耗尽报无法验证），判据强度不动 · `a99b600`→merge `48a4241` @ main（已推送）· 验证：lint 绿、预检块 4 场景桩全过、两臂 5 轮 10/10 绿、drive_gates 内 mpc-reject-smoke 门 PASS
+- #56：`[auto-discovered]` 本机缺 ccache 致 cpp20 门必红（stash 对照证实基线即红；CI 不受影响）
 
-## 一、本棒成果（三项 ready 全部完成，待 Planning 验收）
+## 未完成 / 进行中（下一棒最优先看这里）
+- 无进行中 Issue。#55 在 `in-review` 待 Planner 验收：① 观察合入后 2 次 Nightly 全绿（schedule 约 20:xxZ，基线 `48a4241`）；② 给 #56 定级；③ 评估 daemon 瞬态卡死是否单独立项（本轮：连续 2 轮节点注册环耗尽 + `ros2 daemon status` rc=124，11511 无监听、无残留进程，显式 `daemon start` 自愈；证据见 #55 执行报告；建议先观察）。
+- 若 push CI（`48a4241`）因本改动变红 → 直接 revert `48a4241`（单 merge commit），Issue 回 `in-progress`。
 
-| 序 | Issue | 代码 commit | 验证 |
-|---|---|---|---|
-| 1 | #53 vehicle_simulator 拆 bicycle_model 纯 std 单测进 #40 sanitizer 门 | `eb75d08` | core_standalone 24/24；colcon 484/0 fail；lint 通过 |
-| 2 | #52 `QpSettings::warm_start` 死配置生效 + 单测 | `fe2d97b` | core_standalone 24/24；colcon 486/0 fail；lint 通过 |
-| 3 | #54 sensor_simulator 感知几何核下沉纯 std core | `dbb77c0` | core_standalone 25/25；colcon 492/0 fail；lint 通过 |
+## 验证情况
+- 跑了：`bash -n`（0）、`lint_shell.sh`（0，全 14 脚本 clean）、预检块桩测 4/4、两臂连续 5 轮 10/10 PASS、`SKIP_BUILD=1 drive_gates.sh`（369s：除 cpp20 外全 PASS，mpc-reject-smoke 45s PASS）、`check_cpp20.sh` 基线对照（stash 后同错 rc=2，4 处 ccache 缺失）。
+- 没跑：shellcheck（本机未装，建议性，CI 覆盖）；Nightly（待时间产生）。
 
-- 三条结构化执行结果已挂 issue 评论：`build/issue_comments/c5{2,3,4}.md`（不入库）。
-- **本棒未关闭任何 issue**（按规则由 Planning 按验收裁定）。
-- 额外集成证据：#54 为生产重构，另跑 `scripts/closed_loop_sim_smoke.sh` → **PASS**（已挂 #54 追加评论）。
-- 外部动作：#52 已被外部（非本棒）以 COMPLETED 关闭（15:14Z）；#53/#54 仍 OPEN 待 Planning 验收。
+## 风险与注意事项
+- 合并纪律偏离说明：§9 要求全绿才合回；本轮唯一红门系 stash 对照证实的基线环境红（#56），改动纯 shell 且 CI 含 ccache，故合入 main 以解锁 Nightly 证据；已在执行报告写明 revert 路径。
+- 别全局 apt 装 ccache（接力红线），等 Planner/用户定 #56。
+- 本机 `which ccache mold` 均空；跑门禁前仍需 `FASTDDS_BUILTIN_TRANSPORTS=SHM` + `ROS_HOME=$PWD/build/.ros` + source ROS 与 install。
 
-## 二、下一棒的第一步
+## 给下一棒的第一步建议
+1. 查 push CI（`48a4241`）状态：红且由本改动引起 → revert；绿 → 不动。
+2. 若你是 Planner：按 #55 执行报告逐条验收，重点等 2 次 Nightly；给 #56 定级。
+3. 若你是 Executor：ready 队列预计为空（PLAN 称软件侧已扫尽）；先 `gh issue list --label ready-for-agent --state open` 确认，无则收尾。
 
-1. **Planning 验收**：复核 #53/#52/#54 的 issue 评论 + 代码 commit + 本轮 CI，逐条对照验收标准后裁定关闭；关闭 #53 会自动解除 #54 的原生依赖 `blocked_by #53`。
-2. 若继续执行：重拉 `gh issue list --label ready-for-agent --state open`——
-   - 若为空：软件侧已扫尽，剩余路线图条目卡仓库外输入，见 PLAN 第三/六/七节；不臆造。
-   - 若 Planning 新增 ready：按 PLAN 第四节顺序消费。
-
-## 三、本棒实现的三个任务要点（复现/续做）
-
-- **#53**：新 `test_bicycle_model_core.cpp`（`BicycleModel` 5 用例，无 ROS/msgs）；`test_bicycle_model.cpp` 只留适配层测试；两轨注册（`vehicle_simulator/CMakeLists.txt` + `tests/core_standalone/CMakeLists.txt`）。
-- **#52**：`BoxQpSolver::Solve` 读 `settings_.warm_start`——`false` ⇒ 忽略并清空内部 `z_/y_`、盒中心冷启动、返回前不写回；显式 `warm_x` 不受影响；2 个新纯 std 单测。
-- **#54**：新增 header-only `sensor_model_core.hpp`（`TrackCone`/`DetectedCone`/`PredictVisibleCones`）；`SensorSimulator::GeneratePerceivedCones` 退化为 msg 组装（行为逐位一致）；新 `test_sensor_model_core.cpp`（5 用例）；`test_bicycle_model.cpp` 收敛为适配层测试；同步 ADR 与 #40 排除清单。
-
-## 四、红线（仍然有效）
-
-- 别用过仿真证据关闭 `#17/#15/#16/#19`；关闭条件见各 issue 评论（D-004）。
-- 别改判据（D-003）；别动 `benchmarks/baseline/`；别往 `fsac.benchmark.kpi/v1` 加字段。
-- 代码提交与 `.agent` 状态提交分离（D-006）。
-- 别 force push；清理进程只按 PID/PGID；严禁 `pkill -f <节点名>`。
-- 本机 ROS=lyrical（CI 是 Jazzy）；跑门禁前先设 `FASTDDS_BUILTIN_TRANSPORTS=SHM`、`ROS_HOME=$PWD/build/.ros`。
-- 改 C++ 后先 `clang-format -i <file>`（clang-format 是 lint 必查项）。
-
-## 五、复现本棒验证
-
-```bash
-bash scripts/core_standalone_check.sh                 # 25/25（含 test_bicycle_model_core / test_sensor_model_core / test_qp_solver 新测）
-bash scripts/lint_cpp.sh
-source /opt/ros/lyrical/setup.bash && source install/setup.bash
-MAKEFLAGS=-j4 colcon build --packages-select vehicle_simulator mpc_controller --symlink-install \
-  --cmake-args -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_STANDARD=20 -DCMAKE_LINKER_TYPE=MOLD \
-  -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DBUILD_TESTING=ON
-colcon test --packages-select vehicle_simulator mpc_controller && colcon test-result --verbose
-```
-
-- 本棒起点：`06ce1d6`；产出代码 commit：`eb75d08`、`fe2d97b`、`dbb77c0`（均已 push 到 origin/main）。
+## 给 Planner 的信号
+- 需要 Planner 介入：#55 待验收（in-review）、#56 待定级、D-007 仍 pending（非本棒职责，仅列出）。
+- ready 队列本棒离开时：除 #56（auto-discovered，未定级、不进队列）外为空。
