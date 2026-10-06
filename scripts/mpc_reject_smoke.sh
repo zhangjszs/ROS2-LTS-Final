@@ -115,10 +115,40 @@ echo "OK   拓扑就绪，开始 [$ARM] 采样断言"
 # 出口纯度预检：/vehicle_command 的发布者必须恰好 1 个（本臂 MPC）。
 # 前序门禁泄漏的 command_arbiter_node 会向本话题发 safeStop 帧，直接污染
 # last_cmd_after_rejecting 判据（Nightly 36933923349 假红；断言查询走 daemon，#49）。
-pub_info="$(timeout 12 ros2 topic info /vehicle_command 2>/dev/null || true)"
-pub_count="$(sed -n 's/^Publisher count: \([0-9]*\)$/\1/p' <<<"$pub_info" | head -1)"
-if [ "${pub_count:-0}" != "1" ]; then
-    echo "FAIL: /vehicle_command 发布者数=${pub_count:-未知}（应为 1）；疑似跨门禁泄漏进程污染，当前节点："
+# #55：首行的 `ros2 daemon stop` 后图重建，`ros2 node list` 通过只代表节点发现收敛，
+# 话题端点发现可能滞后；单次 `ros2 topic info` 空返回/超时（Nightly 37068578710 的
+# 12s 超时模式 / 37151769248 的空返回模式，“发布者数=未知”）≠ 真污染（真污染报 2）。
+# 故空返回/超时退避重试，仅确认 Publisher count ≥ 2 才判污染；重试耗尽仍无计数则以
+# “纯度无法验证”失败（与“检测到多发布者”文本区分，便于分诊）。判据强度不变：
+# 恰为 1 才继续，两臂语义与阈值参数一字未动。
+PUB_RETRIES="${PUB_RETRIES:-4}"
+PUB_RETRY_INTERVAL="${PUB_RETRY_INTERVAL:-3}"
+pub_count=""
+pub_attempt=0
+while [ "$pub_attempt" -lt "$PUB_RETRIES" ]; do
+    pub_attempt=$((pub_attempt + 1))
+    pub_info="$(timeout 12 ros2 topic info /vehicle_command 2>/dev/null || true)"
+    pub_count="$(sed -n 's/^Publisher count: \([0-9]*\)$/\1/p' <<<"$pub_info" | head -1)"
+    if [ -n "$pub_count" ]; then
+        [ "$pub_attempt" -gt 1 ] && echo "OK   出口纯度查询第 ${pub_attempt} 次收敛（发布者数=${pub_count}）"
+        break
+    fi
+    echo "...  出口纯度查询第 ${pub_attempt}/${PUB_RETRIES} 次未收敛（空返回/超时），${PUB_RETRY_INTERVAL}s 后重试"
+    sleep "$PUB_RETRY_INTERVAL"
+done
+if [ -z "$pub_count" ]; then
+    echo "FAIL: /vehicle_command 纯度无法验证（${PUB_RETRIES} 次查询均空返回/超时；注意：这是“查不到”，不是“检测到多发布者”）。"
+    echo "      若伴随节点未注册请查 DDS/daemon；当前节点："
+    timeout 12 ros2 node list 2>/dev/null | sed 's/^/  /'
+    exit 1
+fi
+if [ "$pub_count" -ge 2 ]; then
+    echo "FAIL: /vehicle_command 检测到多发布者（=${pub_count}，应为 1）；疑似跨门禁泄漏进程污染，当前节点："
+    timeout 12 ros2 node list 2>/dev/null | sed 's/^/  /'
+    exit 1
+fi
+if [ "$pub_count" != "1" ]; then
+    echo "FAIL: /vehicle_command 发布者数=${pub_count}（应为 1；查询已收敛但计数异常），当前节点："
     timeout 12 ros2 node list 2>/dev/null | sed 's/^/  /'
     exit 1
 fi
