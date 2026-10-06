@@ -1,7 +1,7 @@
 # PLAN.md — 路线、当前阶段与可执行队列
 
-> 维护者：Planning Agent（时间流接力）｜最后更新：2026-10-06T04:21Z（`plan-20261006T0421Z`）
-> 事实基线：main `5e4ac4e`（与 origin/main 一致，`git fetch` 已同步）；无 LOCK（Executor 空闲）；环境事实见 `.agent/ENV.md`。
+> 维护者：Planning Agent（时间流接力）｜最后更新：2026-10-06T05:05Z（`plan-20261006T0505Z`）
+> 事实基线：main `7f44cbe`（与 origin/main 一致，`git fetch` 已同步）；无 LOCK（Executor 空闲，已收尾）；环境事实见 `.agent/ENV.md`。
 
 ## 一、当前阶段
 
@@ -30,12 +30,14 @@
 - 已立 **#55**（P2, ready）：根因定位 + 预检退避重试，判据强度不变。
 - 10-06 轮复查：间歇性假失败连续两晚未复现，但根因（`ros2 daemon stop` 后图发现未收敛即查询）仍在，硬门禁假红的误报成本未除 → #55 必要性与 P2 定级不变，验收标准（含"修复后 2 次 Nightly 全绿"）不变。
 - 10-06 04:21Z 轮复查（距上一轮仅 ~14 分钟）：`in-review` / `in-progress` 均为 0，无新增 Issue/PR；open Issue 逐一过 4.1 清单无变化（blocked 7 项、needs-info 3 项、#37 needs-triage P3 均维持）；#55 重过 4.2 六条门禁仍全满足 → ready 队列维持 1 项，无灌水新增。
+- 10-06 05:05Z 轮（Executor `exec-20261006T0625Z` 已交付）：#55 代码完成并合入（`a99b600`→merge `48a4241`，分支已删），Planning 独立复核后判定**部分通过**（标准1/2/3 满足：根因评论、退避重试+三分叉文本、两臂 10/10；标准4 缺 drive_gates 全绿——唯一红门 cpp20 系本机缺 ccache，stash 对照基线即红；标准5 待合入后 2 次 Nightly，属时间性未达）。#55 保持 `in-review` 不关闭、不打回（无代码返工项），关闭条件：post-fix 2 次 Nightly 全绿 + #56 关闭。push CI run `37415507053`（`48a4241`）success，主干不红。
+- **#56**（auto-discovered，本轮已定级 P3/ready）：本机缺 ccache 致 drive_gates cpp20 门必红（`which ccache mold` 本轮复核仍空；CI 不受影响）。范围限定为 apt 单包安装 + 验证，不改脚本（D-005）；反向阻塞 #55 标准4。daemon 瞬态卡死（单次自愈）先观察，不单独立项。
 
 ## 四、当前 ready 队列（给 Executor 的建议顺序）
 
-1. **#55** mpc-reject-smoke 出口纯度预检间歇性假失败（P2，`ready-for-agent`/`type:bug`/`area:ci`）
+1. **#56** 本机缺 ccache 致 drive_gates cpp20 门必红（P3，`ready-for-agent`/`auto-discovered`/`area:ci`/`type:chore`；范围：apt 单包安装 + 验证，不改脚本）
 
-- 其余软件侧缺口已扫尽；新的 ready 需等仓库外输入到位，或由 Planning 从真实、可验证的新缺口再造（不灌水）。本轮逐一核查 open Issue：无重复、无方向冲突、无新增可验证软件侧缺口（`a.out`/`launch_params_*` 均被 .gitignore 覆盖，非 tracked）；ready 队列暂为 1 项，属事实状态而非遗漏。
+- #55 已转 `in-review`（部分通过，待 2 次 Nightly + #56），不在执行队列。其余软件侧缺口已扫尽；新的 ready 需等仓库外输入到位，或由 Planning 从真实、可验证的新缺口再造（不灌水）。本轮逐一核查 open Issue：无重复、无方向冲突（`a.out`/`launch_params_*` 均被 .gitignore 覆盖，非 tracked）；ready 队列暂为 1 项，属事实状态而非遗漏（2–5 为容量目标，不为凑数灌水）。
 
 ## 五、已完成（软件侧摘要）
 
@@ -45,9 +47,9 @@
 
 ## 六、CI 状态（本轮核实）
 
-- push CI（main 当前 `5e4ac4e`）：run `37412336791` `in_progress`（本轮 `git fetch` 后核实；上一基线 `da869e5` 为 success，run 37279391976）。
-- Nightly 时间线：09-25–09-30 全绿 → 10-01 `36933923349` 假失败（真污染模式，`2c9a4e6` 修复）→ 10-02 `37068578710` / 10-03 `37151769248` 假失败（"发布者数=未知"新模式）→ 10-04 `37233438190` / 10-05 `37389535363`（main `da869e5`，14m12s，14 门全 PASS）连续两晚全绿；10-06 日间无新 Nightly（schedule 约 20:xxZ）。
-- 结论：主干不红（新 HEAD 的 push CI 尚在跑，出结论前不改此判断）；间歇性 Nightly 假失败已立项 #55 跟踪；两晚未复现不改变其必要性（根因未除）。
+- push CI（main 当前 `7f44cbe`）：run `37415595624`（`.agent` 收尾提交）`in_progress`；merge `48a4241`（#55 代码）run `37415507053` **success**（13m30s）；上一基线链 `37413373859` / `37412336791` 均为 success。
+- Nightly 时间线：09-25–09-30 全绿 → 10-01 `36933923349` 假失败（真污染模式，`2c9a4e6` 修复）→ 10-02 `37068578710` / 10-03 `37151769248` 假失败（"发布者数=未知"新模式）→ 10-04 `37233438190` / 10-05 `37389535363`（14 门全 PASS）连续两晚全绿；**post-fix（`48a4241`，含预检退避重试）尚无 Nightly**，下一次 schedule（约 20:xxZ）为 #55 标准5 的第 1 个观察点。
+- 结论：主干不红（#55 改动经 push CI 验证未引入回归）；间歇性假失败修复待 2 次 Nightly 确认后方可关闭 #55。
 
 ## 七、已知阻塞与原因（均有证据；本轮已补 `blocked` 标签与优先级）
 
@@ -62,10 +64,11 @@
 | #24（P1, blocked） | 依赖 #23 + ROS1 环境 | #24 依赖段 |
 | #25/#26/#27（needs-info） | 展示范围与人力（产品决策，见 D-007） | #27 总入口 |
 | #37（needs-triage, P3） | 需 #15 实车标定后翻转默认 | #37 body（本轮三角定位评论） |
+| #55（P2, in-review） | 待 post-fix 2 次 Nightly 全绿（时间性）+ #56（本机 drive_gates 全绿证据） | #55 验收评论（本轮部分通过） |
 
 ## 八、下一阶段（待输入，非当前阻断）
 
-- S3 性能评估（#19 B）与展示（#25/#26/#27）：需 ① 实车/数据输入，或 ② 用户对展示范围的决定（D-007 pending，默认暂缓）。
+- S3 性能评估（#19 B）与展示（#25/#26/#27）：需 ① 实车/数据输入，或 ② 用户对展示范围的新决定（D-007 已默认转正为暂缓，见 DECISIONS；触发条件满足前不展开）。
 - 这些是**非阻断**的下一阶段问题，不阻塞第四节 ready 队列；待相关输入到位或用户决定后再展开。
 
 ## 九、已明确放弃 / 不做
@@ -77,7 +80,7 @@
 
 ## 十、Decision Gate 状态与给 Executor 的指令
 
-- **当前无阻断性 Decision Gate；ready 队列 1 项（#55）**。
-- 下一棒 Executor：领取 #55（先根因定位再硬化预检，判据强度不变）；完成后按契约 1.6 留执行报告。
-- 展示范围（#25/#26/#27）为产品决策，已记 D-007 pending（2026-10-06 04:21Z 轮复查：距第 2 次询问仅 ~14 分钟，用户无实质答复窗口，询问计数仍记第 2 次，不提前转正；默认：暂缓，继续生效），未决前不进 ready。
-- Executor 空闲（无 LOCK）；`in-review` 为空，本轮无验收事项。
+- **当前无阻断性 Decision Gate；ready 队列 1 项（#56 P3）**。
+- 下一棒 Executor：领取 #56（apt 单包安装 ccache + 三条验收验证；无 sudo/apt 则转 blocked，禁改脚本绕过）；完成后按契约 1.6 留执行报告。#55 无需动（待 Nightly 时间证据，观察即可；若 push CI 因 `48a4241` 变红 → revert 该 merge，Issue 回 in-progress——当前 push CI 为 success，此预案未触发）。
+- 展示范围（#25/#26/#27）：D-007 已默认转正（暂缓，见 DECISIONS），未决事项已消除，不进 ready。
+- Executor 空闲（无 LOCK）；`in-review` 1 项（#55，部分通过待时间证据，本轮已留验收评论）。
