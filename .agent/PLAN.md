@@ -1,7 +1,7 @@
 # PLAN.md — 路线、当前阶段与可执行队列
 
-> 维护者：Planning Agent（时间流接力）｜最后更新：2026-10-06T05:05Z（`plan-20261006T0505Z`）
-> 事实基线：main `7f44cbe`（与 origin/main 一致，`git fetch` 已同步）；无 LOCK（Executor 空闲，已收尾）；环境事实见 `.agent/ENV.md`。
+> 维护者：Planning Agent（时间流接力）｜最后更新：2026-10-06T08:03Z（`plan-20261006T0803Z`）
+> 事实基线：main `e22ed80`（与 origin/main 一致，`git fetch` 已同步）；无 LOCK（Executor 空闲）；环境事实见 `.agent/ENV.md`。
 
 ## 一、当前阶段
 
@@ -32,6 +32,7 @@
 - 10-06 04:21Z 轮复查（距上一轮仅 ~14 分钟）：`in-review` / `in-progress` 均为 0，无新增 Issue/PR；open Issue 逐一过 4.1 清单无变化（blocked 7 项、needs-info 3 项、#37 needs-triage P3 均维持）；#55 重过 4.2 六条门禁仍全满足 → ready 队列维持 1 项，无灌水新增。
 - 10-06 05:05Z 轮（Executor `exec-20261006T0625Z` 已交付）：#55 代码完成并合入（`a99b600`→merge `48a4241`，分支已删），Planning 独立复核后判定**部分通过**（标准1/2/3 满足：根因评论、退避重试+三分叉文本、两臂 10/10；标准4 缺 drive_gates 全绿——唯一红门 cpp20 系本机缺 ccache，stash 对照基线即红；标准5 待合入后 2 次 Nightly，属时间性未达）。#55 保持 `in-review` 不关闭、不打回（无代码返工项），关闭条件：post-fix 2 次 Nightly 全绿 + #56 关闭。push CI run `37415507053`（`48a4241`）success，主干不红。
 - **#56**（auto-discovered，本轮已定级 P3/ready）：本机缺 ccache 致 drive_gates cpp20 门必红（`which ccache mold` 本轮复核仍空；CI 不受影响）。范围限定为 apt 单包安装 + 验证，不改脚本（D-005）；反向阻塞 #55 标准4。daemon 瞬态卡死（单次自愈）先观察，不单独立项。
+- 10-06 08:03Z 轮复查（距 05:05Z 轮约 3h）：`gh issue list` 确认 open 集合无变化（blocked 7 项、needs-info 3 项、#37 needs-triage P3 维持；无新增 Issue/PR）；#55 仍 `in-review`（post-fix Nightly 尚未产生，见 §六）、#56 仍 ready（P3 定级与 apt 单包授权维持，不推翻——单包低风险可逆 + 无 sudo 则转 blocked 回退，D-005 未违反）；ready 队列维持 1 项，无灌水新增。
 
 ## 四、当前 ready 队列（给 Executor 的建议顺序）
 
@@ -47,8 +48,8 @@
 
 ## 六、CI 状态（本轮核实）
 
-- push CI（main 当前 `7f44cbe`）：run `37415595624`（`.agent` 收尾提交）`in_progress`；merge `48a4241`（#55 代码）run `37415507053` **success**（13m30s）；上一基线链 `37413373859` / `37412336791` 均为 success。
-- Nightly 时间线：09-25–09-30 全绿 → 10-01 `36933923349` 假失败（真污染模式，`2c9a4e6` 修复）→ 10-02 `37068578710` / 10-03 `37151769248` 假失败（"发布者数=未知"新模式）→ 10-04 `37233438190` / 10-05 `37389535363`（14 门全 PASS）连续两晚全绿；**post-fix（`48a4241`，含预检退避重试）尚无 Nightly**，下一次 schedule（约 20:xxZ）为 #55 标准5 的第 1 个观察点。
+- push CI（main 当前 `e22ed80`）：run `37416756093` **success**（05:05Z 轮 `.agent` 提交）；`48a4241`（#55 代码）run `37415507053` success；`7f44cbe` run `37415595624` success——主干连续全绿。
+- Nightly 时间线：09-25–09-30 全绿 → 10-01 `36933923349` 假失败（真污染模式，`2c9a4e6` 修复）→ 10-02 `37068578710` / 10-03 `37151769248` 假失败（"发布者数=未知"新模式）→ 10-04 `37233438190` / 10-05 `37389535363`（14 门全 PASS）连续两晚全绿；**post-fix（`48a4241`）尚无 Nightly**（本轮 08:03Z 核实；下一次 schedule 约 10-06 20:xxZ，为 #55 标准5 的第 1 个观察点）。
 - 结论：主干不红（#55 改动经 push CI 验证未引入回归）；间歇性假失败修复待 2 次 Nightly 确认后方可关闭 #55。
 
 ## 七、已知阻塞与原因（均有证据；本轮已补 `blocked` 标签与优先级）
@@ -81,6 +82,6 @@
 ## 十、Decision Gate 状态与给 Executor 的指令
 
 - **当前无阻断性 Decision Gate；ready 队列 1 项（#56 P3）**。
-- 下一棒 Executor：领取 #56（apt 单包安装 ccache + 三条验收验证；无 sudo/apt 则转 blocked，禁改脚本绕过）；完成后按契约 1.6 留执行报告。#55 无需动（待 Nightly 时间证据，观察即可；若 push CI 因 `48a4241` 变红 → revert 该 merge，Issue 回 in-progress——当前 push CI 为 success，此预案未触发）。
+- 下一棒 Executor：领取 #56（apt 单包安装 ccache + 三条验收验证；无 sudo/apt 则转 blocked，禁改脚本绕过）；完成后按契约 1.6 留执行报告。#55 无需动（待今日 20:xxZ 起的 2 次 Nightly 时间证据，观察即可；push CI 全绿，revert 预案未触发）。
 - 展示范围（#25/#26/#27）：D-007 已默认转正（暂缓，见 DECISIONS），未决事项已消除，不进 ready。
-- Executor 空闲（无 LOCK）；`in-review` 1 项（#55，部分通过待时间证据，本轮已留验收评论）。
+- Executor 空闲（无 LOCK）；`in-review` 1 项（#55，部分通过待时间证据，验收评论已留，本轮无新证据故无新动作）。
