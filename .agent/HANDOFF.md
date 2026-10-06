@@ -1,29 +1,27 @@
 # HANDOFF
 ## 本轮概要
-- `exec-20261006T0625Z`：领取并完成 ready 队列唯一项 #55（mpc-reject-smoke 出口纯度预检间歇假失败），结论**部分完成**（本地 4/5 验收满足；drive_gates 全绿被本机缺 ccache 阻塞→已立 #56；2 次 Nightly 待 CI 产生）。新建标签 `in-progress`/`in-review`/`auto-discovered`（本仓缺失，按契约 1.4 创建）。
+- `exec-20261006T0822Z`：领取 ready 队列唯一项 #56（本机缺 ccache，P3），结论**阻塞**（无免密 sudo，授权的 apt 单包路径走不通；零文件变更，未建临时分支）。执行报告已留 #56 评论，标签 `in-progress`→`blocked`。
 
 ## 已完成
-- #55：预检退避重试 + 三分叉失败文本（未收敛重试 / ≥2 判污染 / 耗尽报无法验证），判据强度不动 · `a99b600`→merge `48a4241` @ main（已推送）· 验证：lint 绿、预检块 4 场景桩全过、两臂 5 轮 10/10 绿、drive_gates 内 mpc-reject-smoke 门 PASS
-- #56：`[auto-discovered]` 本机缺 ccache 致 cpp20 门必红（stash 对照证实基线即红；CI 不受影响）
+- 无本轮完成的 Issue。#55（上一棒 `exec-20261006T0625Z`，in-review 部分通过）未动——post-fix Nightly 尚未产生（下一次 schedule 约今日 20:xxZ），无新证据故无新动作。
 
 ## 未完成 / 进行中（下一棒最优先看这里）
-- 无进行中 Issue。#55 在 `in-review` 待 Planner 验收：① 观察合入后 2 次 Nightly 全绿（schedule 约 20:xxZ，基线 `48a4241`）；② 给 #56 定级；③ 评估 daemon 瞬态卡死是否单独立项（本轮：连续 2 轮节点注册环耗尽 + `ros2 daemon status` rc=124，11511 无监听、无残留进程，显式 `daemon start` 自愈；证据见 #55 执行报告；建议先观察）。
-- 若 push CI（`48a4241`）因本改动变红 → 直接 revert `48a4241`（单 merge commit），Issue 回 `in-progress`。
+- #56（blocked）：停在"安装 ccache"一步。已证：`which ccache` 空（rc=1）、`/usr/bin|/usr/local/bin/ccache` 均无、apt 源可达（Candidate 4.12.3-1）、`sudo -n apt-get install` 报 `interactive authentication is required`（rc=1）。未改任何脚本（D-005）、未装其他包、未试源码编译/局部解包（超授权范围）。
+- 从哪继续：用户在具终端会话手动 `sudo apt-get install -y ccache` 后，Planner 将 #56 打回 ready；下一棒按 #56 验收评论三条逐一验证（`which ccache` → `bash scripts/check_cpp20.sh` → `SKIP_BUILD=1 drive_gates.sh` cpp20 门 + 附带 mpc-reject-smoke 门状态）。
 
 ## 验证情况
-- 跑了：`bash -n`（0）、`lint_shell.sh`（0，全 14 脚本 clean）、预检块桩测 4/4、两臂连续 5 轮 10/10 PASS、`SKIP_BUILD=1 drive_gates.sh`（369s：除 cpp20 外全 PASS，mpc-reject-smoke 45s PASS）、`check_cpp20.sh` 基线对照（stash 后同错 rc=2，4 处 ccache 缺失）。
-- 没跑：shellcheck（本机未装，建议性，CI 覆盖）；Nightly（待时间产生）。
+- 跑了：`which ccache`（rc=1 空）、`ls /usr/bin/ccache /usr/local/bin/ccache`（均不存在）、`apt-cache policy ccache`（rc=0，源可达）、`sudo -n apt-get install -y --no-install-recommends ccache`（rc=1，鉴权失败原文已记报告）、`git status`（干净，零变更）。
+- 没跑：三条验收（前置安装未达成，复跑已知失败构建不增信息）；shellcheck（本机未装，CI 覆盖）；Nightly（待时间产生，非本棒可跑）。
 
 ## 风险与注意事项
-- 合并纪律偏离说明：§9 要求全绿才合回；本轮唯一红门系 stash 对照证实的基线环境红（#56），改动纯 shell 且 CI 含 ccache，故合入 main 以解锁 Nightly 证据；已在执行报告写明 revert 路径。
-- 别全局 apt 装 ccache（接力红线），等 Planner/用户定 #56。
-- 本机 `which ccache mold` 均空；跑门禁前仍需 `FASTDDS_BUILTIN_TRANSPORTS=SHM` + `ROS_HOME=$PWD/build/.ros` + source ROS 与 install。
+- 本机 drive_gates 本地结论继续含 cpp20 环境红门；CI 不受影响（push 全绿，toolchain 自带 ccache）。
+- #55 标准4（本机 drive_gates 全绿）维持未达，反向依赖 #56；#55 标准5 待 2 次 post-fix Nightly（时间性）。
+- 开工时树干净，无他人未提交改动需要绕开；本轮零代码变更，无 revert 预案触发项。
 
 ## 给下一棒的第一步建议
-1. 查 push CI（`48a4241`）状态：红且由本改动引起 → revert；绿 → 不动。
-2. 若你是 Planner：按 #55 执行报告逐条验收，重点等 2 次 Nightly；给 #56 定级。
-3. 若你是 Executor：ready 队列预计为空（PLAN 称软件侧已扫尽）；先 `gh issue list --label ready-for-agent --state open` 确认，无则收尾。
+1. 先 `gh issue list --state open --label ready-for-agent` 确认 ready 队列（本棒离开时预期为空：#56 blocked、#55 in-review）。
+2. 若 #56 已被用户手动安装后打回 ready：直接重走三条验收，不要重装。
+3. 若仍 blocked 且无新 ready：收尾即可，不要硬闯 blocked 队列。
 
 ## 给 Planner 的信号
-- 需要 Planner 介入：#55 待验收（in-review）、#56 待定级、D-007 仍 pending（非本棒职责，仅列出）。
-- ready 队列本棒离开时：除 #56（auto-discovered，未定级、不进队列）外为空。
+- 需要 Planner 介入：① #56 阻塞需用户决策（三选项已列执行报告：用户手动 sudo 安装后打回 ready / 授权新安装路径 / 接受本机 cpp20 长期环境阻塞并改 #55 标准4 验收口径）；② #55 待验收（in-review，待 2 次 Nightly 时间证据）；③ ready 队列已空。
