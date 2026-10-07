@@ -1,7 +1,7 @@
 # PLAN.md — 路线、当前阶段与可执行队列
 
 > 维护者：Planning Agent（时间流接力）｜最后更新：2026-10-07T00:05Z（`plan-20261007T0005Z`）
-> 事实基线：main `3e0468f`（与 origin/main 一致；`git pull --rebase` 因外部未暂存 `M AGENTS.md` 跳过，未碰该文件）；无 LOCK（Executor 空闲）；环境事实见 `.agent/ENV.md`（新增 PATH 条目）。
+> 事实基线：main `3e0468f`（与 origin/main 一致；`git pull --rebase` 因外部未暂存 `M AGENTS.md` 跳过，未碰该文件，用户 10-07 确认保留并忽略）；无 LOCK（Executor 空闲）；环境事实见 `.agent/ENV.md`（新增 PATH 条目）。
 
 ## 一、当前阶段
 
@@ -35,12 +35,13 @@
 - 10-06 08:03Z 轮复查（距 05:05Z 轮约 3h）：`gh issue list` 确认 open 集合无变化（blocked 7 项、needs-info 3 项、#37 needs-triage P3 维持；无新增 Issue/PR）；#55 仍 `in-review`（post-fix Nightly 尚未产生，见 §六）、#56 仍 ready（P3 定级与 apt 单包授权维持，不推翻——单包低风险可逆 + 无 sudo 则转 blocked 回退，D-005 未违反）；ready 队列维持 1 项，无灌水新增。
 - 10-06 23:29Z Executor 收尾（`exec-20261006T2329Z`，`3e0468f`）：接管过期 LOCK 后 #56 三验收全绿 → 转 `in-review`；关键纠正——mold 缺失系 PATH 误判（`~/.local/bin/mold` 2.42.0 本体一直在，login 等效 PATH 即解），未装包、未改脚本、未清缓存；根因记入 ENV.md。
 - **10-07 00:05Z 本轮（Planning 验收）**：#56 **验收通过并关闭**（独立复核：`which ccache/mold` 双命中；`check_cpp20.sh` 独立重跑 rc=0，19 pkgs；`build/drive_gates/last.json` 23:30Z 机器产物 11 门全 PASS hard_fail=0，代码树其后零变更故证据有效；报告"12 门"与文件"11 门"系 SKIP_BUILD 计数口径差，不影响结论）。#55 标准4 同步满足（同一 drive_gates 实跑，mpc-reject-smoke PASS）；标准5 达 1/2（post-fix 首个 Nightly `37539011241` success，14 门全绿；第 2 个观察点约 10-07 20:xxZ）。open 集合复查：除 #56 关闭外无变化（blocked 7 项、needs-info 3 项、#37 P3 维持；无新增 Issue/PR；P0 为 0）。外部未暂存 `M AGENTS.md`（ enriching 改写，44+/3-）非本体系产生，全程未碰；`git pull --rebase` 因此跳过，main 与 origin/main 仍一致。
+- **10-07 本轮加时（用户驱动规划）**：用户质疑 ready 归零 → 加做软件侧缺口扫描（`src/scripts/tests/config` TODO 全仓 grep 仅 Doxyfile 模板字样；post-fix Nightly 日志关键字扫 warn/skip/retry/timeout/daemon 仅第三方噪音、无 daemon 异常；blocked 7 项确系仓库外输入）——无新可验证缺口，不灌水。同时用户三项亲定：① **D-007 推翻 A→B**（现在做最小展示，接受返工风险）：B 子集单立 **#57**（P2, ready-for-agent：`scripts/demo.sh` + README 展示小节，仅仿真证据；视频/大 bag/release/博客正文明确排除），#26 留作完整展示父跟踪（仍 needs-info，已留言），#25 博客保持 needs-info；② 仓库外输入暂无到位，blocked 维持；③ 外部 `M AGENTS.md` 保留并忽略（任何一棒不碰）。
 
 ## 四、当前 ready 队列（给 Executor 的建议顺序）
 
-**空**（0 项）。
+1. **#57** 提供最小可复现展示入口：demo.sh 一键正常/故障仿真演示 + README 展示小节（P2，`ready-for-agent`；D-007-B 用户亲定；范围：新增 demo.sh + README 小节，不碰 CI workflow；视频/bag/release/博客明确排除）
 
-- #56 已验收关闭；#55 为 `in-review`（仅剩时间证据，无代码返工项，不在执行队列）。其余软件侧缺口已扫尽；新的 ready 需等仓库外输入到位，或由 Planning 从真实、可验证的新缺口再造（不灌水）。本轮逐一核查 open Issue：无重复、无方向冲突、无新增 auto-discovered、无优先级缺失（除路线图容器 #20 外均有优先级标签）、无可排除的 blocked（7 项均系仓库外输入）；ready 队列为 0 属事实状态而非遗漏（2–5 为容量目标，不为凑数灌水）。
+- #55 为 `in-review`（仅剩时间证据，无代码返工项，不在执行队列）。#57 已过 4.2 六条门禁：目标/范围（含不包含）明确、无依赖、无未决取舍（用户已定 B）、验收逐条可判定、不触红线（不改 CI 结构、不动 benchmarks）。#26 留作完整展示父跟踪（仍 needs-info），#25 博客保持 needs-info。
 
 ## 五、已完成（软件侧摘要）
 
@@ -73,8 +74,9 @@
 
 ## 八、下一阶段（待输入，非当前阻断）
 
-- S3 性能评估（#19 B）与展示（#25/#26/#27）：需 ① 实车/数据输入，或 ② 用户对展示范围的新决定（D-007 已默认转正为暂缓，见 DECISIONS；触发条件满足前不展开）。
-- 这些是**非阻断**的下一阶段问题，不阻塞第四节 ready 队列；待相关输入到位或用户决定后再展开。
+- S3 性能评估（#19 B）：需 ① 实车/数据输入（用户确认暂无到位，blocked 维持）。
+- 展示工作：D-007 已由用户 10-07 推翻为 B——最小展示（#57，ready）先行；完整展示（#26，视频/bag/release）与博客（#25）仍待 #17①②/#18 证据，到位后返工更新 demo 产物（接受的风险）。
+- #57 与 #55（待第 2 次 Nightly）均不阻塞对方，可并行。
 
 ## 九、已明确放弃 / 不做
 
@@ -85,7 +87,7 @@
 
 ## 十、Decision Gate 状态与给 Executor 的指令
 
-- **当前无阻断性 Decision Gate；ready 队列 0 项（#56 已关，#55 待时间证据）。**
-- 下一棒 Executor：无可领取 Issue，仅观察——查一次 post-fix 第 2 次 Nightly 是否产生（约 10-07 20:xxZ schedule 之后），有新证据就在 #55 留言（仍不得 close），无则收尾。验证前记得先 `export PATH="$HOME/.local/bin:$PATH"`（ENV.md），否则复现 mold/ccache"缺失"误判。
+- **当前无阻断性 Decision Gate；ready 队列 1 项（#57 P2，最小展示）。**
+- 下一棒 Executor：领取 #57（新增 `scripts/demo.sh` 串联已有 smoke 脚本 + README 展示小节；禁碰 CI workflow；视频/bag/release/博客正文一律不做）；验证前记得先 `export PATH="$HOME/.local/bin:$PATH"`（ENV.md）。#55 无需动（待约 10-07 20:xxZ 的第 2 次 Nightly，有新证据就在 #55 留言，不得 close）。
 - 展示范围（#25/#26/#27）：D-007 已默认转正（暂缓，见 DECISIONS），未决事项已消除，不进 ready。
 - Executor 空闲（无 LOCK）；`in-review` 1 项（#55，标准1–4 满足、标准5 达 1/2，验收评论已留）。外部 `M AGENTS.md` 脏改动非本体系产生，任何一棒都不碰（Planning/Executor 均只读记录）。
