@@ -1,7 +1,7 @@
 # PLAN.md — 路线、当前阶段与可执行队列
 
-> 维护者：Planning Agent（时间流接力）｜最后更新：2026-10-07T00:05Z（`plan-20261007T0005Z`）
-> 事实基线：main `3e0468f`（与 origin/main 一致；`git pull --rebase` 因外部未暂存 `M AGENTS.md` 跳过，未碰该文件，用户 10-07 确认保留并忽略）；无 LOCK（Executor 空闲）；环境事实见 `.agent/ENV.md`（新增 PATH 条目）。
+> 维护者：Planning Agent（时间流接力）｜最后更新：2026-10-07T12:35Z（`plan-20261007T1235Z`）
+> 事实基线：main `3a2e337`（与 origin/main 一致；远端无新提交，加外部未暂存 `M AGENTS.md` 未碰，故未执行 pull；`git fetch` 已同步）；无 LOCK（Executor 空闲）；环境事实见 `.agent/ENV.md`（PATH 条目）。
 
 ## 一、当前阶段
 
@@ -36,6 +36,7 @@
 - 10-06 23:29Z Executor 收尾（`exec-20261006T2329Z`，`3e0468f`）：接管过期 LOCK 后 #56 三验收全绿 → 转 `in-review`；关键纠正——mold 缺失系 PATH 误判（`~/.local/bin/mold` 2.42.0 本体一直在，login 等效 PATH 即解），未装包、未改脚本、未清缓存；根因记入 ENV.md。
 - **10-07 00:05Z 本轮（Planning 验收）**：#56 **验收通过并关闭**（独立复核：`which ccache/mold` 双命中；`check_cpp20.sh` 独立重跑 rc=0，19 pkgs；`build/drive_gates/last.json` 23:30Z 机器产物 11 门全 PASS hard_fail=0，代码树其后零变更故证据有效；报告"12 门"与文件"11 门"系 SKIP_BUILD 计数口径差，不影响结论）。#55 标准4 同步满足（同一 drive_gates 实跑，mpc-reject-smoke PASS）；标准5 达 1/2（post-fix 首个 Nightly `37539011241` success，14 门全绿；第 2 个观察点约 10-07 20:xxZ）。open 集合复查：除 #56 关闭外无变化（blocked 7 项、needs-info 3 项、#37 P3 维持；无新增 Issue/PR；P0 为 0）。外部未暂存 `M AGENTS.md`（ enriching 改写，44+/3-）非本体系产生，全程未碰；`git pull --rebase` 因此跳过，main 与 origin/main 仍一致。
 - **10-07 本轮加时（用户驱动规划）**：用户质疑 ready 归零 → 加做软件侧缺口扫描（`src/scripts/tests/config` TODO 全仓 grep 仅 Doxyfile 模板字样；post-fix Nightly 日志关键字扫 warn/skip/retry/timeout/daemon 仅第三方噪音、无 daemon 异常；blocked 7 项确系仓库外输入）——无新可验证缺口，不灌水。同时用户三项亲定：① **D-007 推翻 A→B**（现在做最小展示，接受返工风险）：B 子集单立 **#57**（P2, ready-for-agent：`scripts/demo.sh` + README 展示小节，仅仿真证据；视频/大 bag/release/博客正文明确排除），#26 留作完整展示父跟踪（仍 needs-info，已留言），#25 博客保持 needs-info；② 仓库外输入暂无到位，blocked 维持；③ 外部 `M AGENTS.md` 保留并忽略（任何一棒不碰）。
+- **10-07 12:35Z 本轮复查**：`gh run list` 确认 post-fix 第 2 个 Nightly 观察点尚未产生（最新仍为 `37539011241` 10-06T22:11Z success；其后仅 push CI `37572989939` / `37573490832` 均 success，无 in-progress run）→ #55 标准5 仍 1/2，保持 `in-review`，无新证据故不在 Issue 留言（沿 10-06 08:03Z 轮先例，避免无实质更新刷屏）。open 集合除 #56 已关闭外无变化（blocked 7 项、needs-info 3 项、#37 P3 维持；无新增 Issue/PR；P0 为 0）。#57 重过 4.2 六条门禁仍全满足（目标/范围/无依赖/D-007-B 已决/验收可判定/不触红线——Issue 正文含"不接入 ci.yml、不动 benchmarks"）→ ready 队列维持 1 项，无灌水新增。STATE.md 称"ready 队列空"已过期（早于 #57 立项），以本 PLAN 为准，不改写 Executor 文件。
 
 ## 四、当前 ready 队列（给 Executor 的建议顺序）
 
@@ -52,7 +53,7 @@
 
 ## 六、CI 状态（本轮核实）
 
-- push CI（main 当前 `3e0468f`）：run `37547882823` **success**（`exec-20261006T2329Z` 收尾 `.agent` 提交）；其间 `.agent` 提交 run `37438388023` success、`37435811477` failure（纯 `.agent` chore 提交的偶发红，非代码回归，其后 success 已覆盖）——主干不红。
+- push CI（main 当前 `3a2e337`）：run `37573490832` **success**（加时轮 `.agent` 提交：立 #57 + D-007→B）；前一 `.agent` 提交 run `37572989939` success（验收关闭 #56 那轮）。其间 `37437488247` failure 为纯 `.agent` chore 提交的偶发红（26s 即挂，非代码回归，其后 success 已覆盖）——主干不红。
 - Nightly 时间线：09-25–09-30 全绿 → 10-01 `36933923349` 假失败（真污染模式，`2c9a4e6` 修复）→ 10-02 `37068578710` / 10-03 `37151769248` 假失败（"发布者数=未知"新模式）→ 10-04 `37233438190` / 10-05 `37389535363` 连续两晚全绿；**post-fix 首个 Nightly `37539011241`（10-06T22:11Z，sha `bda2d90` 含 `48a4241` 修复）success——14 门全 PASS 含 mpc-reject-smoke（48s），为 #55 标准5 的第 1/2 个观察点**；第 2 个观察点为下一次 schedule（约 10-07 20:xxZ）。
 - 结论：主干不红（#55 改动经 push CI + post-fix Nightly 首绿验证未引入回归）；#55 关闭待第 2 次 post-fix Nightly。
 
