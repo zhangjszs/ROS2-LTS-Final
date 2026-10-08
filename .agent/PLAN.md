@@ -1,14 +1,14 @@
 # PLAN.md — 路线、当前阶段与可执行队列
 
-> 维护者：Planning Agent（时间流接力）｜最后更新：2026-10-07T12:35Z（`plan-20261007T1235Z`）
-> 事实基线：main `3a2e337`（与 origin/main 一致；远端无新提交，加外部未暂存 `M AGENTS.md` 未碰，故未执行 pull；`git fetch` 已同步）；无 LOCK（Executor 空闲）；环境事实见 `.agent/ENV.md`（PATH 条目）。
+> 维护者：Planning Agent（时间流接力）｜最后更新：2026-10-08T11:25Z（`plan-20261008T1120Z`）
+> 事实基线：main `c364575`（与 origin/main 一致；`git fetch` 已同步且远端无新提交，`git pull --rebase` 因未暂存的外部 `M AGENTS.md` 跳过——非本体系产生，未碰）；**无 LOCK（Executor 空闲，最后一棒 `exec-20261006T2329Z`）**；环境事实见 `.agent/ENV.md`。
 
 ## 一、当前阶段
 
 路线图来源：#20「ROS 2 车队开发路线：运行基线 → 可信仿真 → 低速闭环 → 性能优化」（S0–S3）。
 
 - **S0 可重复启动：完成**（#13/#14 已关闭；CI/lint/headless/qos 门常绿）。
-- **S1 可信接口与仿真 / S2 低速稳定闭环：进行中，软件侧基本完成，剩余卡仓库外输入**：
+- **S1 可信接口与仿真 / S2 低速稳定闭环：软件侧基本完成，剩余卡仓库外输入**：
   - #15 共用执行器适配层：软件侧（codec/标定单一来源/停车帧工厂）已交付并审计；剩余 = VCU 协议资料 + 台架实车标定。
   - #16 任务/安全状态与最终仲裁：软件侧（状态机/信任门/新鲜度租约/故障注入矩阵）闭环；剩余 = 硬件急停链路 + 实车停车预算。
   - #17 可复现仿真/KPI/回归：③④已合入并进 CI 硬门；①②受实车标定与感知扰动数据阻塞。
@@ -20,44 +20,38 @@
 
 - 目标（S1+S2）：接口/编码/单位/坐标系一致；固定场景可复现且 KPI 能识别失败；选定赛制低速闭环可重复完成，停车/失效/重启行为通过。
 - 完成判据：以各 Issue 验收标准为准；其中依赖实车/台架/硬件的条目**不得以仅仿真证据关闭**（见 D-004）。
+- Issue 台账（本 `gh` 实测，共 13 open）：执行类 1（#57 ready）· 仓库外阻塞 7（#15–#19 / #23 / #24）· 展示待条件 3（#25/#26/#27 needs-info）· 待实车翻转 1（#37 needs-triage）· 路线图伞形 1（#20，仅跟踪）。
+- 本轮进展：**#55 验收通过并关闭**（详见 §三 / §六）；`in-review` 归零，队列维持 1 项。
 
-## 三、软件侧缺口扫描（本轮更新）
+## 三、软件侧缺口扫描与近期 CI 事件（本轮更新）
 
-2026-10-02 版 PLAN 判定"软件侧已扫尽"。本轮核实 CI 证据时发现新缺口：
-
-- **Nightly `drive_gates` 在 10-02/10-03 连续两次假失败**：`mpc-reject-smoke` 出口纯度预检报 `/vehicle_command 发布者数=未知（应为 1）`；10-04 与 10-05 在**同一代码树**（`64b5185`→`da869e5`，其间仅 `.agent/` chore 提交）上连续两晚全部 14 门通过（run `37233438190` / `37389535363`）。push CI 全绿 → 主干不红，属间歇性。
-- 该预检（`scripts/mpc_reject_smoke.sh:115-124`）本身是 10-01 真污染假红（Nightly 36933923349）后由 `2c9a4e6` 加入的防线；现其自身在 `ros2 daemon stop` 后图重建未收敛即查询（12s 超时无退避），空返回/超时与真实多发布者（=2）被混为一谈。
-- 已立 **#55**（P2, ready）：根因定位 + 预检退避重试，判据强度不变。
-- 10-06 轮复查：间歇性假失败连续两晚未复现，但根因（`ros2 daemon stop` 后图发现未收敛即查询）仍在，硬门禁假红的误报成本未除 → #55 必要性与 P2 定级不变，验收标准（含"修复后 2 次 Nightly 全绿"）不变。
-- 10-06 04:21Z 轮复查（距上一轮仅 ~14 分钟）：`in-review` / `in-progress` 均为 0，无新增 Issue/PR；open Issue 逐一过 4.1 清单无变化（blocked 7 项、needs-info 3 项、#37 needs-triage P3 均维持）；#55 重过 4.2 六条门禁仍全满足 → ready 队列维持 1 项，无灌水新增。
-- 10-06 05:05Z 轮（Executor `exec-20261006T0625Z` 已交付）：#55 代码完成并合入（`a99b600`→merge `48a4241`，分支已删），Planning 独立复核后判定**部分通过**（标准1/2/3 满足：根因评论、退避重试+三分叉文本、两臂 10/10；标准4 缺 drive_gates 全绿——唯一红门 cpp20 系本机缺 ccache，stash 对照基线即红；标准5 待合入后 2 次 Nightly，属时间性未达）。#55 保持 `in-review` 不关闭、不打回（无代码返工项），关闭条件：post-fix 2 次 Nightly 全绿 + #56 关闭。push CI run `37415507053`（`48a4241`）success，主干不红。
-- **#56**（auto-discovered，本轮已定级 P3/ready）：本机缺 ccache 致 drive_gates cpp20 门必红（`which ccache mold` 本轮复核仍空；CI 不受影响）。范围限定为 apt 单包安装 + 验证，不改脚本（D-005）；反向阻塞 #55 标准4。daemon 瞬态卡死（单次自愈）先观察，不单独立项。
-- 10-06 08:03Z 轮复查（距 05:05Z 轮约 3h）：`gh issue list` 确认 open 集合无变化（blocked 7 项、needs-info 3 项、#37 needs-triage P3 维持；无新增 Issue/PR）；#55 仍 `in-review`（post-fix Nightly 尚未产生，见 §六）、#56 仍 ready（P3 定级与 apt 单包授权维持，不推翻——单包低风险可逆 + 无 sudo 则转 blocked 回退，D-005 未违反）；ready 队列维持 1 项，无灌水新增。
-- 10-06 23:29Z Executor 收尾（`exec-20261006T2329Z`，`3e0468f`）：接管过期 LOCK 后 #56 三验收全绿 → 转 `in-review`；关键纠正——mold 缺失系 PATH 误判（`~/.local/bin/mold` 2.42.0 本体一直在，login 等效 PATH 即解），未装包、未改脚本、未清缓存；根因记入 ENV.md。
-- **10-07 00:05Z 本轮（Planning 验收）**：#56 **验收通过并关闭**（独立复核：`which ccache/mold` 双命中；`check_cpp20.sh` 独立重跑 rc=0，19 pkgs；`build/drive_gates/last.json` 23:30Z 机器产物 11 门全 PASS hard_fail=0，代码树其后零变更故证据有效；报告"12 门"与文件"11 门"系 SKIP_BUILD 计数口径差，不影响结论）。#55 标准4 同步满足（同一 drive_gates 实跑，mpc-reject-smoke PASS）；标准5 达 1/2（post-fix 首个 Nightly `37539011241` success，14 门全绿；第 2 个观察点约 10-07 20:xxZ）。open 集合复查：除 #56 关闭外无变化（blocked 7 项、needs-info 3 项、#37 P3 维持；无新增 Issue/PR；P0 为 0）。外部未暂存 `M AGENTS.md`（ enriching 改写，44+/3-）非本体系产生，全程未碰；`git pull --rebase` 因此跳过，main 与 origin/main 仍一致。
-- **10-07 本轮加时（用户驱动规划）**：用户质疑 ready 归零 → 加做软件侧缺口扫描（`src/scripts/tests/config` TODO 全仓 grep 仅 Doxyfile 模板字样；post-fix Nightly 日志关键字扫 warn/skip/retry/timeout/daemon 仅第三方噪音、无 daemon 异常；blocked 7 项确系仓库外输入）——无新可验证缺口，不灌水。同时用户三项亲定：① **D-007 推翻 A→B**（现在做最小展示，接受返工风险）：B 子集单立 **#57**（P2, ready-for-agent：`scripts/demo.sh` + README 展示小节，仅仿真证据；视频/大 bag/release/博客正文明确排除），#26 留作完整展示父跟踪（仍 needs-info，已留言），#25 博客保持 needs-info；② 仓库外输入暂无到位，blocked 维持；③ 外部 `M AGENTS.md` 保留并忽略（任何一棒不碰）。
-- **10-07 12:35Z 本轮复查**：`gh run list` 确认 post-fix 第 2 个 Nightly 观察点尚未产生（最新仍为 `37539011241` 10-06T22:11Z success；其后仅 push CI `37572989939` / `37573490832` 均 success，无 in-progress run）→ #55 标准5 仍 1/2，保持 `in-review`，无新证据故不在 Issue 留言（沿 10-06 08:03Z 轮先例，避免无实质更新刷屏）。open 集合除 #56 已关闭外无变化（blocked 7 项、needs-info 3 项、#37 P3 维持；无新增 Issue/PR；P0 为 0）。#57 重过 4.2 六条门禁仍全满足（目标/范围/无依赖/D-007-B 已决/验收可判定/不触红线——Issue 正文含"不接入 ci.yml、不动 benchmarks"）→ ready 队列维持 1 项，无灌水新增。STATE.md 称"ready 队列空"已过期（早于 #57 立项），以本 PLAN 为准，不改写 Executor 文件。
+- **#55（2026-10-08 验收通过关闭）**：Nightly 硬门禁 `mpc-reject-smoke` 的出口纯度预检曾间歇假失败（10-02 `37068578710` = 12s 超时模式 / 10-03 `37151769248` = 空返回模式，均为"发布者数=未知"，≠ 真污染 2）；根因 = `ros2 daemon stop` 后节点发现先收敛、话题端点发现滞后，而该处 `ros2 topic info` 为单次查询无退避。修复 `a99b600`（退避重试 + FAIL 文本三分叉，判据强度与两臂语义一字未动）→ 本机两臂 10/10、`drive_gates` 全绿、post-fix Nightly 2/2 全绿 → 本轮关闭。
+- **本轮缺口扫描结论（2026-10-08）：无新增可验证缺口，不灌水。** ① blocked 7 项确系仓库外输入（用户 10-07 确认暂无到位，维持）；② 展示类未决取舍已被 D-007(B) 消除，可执行子集由 #57 承担（#26/#25 留待 #17①② / #18 证据）；③ "统一发现收敛等待策略"候选已评估 → **不立项**（理由与触发条件见 §九）；④ 无新增 auto-discovered（配额 0/3）；⑤ 无 open PR。
+- 历史留痕（压缩备查）：pre-fix 的 10-04 `37233438190` / 10-05 `37389535363` 在同一代码树两晚全绿，属间歇性时序窗口；#56（本机 mold/ccache"缺失"实为 PATH 误判）已关闭，根因记入 `ENV.md`。
 
 ## 四、当前 ready 队列（给 Executor 的建议顺序）
 
-1. **#57** 提供最小可复现展示入口：demo.sh 一键正常/故障仿真演示 + README 展示小节（P2，`ready-for-agent`；D-007-B 用户亲定；范围：新增 demo.sh + README 小节，不碰 CI workflow；视频/bag/release/博客明确排除）
+1. **#57** 提供最小可复现展示入口：demo.sh 一键正常/故障仿真演示 + README 展示小节（P2，`ready-for-agent`；D-007-B 用户亲定；范围：新增 `scripts/demo.sh` + README 小节，不碰 CI workflow；视频/bag/release/博客明确排除）
 
-- #55 为 `in-review`（仅剩时间证据，无代码返工项，不在执行队列）。#57 已过 4.2 六条门禁：目标/范围（含不包含）明确、无依赖、无未决取舍（用户已定 B）、验收逐条可判定、不触红线（不改 CI 结构、不动 benchmarks）。#26 留作完整展示父跟踪（仍 needs-info），#25 博客保持 needs-info。
+- 队列 = **1 项**（非灌水收缩：本轮复查确无第二项够格）。#57 已过 4.2 六条门禁：目标/范围（含"不包含"）/无依赖/无未决取舍（用户已定 B）/验收逐条可判定/不触红线（不改 CI 结构、不动 `benchmarks/`）。
+- 其余候选为何不入队：#55 已关闭；blocked 7 项与 #37 缺仓库外输入；#25/#26/#27 受 D-007 边界约束；ADR 其余下沉候选与"统一收敛等待策略"均无证据支撑（§九）。
+- **#20 优先级豁免（本轮判定，备案）**：#20 为路线图伞形跟踪 issue（无执行体、随 S0–S3 存活），刻意不设 priority 标签——避免被"P3/P4 两 Milestone 未动即 close"的饥饿规则误关；该豁免为长期约定，后续 Planning 不必再纠。
 
 ## 五、已完成（软件侧摘要）
 
-- 已关闭：S0 全部（#13/#14）、#22/#30/#31/#32/#33/#34/#35/#36/#38/#39/#40/#41/#42/#43/#44/#45/#46/#47/#48/#49/#50/#51/#52/#53/#54 等。
+- 已关闭：S0 全部（#13/#14）、#22、#30–#36、#38–#54 等。
 - #17 ③④、#15/#16/#19 软件侧、#24 合成夹具已合入并附证据（见各 issue 评论与 git 历史）。
-- **2026-10-02 ready 批（软件侧最后一批）**：#53（bicycle_model 纯 std 单测，`eb75d08`）、#52（`warm_start` 死配置生效，`fe2d97b`）、#54（sensor_simulator 感知核下沉纯 std core，`dbb77c0`）——均经 Planning 独立复核后 CLOSED（CI：run 37025171399 / 37026081026 success）。
-- **#56**（本机 ccache/mold 环境缺口，实为 PATH 误判）：零代码变更，Planning 独立复核（`which` 双命中 + `check_cpp20.sh` 重跑 rc=0 + `last.json` 11 门全 PASS）后本轮 CLOSED。
+- **2026-10-02 ready 批（软件侧最后一批）**：#53（bicycle_model 纯 std 单测，`eb75d08`）、#52（`warm_start` 死配置生效，`fe2d97b`）、#54（sensor_simulator 感知核下沉纯 std core，`dbb77c0`）——均经 Planning 独立复核后 CLOSED（CI run 37025171399 / 37026081026 success）。
+- **#56**（本机 ccache/mold 环境缺口，实为 PATH 误判）：零代码变更，10-07 验收 CLOSED。
+- **#55**（`mpc-reject-smoke` 纯度预检假失败）：`a99b600` / merge `48a4241`，本机 + push CI + post-fix Nightly 2/2 三线全绿，10-08 验收 CLOSED。
 
 ## 六、CI 状态（本轮核实）
 
-- push CI（main 当前 `3a2e337`）：run `37573490832` **success**（加时轮 `.agent` 提交：立 #57 + D-007→B）；前一 `.agent` 提交 run `37572989939` success（验收关闭 #56 那轮）。其间 `37437488247` failure 为纯 `.agent` chore 提交的偶发红（26s 即挂，非代码回归，其后 success 已覆盖）——主干不红。
-- Nightly 时间线：09-25–09-30 全绿 → 10-01 `36933923349` 假失败（真污染模式，`2c9a4e6` 修复）→ 10-02 `37068578710` / 10-03 `37151769248` 假失败（"发布者数=未知"新模式）→ 10-04 `37233438190` / 10-05 `37389535363` 连续两晚全绿；**post-fix 首个 Nightly `37539011241`（10-06T22:11Z，sha `bda2d90` 含 `48a4241` 修复）success——14 门全 PASS 含 mpc-reject-smoke（48s），为 #55 标准5 的第 1/2 个观察点**；第 2 个观察点为下一次 schedule（约 10-07 20:xxZ）。
-- 结论：主干不红（#55 改动经 push CI + post-fix Nightly 首绿验证未引入回归）；#55 关闭待第 2 次 post-fix Nightly。
+- push CI（main `c364575`）：run `37622229424` **success**（上一轮 `.agent` 提交）；再前 `37573490832`（`3a2e337`）success。主干不红（`37437488247` failure 为 10-06 纯 `.agent` 提交的偶发红，26s 即挂，已被其后 success 覆盖）。
+- Nightly：**post-fix 连续 2 晚全绿 = #55 标准5 的 2/2 观察点** —— `37539011241`（10-06T22:11Z，`bda2d90`，14 门全 PASS，mpc-reject-smoke 48s）/ `37696935383`（10-07T22:33Z，`c364575`，14 门全 PASS，mpc-reject-smoke 51s）；两 sha 均含 `48a4241`（`git merge-base --is-ancestor` 双 YES）。更早 10-04/10-05 为 pre-fix 同树全绿；10-01–10-03 三次失败已分别由 `2c9a4e6`（真污染）与 `a99b600`（假失败）修复。
+- 结论：主干与 Nightly 均绿；下一次 Nightly 若红，须先区分新根因与既有两种模式（真污染 / 端点未收敛）。
 
-## 七、已知阻塞与原因（均有证据；本轮已补 `blocked` 标签与优先级）
+## 七、已知阻塞与原因（均有证据）
 
 | Issue | 阻塞原因（仓库外） | 证据 |
 |---|---|---|
@@ -68,16 +62,16 @@
 | #18（P2, blocked） | 真实 bag | #18 依赖段 |
 | #23（P1, blocked） | ROS1 环境 / 外部驱动确认 | #23 依赖段 |
 | #24（P1, blocked） | 依赖 #23 + ROS1 环境 | #24 依赖段 |
-| #25/#26/#27（needs-info） | 展示范围与人力（产品决策，见 D-007） | #27 总入口 |
-| #37（needs-triage, P3） | 需 #15 实车标定后翻转默认 | #37 body（本轮三角定位评论） |
-| #55（P2, in-review） | 仅剩 post-fix 第 2 次 Nightly 全绿（时间性，约 10-07 20:xxZ schedule） | #55 验收更新评论（本轮；标准1–4 已满足） |
-| #56（P3，已关闭） | ——本轮验收通过关闭；PATH 误判根因记入 ENV.md | #56 验收评论 + `build/drive_gates/last.json` |
+| #25/#26/#27（needs-info） | 展示范围与人力（D-007(B) 已决；剩余待 #17①② / #18 证据） | #27 总入口；#26 评论 |
+| #37（needs-triage, P3） | 需 #15 实车标定后翻转默认 | #37 body |
+| #55（P2） | —— 10-08 验收通过关闭 | #55 验收评论；run `37539011241` / `37696935383` |
+| #56（P3） | —— 10-07 验收通过关闭（PATH 误判） | #56 验收评论；`build/drive_gates/last.json` |
 
 ## 八、下一阶段（待输入，非当前阻断）
 
-- S3 性能评估（#19 B）：需 ① 实车/数据输入（用户确认暂无到位，blocked 维持）。
-- 展示工作：D-007 已由用户 10-07 推翻为 B——最小展示（#57，ready）先行；完整展示（#26，视频/bag/release）与博客（#25）仍待 #17①②/#18 证据，到位后返工更新 demo 产物（接受的风险）。
-- #57 与 #55（待第 2 次 Nightly）均不阻塞对方，可并行。
+- S3 性能评估（#19 B）：需实车/数据输入（用户确认暂无到位，blocked 维持）。
+- 展示工作：D-007(B) 的最小展示（#57，ready）先行；完整展示（#26：视频/bag/release）与博客（#25）待 #17①② / #18 证据，到位后返工更新 demo 产物（该返工风险已由用户接受）。
+- #57 与 "后续 Nightly 观察" 互不阻塞，可并行。
 
 ## 九、已明确放弃 / 不做
 
@@ -85,10 +79,11 @@
 - 不从运动学模型推出轮胎极限结论（#17 边界）。
 - 不用仿真证据关闭实车依赖 issue（D-004）。
 - 不顺手做 ADR 其余下沉候选（velocity_profiler 梯形规划、safety_monitor 看门狗、lidar_cluster 几何核、skidpad `IcpApFPlanner::ClusterCones`）——未定级、未 ready。
+- **"统一发现收敛等待策略"（2026-10-08 评估后不立项）**：`qos_contract_check.sh` 的端点断言为单次查询 + `sleep 3`，与 #55 同属"发现收敛"家族；但除已修的 `mpc-reject-smoke` 外，其余运行时门禁的**节点等待均有重试环**（closed_loop_sim 12 轮 / closed_loop_fault 15 轮 / fault_injection 12 轮 / headless_smoke WAIT_SEC 轮 / qos_contract 25 轮 / mpc_reject 12 轮，逐脚本核过），且 qos-contract 历史唯一失败（Nightly `36148985687`）系 `--no-daemon` 回归（已由 `03a3cfe` 修复，非本家族）——**无假红证据，不立项、不灌水**。触发条件：任一运行时门禁再现"空表 / pub-sub=0"类假红，则立项统一退避等待。
 
 ## 十、Decision Gate 状态与给 Executor 的指令
 
-- **当前无阻断性 Decision Gate；ready 队列 1 项（#57 P2，最小展示）。**
-- 下一棒 Executor：领取 #57（新增 `scripts/demo.sh` 串联已有 smoke 脚本 + README 展示小节；禁碰 CI workflow；视频/bag/release/博客正文一律不做）；验证前记得先 `export PATH="$HOME/.local/bin:$PATH"`（ENV.md）。#55 无需动（待约 10-07 20:xxZ 的第 2 次 Nightly，有新证据就在 #55 留言，不得 close）。
-- 展示范围（#25/#26/#27）：D-007 已默认转正（暂缓，见 DECISIONS），未决事项已消除，不进 ready。
-- Executor 空闲（无 LOCK）；`in-review` 1 项（#55，标准1–4 满足、标准5 达 1/2，验收评论已留）。外部 `M AGENTS.md` 脏改动非本体系产生，任何一棒都不碰（Planning/Executor 均只读记录）。
+- **当前无阻断性 Decision Gate，无待用户决策项；ready 队列 1 项（#57 P2，最小展示）。**
+- 下一棒 Executor：领取 **#57**（新增 `scripts/demo.sh` 串联已有 smoke 脚本 + README 展示小节；禁碰 CI workflow；视频/bag/release/博客正文一律不做）；本机验证前先 `export PATH="$HOME/.local/bin:$PATH"`，多节点脚本前 `export FASTDDS_BUILTIN_TRANSPORTS=SHM`（ENV.md）。**#55 已关闭、无需再动**；Nightly 若出现新红，按新根因建账（勿重开 #55）。
+- 展示范围（#25/#26/#27）：D-007(B) 已生效；#57 交付后，#26 仍为完整展示父跟踪（needs-info）。
+- Executor 空闲（无 LOCK）；`in-review` 0 项；外部 `M AGENTS.md` 脏改动非本体系产生，任何一棒都不碰（只读记录）。
