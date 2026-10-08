@@ -122,6 +122,34 @@ ros2 launch huat_launch perception.launch.py
 ros2 launch fsac_viz rviz.launch.py
 ```
 
+### 3. 一键演示：正常 vs 故障（`scripts/demo.sh`）
+
+**问题背景**：上面的 launch 命令只把节点拉起来——既不注入故障，也不给结论；仓库访客/新成员缺一个"一条命令看懂系统能跑什么"的入口。
+
+**启动方法**（两臂都是 CI 常绿门禁脚本，本入口只做串联、回显与退出码传播）：
+
+```bash
+# 前置：已完成第四节构建（install/setup.bash 存在）；
+#       本机若 UDP 组播被 VPN 挡住，先 export FASTDDS_BUILTIN_TRANSPORTS=SHM（CI 上不需要）
+bash scripts/demo.sh
+```
+
+| 臂（脚本） | 演示内容 | 判据 |
+|---|---|---|
+| 正常臂 `closed_loop_sim_smoke.sh` | 多节点闭环真的闭合：仿真器 → 速度规划 → Pure Pursuit → 安全/仲裁 → 回到仿真器 | `/clock` 随仿真时间推进、车速真的上升、出口指令帧合法（帧头/校验和）、评测器吃到样本 |
+| 故障臂 `fault_injection_smoke.sh` | 注入 10 类软故障（路径停发、空路径、源帧被篡改、外部停车与恢复、任务级锁存停、监控退出、仲裁器重启…） | 每个故障有可重复的预期终态：检测 → 状态迁移 → 出口零油门 + 制动；时间线落盘 `build/demo/fault/*.json` |
+
+任一臂失败、或故障臂证据文件缺失/字段不符 → 脚本非零退出，不做"跑完就算过"的宽容。架构与话题契约细节见 [一、项目架构与包全景](#一项目架构与包全景) 与 [INTERFACE_CONTRACT.md](docs/INTERFACE_CONTRACT.md)。
+
+**已知限制**：
+
+- **本演示只提供仿真证据，不构成实车可用结论**（D-004）：硬件急停链路、VCU 断连/掉电、台架标定需实车/台架；感知与规划质量评估（真实 bag）见 #18 / #19。
+- 故障臂只覆盖软件可观测的软故障，真实断连/掉电/硬件急停不在其内。
+- 需要已构建的工作区与 ROS 2 环境，耗时约 1–2 分钟；全程无界面（不拉 RViz、不需要 DISPLAY），输出落在 `build/demo/`。
+- 视频录制、大 bag 托管、发布 release 不在本入口范围（属完整展示 #26）。
+
+**相关**：[#26 完整展示（视频 / bag / release，父跟踪）](https://github.com/zhangjszs/ROS2-LTS-Final/issues/26) · [#25 技术博客](https://github.com/zhangjszs/ROS2-LTS-Final/issues/25)
+
 ---
 
 ## 六、技术文档中心
