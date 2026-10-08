@@ -1,7 +1,7 @@
 # STATE
-- 更新时间：2026-10-07T00:05Z
-- 当前 Issue：#56（in-review，三条验收全绿；#55 in-review 待 Nightly，无动作）
-- 分支：main（零文件变更，无临时分支；开工时 `M AGENTS.md` 外部脏改动仍在，全程未碰）
-- 未完成工作：无（#56 已完成验证+报告+转 in-review；ready 队列空）
-- 最近提交：无代码提交（本轮仅 #56 执行报告 comment + in-progress→in-review，无 .agent/ 之外的变更）
-- 已知环境限制：agent 非交互 shell PATH 缺 `~/.local/bin`（mold/ccache 本体在，login shell 命中；详见 ENV.md）；本机 ROS=lyrical（CI Jazzy），多节点脚本前 `export FASTDDS_BUILTIN_TRANSPORTS=SHM`
+- 更新时间：2026-10-08T11:49Z
+- 当前 Issue：#57（in-review，六条验收全绿；执行报告已留；等 Planner 验收）
+- 分支：main（已合并 `97de15d`；临时分支 `agent/issue-57-demo-entry` 已删除；开工即存的外部 `M AGENTS.md` 全程未碰）
+- 未完成工作：无（ready 队列空，下一棒无现场可恢复）
+- 最近提交：`97de15d`（merge #57：`scripts/demo.sh` + README 展示小节；内容提交 `c79b71d`）
+- 已知环境限制：agent 非交互 shell 若 PATH 缺 `~/.local/bin` 会把 mold/ccache 误判为缺失（本体在，先 export）；本机 ROS=lyrical（CI Jazzy）；多节点脚本前**必须** `export FASTDDS_BUILTIN_TRANSPORTS=SHM`（本轮实测：不设时 `ros2 node list` 空表 → 闭环冒烟报"节点未全部注册"）
