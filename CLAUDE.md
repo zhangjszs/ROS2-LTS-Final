@@ -53,6 +53,7 @@ bash scripts/closed_loop_sim_smoke.sh   # #17: sim→profiler→PP→sim really 
 bash scripts/closed_loop_fault_smoke.sh # #17: 闭环内注入 越界/持续碰撞/反向/未完赛/超时，断言 KpiEvaluator 报告命中失败判据
 bash scripts/fault_injection_smoke.sh   # #16: 10 software fault cases judged from /system/state + /vehicle_command (no RViz/log eyeballing)
 bash scripts/mpc_reject_smoke.sh <out> <reject|normal>  # #50: MPC 持续拒解出口两臂冒烟（注入→rejecting 锁存+安全侧保持；默认→永不点亮）
+bash scripts/demo.sh                    # #57: one-click normal-vs-fault demo (chains closed-loop + fault-injection arms; simulation evidence only)
 ```
 
 工具缺失不得静默变绿（#41）：`lint_cpp.sh` 在 clang-format / cppcheck 缺失时**判失败**而不是
