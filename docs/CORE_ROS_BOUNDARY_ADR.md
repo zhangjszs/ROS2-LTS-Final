@@ -52,11 +52,12 @@ ROS 1 基线的算法逻辑与中间件强耦合（catkin 构建、节点内联�
 | `straight_line_planner/cone_boundary.h` | #22-3 锥桶左右分离与边界宽度判定 | line_detector、straight_line_planner 节点 | `test_cone_boundary` |
 | `track_benchmark/kpi_evaluator.hpp`（+ `track_generator.hpp`） | #17 KPI 判定/赛道生成 | 离线 benchmark runner | `test_kpi_evaluator` |
 | `vehicle_simulator/sensor_model_core.hpp` | #54 感知几何核（FOV/距离过滤/坐标变换/测距噪声，header-only） | `SensorSimulator`（仅做中性类型→`HuatMap`/`HuatCone` 组装） | `test_sensor_model_core` |
+| `lidar_cluster/scoring_core.hpp` | #59 置信度评分几何核（长宽/尺寸惩罚、手写协方差 PCA 倾斜惩罚、置信度合成，header-only） | `lidar_cluster_scoring.cpp`（仅做 `pcl::PointCloud`→点集转换） | `test_scoring_core` |
 
 ## 仍依赖中间件的模块
 
 - 各 `*_node.cpp` 适配层（参数/QoS/时钟/发布/日志），属设计内边界，不视为残留耦合。
-- 后续候选（各自独立、行为可证等价后再动）：velocity_profiler 梯形规划、safety_monitor 看门狗计时、lidar_cluster 几何核、skidpad_planner `IcpApfPlanner::ClusterCones`。
+- 后续候选（各自独立、行为可证等价后再动）：velocity_profiler 梯形规划、safety_monitor 看门狗计时、skidpad_planner `IcpApfPlanner::ClusterCones`。（lidar_cluster 几何核已由 #59 下沉，见上表。）
 
 ## 后果与边界
 

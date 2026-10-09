@@ -1,64 +1,35 @@
 #include "lidar_cluster_scoring.h"
 
-#include <pcl/common/centroid.h>
-#include <pcl/common/common.h>
-
-#include <algorithm>
 #include <cmath>
-#include <numbers>
+#include <utility>
+#include <vector>
 
-double ScoreAspectPenalty(double length, double width, double height, const ScoringParams& p) {
-    double penalty = 0.0;
-    if (length > height)
-        penalty += p.conf_penalty_aspect * (length - height);
-    if (width > height)
-        penalty += p.conf_penalty_aspect * (width - height);
-    return penalty;
-}
-
-double ScoreSizePenalty(double height, double area, const ScoringParams& p) {
-    double penalty = 0.0;
-    if (p.road_type == 1) {
-        if (height > p.max_height)
-            penalty += p.conf_penalty_over_max_accel;
-        if (area > p.max_area)
-            penalty += p.conf_penalty_over_max_accel;
-    } else {
-        if (height > p.max_height)
-            penalty += p.conf_penalty_height_over * (height - p.max_height);
-        if (area > p.max_area)
-            penalty += p.conf_penalty_area_over * (area - p.max_area);
-    }
-    if (height < p.min_height)
-        penalty += p.conf_penalty_height_under * (p.min_height - height);
-    if (area < p.min_area)
-        penalty += p.conf_penalty_area_under * (p.min_area - area);
-    return penalty;
-}
+// #59：评分几何核已下沉至纯 std core（lidar_cluster/scoring_core.hpp）。
+// 本文件只剩 ROS 侧薄适配层：pcl::PointCloud<PointType> → 点集 → 转发 core 函数；
+// SingleFrameDedup 的 msgs 操作留在 ROS 侧。
 
 double ScoreTiltPenalty(const pcl::PointCloud<PointType>::Ptr& cloud, const ScoringParams& p) {
-    if (!cloud || cloud->size() < 3)
+    if (!cloud)
         return 0.0;
-    Eigen::Matrix3f cov = Eigen::Matrix3f::Zero();
-    Eigen::Vector4f pca_centroid = Eigen::Vector4f::Zero();
-    pcl::computeMeanAndCovarianceMatrix(*cloud, cov, pca_centroid);
-    Eigen::SelfAdjointEigenSolver<Eigen::Matrix3f> solver(cov);
-    if (solver.info() != Eigen::Success)
-        return 0.0;
-    float cos_theta = std::abs(solver.eigenvectors().col(2).dot(Eigen::Vector3f::UnitZ()));
-    cos_theta = std::max(-1.0f, std::min(1.0f, cos_theta));
-    float tilt_deg = std::acos(cos_theta) * 180.0f / std::numbers::pi_v<float>;
-    return tilt_deg > p.max_tilt_angle ? p.conf_penalty_tilt * (tilt_deg - p.max_tilt_angle) / p.max_tilt_angle : 0.0;
+    std::vector<Eigen::Vector3f> points;
+    points.reserve(cloud->size());
+    for (const auto& pt : *cloud)
+        points.emplace_back(pt.x, pt.y, pt.z);
+    return lidar_cluster::ScoreTiltPenalty(points, p);
 }
 
 double ComputeConfidence(PointType max_pt, PointType min_pt, [[maybe_unused]] Eigen::Vector4f centroid,
                          const pcl::PointCloud<PointType>::Ptr& cloud, const ScoringParams& p) {
-    double length = std::fabs(max_pt.x - min_pt.x);
-    double width = std::fabs(max_pt.y - min_pt.y);
-    double height = std::fabs(max_pt.z - min_pt.z);
-    double score = 1.0 - ScoreAspectPenalty(length, width, height, p) - ScoreSizePenalty(height, length * width, p) -
-                   ScoreTiltPenalty(cloud, p);
-    return score < 0 ? -1.0 : score;
+    const double length = std::fabs(max_pt.x - min_pt.x);
+    const double width = std::fabs(max_pt.y - min_pt.y);
+    const double height = std::fabs(max_pt.z - min_pt.z);
+    std::vector<Eigen::Vector3f> points;
+    if (cloud) {
+        points.reserve(cloud->size());
+        for (const auto& pt : *cloud)
+            points.emplace_back(pt.x, pt.y, pt.z);
+    }
+    return lidar_cluster::ComputeConfidence(length, width, height, points, p);
 }
 
 int SingleFrameDedup(common_msgs::msg::HuatConeCluster& position, double dedup_radius) {

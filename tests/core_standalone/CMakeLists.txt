@@ -39,6 +39,7 @@ set(CORE_INCLUDE_DIRS
     "${REPO_ROOT}/src/safety/safety_monitor/include"
     "${REPO_ROOT}/src/sensors/cone_tracker/include"
     "${REPO_ROOT}/src/sensors/cone_fusion/include"
+    "${REPO_ROOT}/src/sensors/lidar_cluster/include"
     "${REPO_ROOT}/src/simulation/track_benchmark/include"
     "${REPO_ROOT}/src/simulation/vehicle_simulator/include"
     "${REPO_ROOT}/src/planning/urinay/include"
@@ -171,6 +172,12 @@ add_core_test(test_sensor_model_core
     SOURCES
         "${REPO_ROOT}/src/simulation/vehicle_simulator/test/test_sensor_model_core.cpp")
 
+# #59：lidar_cluster 置信度评分几何核（纯 std/Eigen，header-only）——
+# 长宽/尺寸惩罚、手写协方差 PCA 倾斜惩罚、置信度合成；ROS 侧只剩点云转换适配层
+add_core_test(test_scoring_core
+    SOURCES
+        "${REPO_ROOT}/src/sensors/lidar_cluster/test/test_scoring_core.cpp")
+
 # 排除清单（#40 逐个数过，不靠“碰巧没加”）——这些测试文件本身零 rclcpp，
 # 但传递依赖 ROS 生成消息头或 PCL，无法在“不 source ROS”的入口里编译：
 #   test_command_roundtrip      → pure_pursuit/vehicle_command_encoder.h 组的是
@@ -186,6 +193,8 @@ add_core_test(test_sensor_model_core
 #   test_three_way_comparison    → 文件开头只有 std include，但背后半部分拉
 #                                structures/Node.hpp（include common_msgs/msg/huat_cone.hpp）
 #   test_lidar_cluster_scoring / test_lidar_cluster_component → PCL 点云类型
+#                                （评分数值核已由 test_scoring_core 在 sanitizer 下
+#                                 覆盖，#59；本文件因 ROS 侧适配层测试保留排除）
 #   test_line_detector           → line_detector.hpp include common_msgs/msg/huat_cone.hpp
 #                                 （测试文件自己只 include 该头，没直接碰 rclcpp）
 #   test_pure_pursuit           → 节点级测试，依赖 rclcpp

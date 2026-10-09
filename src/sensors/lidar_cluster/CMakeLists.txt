@@ -118,6 +118,10 @@ if(BUILD_TESTING)
   ament_add_gtest(test_lidar_cluster_scoring test/test_lidar_cluster_scoring.cpp)
   target_link_libraries(test_lidar_cluster_scoring ${PROJECT_NAME})
 
+  # #59：置信度评分几何核单测（纯 std/Eigen，脱 PCL/msgs）。与 tests/core_standalone
+  # 注册同一份文件，以便在无 ROS 的 ASan+UBSan 门里运行。
+  ament_add_gtest(test_scoring_core test/test_scoring_core.cpp)
+
   ament_add_gtest(test_lidar_cluster_component test/test_lidar_cluster_component.cpp)
   target_link_libraries(test_lidar_cluster_component ${PROJECT_NAME})
 endif()
