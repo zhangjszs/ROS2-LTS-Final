@@ -1,7 +1,7 @@
 # PLAN.md — 路线、当前阶段与可执行队列
 
-> 维护者：Planning Agent（时间流接力）｜最后更新：2026-10-10T08:13Z（`plan-20261010T0813Z`）
-> 事实基线：main `04981c5`（与 origin/main 一致，`git fetch --all --prune` 已同步——首次因 HTTP2 framing 报错失败、重试成功；无未推送提交）；**LOCK 过期**（`executor-20261009T1508Z`，`heartbeat_at` 2026-10-09T16:05Z，至本轮 16 小时无心跳 = TTL 30 min 的 32 倍）；工作区仅 `M .agent/STATE.md`（Executor 未提交的收尾）与外部 `M AGENTS.md`；环境事实见 `.agent/ENV.md`。
+> 维护者：Planning Agent（时间流接力）｜最后更新：2026-10-10T08:54Z（`plan-20261010T0813Z`，§六 已于 CI 重跑后续订）
+> 事实基线：main `8c6fd5b`（与 origin/main 一致，已推送；`git fetch --all --prune` 已同步——首次因 HTTP2 framing 报错失败、重试成功；无未推送提交）；**LOCK 过期**（`executor-20261009T1508Z`，`heartbeat_at` 2026-10-09T16:05Z，至本轮 16 小时无心跳 = TTL 30 min 的 32 倍）；工作区仅 `M .agent/STATE.md`（Executor 未提交的收尾）与外部 `M AGENTS.md`；环境事实见 `.agent/ENV.md`。
 
 ## 一、当前阶段
 
@@ -64,9 +64,11 @@
 
 ## 六、CI 状态（本轮核实）
 
-- push CI（main `04981c5`）：最近 8 次全 success——`3797599751`（10-09 Nightly, schedule）→ `37955949456`（#59 merge `04981c5`）→ `37947921737`（chore plan-1455Z）→ `37946760540`（chore exec-1446Z）→ `37942367376` → `37940137342`（#58 merge）→ `37934195755` → `37855491072`。主干不红。
+- push CI（main `8c6fd5b`，本轮提交）：**`38038239547` 首次 failure，`--failed` 重跑 success**（同一 commit `8c6fd5b` 验证通过）。
+- **本轮新增并已实证的第三种失败模式：CI 环境准备阶段的 ros2-apt-source 404（与仓库内容无关）。** 首次失败日志：`Prepare ROS 2 jazzy` 步骤（`ros-tooling/setup-ros@v0.7`）内 `curl: (22) The requested URL returned error: 404` → `exit code 22`，发生在 checkout 之后、任何构建/测试/lint 之前。本 commit 只改 `.agent/PLAN.md` + `.agent/DECISIONS.md` 两个 markdown，不可能触发；同签名在 10-06 已出现过一次（`37437488247`，push `08:38Z`，同样 curl 404 + exit 22）。**判定：CI 基础设施间歇性故障，处置 = `gh run rerun <id> --failed`，不立案、不改 ci.yml。**
+- push CI 历史（近 10 次 push/schedule）：`38038239547`（`8c6fd5b`，重跑 success）→ `3797599751`（10-09 Nightly, success）→ `37955949456`（#59 merge `04981c5`, success）→ `37947921737`（chore plan-1455Z）→ `37946760540`（chore exec-1446Z）→ `37942367376` → `37940137342`（#58 merge）→ `37934195755` → `37855491072` → `37769542823`。除本轮 infra 404 外全 success，主干不红。
 - Nightly：**10-09 `3797599751` success（22:08Z）——本轮入账**；10-08 `37855491072` success（22:45Z）；10-07 `37696935383` success。**10-09 Nightly 观察点已清零。**
-- 结论：主干与 Nightly 均绿；下一次 Nightly 若红，须先区分新根因与既有两种模式（真污染 / 端点未收敛）。
+- 结论：主干与 Nightly 均绿。下一次 CI 若红，按**三种既有模式**区分：① 真污染（新引入的失败，需定位根因）；② 端点未收敛（`--no-daemon` / 发现收敛家族）；③ **ros2-apt-source 404（本轮新增，环境准备阶段，重跑即可）**。
 
 ## 七、已知阻塞与原因（均有证据）
 
