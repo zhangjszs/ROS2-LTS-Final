@@ -80,46 +80,6 @@ static Eigen::Matrix2d SvdRotation2D(const Eigen::Matrix2d& H) {
     return R;
 }
 
-/**
- * @brief 对 primary 中每个锥桶，在 secondary 中找最近邻（KD-tree），
- * 若距离 ≤ max_dist 则取中点加入 out。
- */
-static void AppendMidpoints(const std::vector<common_msgs::msg::HuatCone>& primary,
-                            const std::vector<common_msgs::msg::HuatCone>& secondary, double max_dist,
-                            std::vector<skidpad::Point2D>& out) {
-    if (primary.empty() || secondary.empty())
-        return;
-
-    const double max_dist_sq = max_dist * max_dist;
-
-    // 用 secondary 构建 KD-tree
-    pcl::PointCloud<pcl::PointXY>::Ptr sec_cloud(new pcl::PointCloud<pcl::PointXY>);
-    sec_cloud->points.reserve(secondary.size());
-    for (const auto& s : secondary) {
-        pcl::PointXY pt;
-        pt.x = static_cast<float>(s.position_base_link.x);
-        pt.y = static_cast<float>(s.position_base_link.y);
-        sec_cloud->points.push_back(pt);
-    }
-    sec_cloud->width = sec_cloud->points.size();
-    sec_cloud->height = 1;
-    pcl::KdTreeFLANN<pcl::PointXY> kdtree;
-    kdtree.setInputCloud(sec_cloud);
-
-    for (const auto& p : primary) {
-        double px = p.position_base_link.x, py = p.position_base_link.y;
-        pcl::PointXY query;
-        query.x = static_cast<float>(px);
-        query.y = static_cast<float>(py);
-        std::vector<int> idx(1);
-        std::vector<float> dist_sq(1);
-        if (kdtree.nearestKSearch(query, 1, idx, dist_sq) == 1 && dist_sq[0] <= max_dist_sq) {
-            const auto& best = secondary[idx[0]];
-            out.emplace_back((px + best.position_base_link.x) * 0.5, (py + best.position_base_link.y) * 0.5);
-        }
-    }
-}
-
 }  // namespace
 
 namespace skidpad {
@@ -155,57 +115,26 @@ std::vector<Point2D> IcpApfPlanner::ComputeCenterline(const std::vector<common_m
     if (left.empty() || right.empty())
         return {};
 
+    std::vector<Point2D> left_pts;
+    left_pts.reserve(left.size());
+    for (const auto& c : left) {
+        left_pts.emplace_back(c.position_base_link.x, c.position_base_link.y);
+    }
+
+    std::vector<Point2D> right_pts;
+    right_pts.reserve(right.size());
+    for (const auto& c : right) {
+        right_pts.emplace_back(c.position_base_link.x, c.position_base_link.y);
+    }
+
     constexpr double kMaxPairDist = 6.0;
-    std::vector<Point2D> centerline;
-    centerline.reserve(left.size() + right.size());
-
-    AppendMidpoints(left, right, kMaxPairDist, centerline);
-    AppendMidpoints(right, left, kMaxPairDist, centerline);
-
-    // 从原点最近邻串起来，避免按 x 排序在圆环上锯齿化
-    std::vector<Point2D> ordered;
-    ordered.reserve(centerline.size());
-    std::vector<bool> used(centerline.size(), false);
-    auto take_nearest = [&](double x0, double y0) -> int {
-        auto unused_indices =
-            std::views::iota(size_t{0}, centerline.size()) | std::views::filter([&used](size_t i) { return !used[i]; });
-        auto it = std::ranges::min_element(unused_indices, {}, [&](size_t i) {
-            const double dx = centerline[i].x - x0;
-            const double dy = centerline[i].y - y0;
-            return dx * dx + dy * dy;
-        });
-        if (it == unused_indices.end())
-            return -1;
-        return static_cast<int>(*it);
+    const CenterlineParams params{
+        .max_pair_dist = kMaxPairDist,
+        .path_spacing = path_spacing_,
+        .path_lookahead = path_lookahead_,
     };
-    int start = take_nearest(0.0, 0.0);
-    while (start >= 0) {
-        used[static_cast<size_t>(start)] = true;
-        ordered.push_back(centerline[static_cast<size_t>(start)]);
-        start = take_nearest(ordered.back().x, ordered.back().y);
-    }
-    centerline.swap(ordered);
 
-    const double dedup_sq = (path_spacing_ * 0.5) * (path_spacing_ * 0.5);
-    std::vector<Point2D> deduped;
-    deduped.reserve(centerline.size());
-    for (const auto& p : centerline) {
-        if (deduped.empty()) {
-            deduped.push_back(p);
-            continue;
-        }
-        double dx = p.x - deduped.back().x, dy = p.y - deduped.back().y;
-        if (dx * dx + dy * dy > dedup_sq)
-            deduped.push_back(p);
-    }
-
-    std::vector<Point2D> result;
-    result.reserve(deduped.size());
-    const double lookahead_sq = path_lookahead_ * path_lookahead_;
-    std::ranges::copy_if(
-        deduped, std::back_inserter(result), [lookahead_sq](double d2) { return d2 <= lookahead_sq; },
-        [](const Point2D& p) { return p.x * p.x + p.y * p.y; });
-    return result;
+    return ComputeCenterlineCore(left_pts, right_pts, params);
 }
 
 Circle2D IcpApfPlanner::FitCircleTaubin(const std::vector<common_msgs::msg::HuatCone>& cones) {

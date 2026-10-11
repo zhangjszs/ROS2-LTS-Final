@@ -45,6 +45,8 @@ if(BUILD_TESTING)
   find_package(ament_cmake_gtest REQUIRED)
   ament_add_gtest(test_icp_apf_planner test/test_icp_apf_planner.cpp)
   target_link_libraries(test_icp_apf_planner ${PROJECT_NAME}_core)
+
+  ament_add_gtest(test_centerline_core test/test_centerline_core.cpp)
 endif()
 
 ament_package()

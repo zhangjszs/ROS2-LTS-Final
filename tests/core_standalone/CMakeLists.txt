@@ -43,6 +43,7 @@ set(CORE_INCLUDE_DIRS
     "${REPO_ROOT}/src/simulation/track_benchmark/include"
     "${REPO_ROOT}/src/simulation/vehicle_simulator/include"
     "${REPO_ROOT}/src/planning/urinay/include"
+    "${REPO_ROOT}/src/planning/skidpad_planner/include"
     "${EIGEN3_INCLUDE_DIR}"
 )
 
@@ -178,6 +179,11 @@ add_core_test(test_scoring_core
     SOURCES
         "${REPO_ROOT}/src/sensors/lidar_cluster/test/test_scoring_core.cpp")
 
+# #60：skidpad 中心线回退路径几何核（纯 std，header-only）
+add_core_test(test_centerline_core
+    SOURCES
+        "${REPO_ROOT}/src/planning/skidpad_planner/test/test_centerline_core.cpp")
+
 # 排除清单（#40 逐个数过，不靠“碰巧没加”）——这些测试文件本身零 rclcpp，
 # 但传递依赖 ROS 生成消息头或 PCL，无法在“不 source ROS”的入口里编译：
 #   test_command_roundtrip      → pure_pursuit/vehicle_command_encoder.h 组的是
@@ -188,6 +194,8 @@ add_core_test(test_scoring_core
 #                                BicycleModel 用例在 test_bicycle_model_core、感知几何核在
 #                                test_sensor_model_core（均见上方 add_core_test）
 #   test_icp_apf_planner         → icp_apf_planner.hpp include common_msgs/geometry msgs
+#                                 （中心线回退路径几何核已由 test_centerline_core 在 sanitizer 下
+#                                  覆盖，#60；本文件因 ROS 侧适配层与 ICP 测试保留排除）
 #   test_way / test_kdtree_concepts / test_point_concepts
 #                                → Way/delaunay/kdtree 链路 include msgs 与 PCL
 #   test_three_way_comparison    → 文件开头只有 std include，但背后半部分拉
