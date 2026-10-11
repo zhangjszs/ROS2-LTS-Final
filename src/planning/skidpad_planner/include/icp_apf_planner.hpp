@@ -5,19 +5,14 @@
 #include <geometry_msgs/msg/point.hpp>
 #include <vector>
 
+#include "centerline_core.hpp"
+
 namespace skidpad {
 
 struct Circle2D {
     double cx, cy, r;
     bool valid;
     Circle2D() : cx(0.0), cy(0.0), r(0.0), valid(false) {}
-};
-
-struct Point2D {
-    double x;
-    double y;
-    Point2D() : x(0.0), y(0.0) {}
-    Point2D(double _x, double _y) : x(_x), y(_y) {}
 };
 
 struct IcpResult {
