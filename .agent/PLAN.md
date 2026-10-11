@@ -1,7 +1,7 @@
 # PLAN.md — 路线、当前阶段与可执行队列
 
-> 维护者：Planning Agent（时间流接力）｜最后更新：2026-10-10T08:54Z（`plan-20261010T0813Z`，§六 已于 CI 重跑后续订）
-> 事实基线：main `8c6fd5b`（与 origin/main 一致，已推送；`git fetch --all --prune` 已同步——首次因 HTTP2 framing 报错失败、重试成功；无未推送提交）；**LOCK 过期**（`executor-20261009T1508Z`，`heartbeat_at` 2026-10-09T16:05Z，至本轮 16 小时无心跳 = TTL 30 min 的 32 倍）；工作区仅 `M .agent/STATE.md`（Executor 未提交的收尾）与外部 `M AGENTS.md`；环境事实见 `.agent/ENV.md`。
+> 维护者：Planning Agent（时间流接力）｜最后更新：2026-10-11T14:20Z（`plan-20261011T1420Z`）
+> 事实基线：main `8b179ae`（与 origin/main 一致，已推送；`git fetch --all --prune` 已同步；无未推送提交）；**LOCK 过期**（`executor-20261009T1508Z`，`heartbeat_at` 2026-10-09T16:05Z，至本轮已 >47 小时无心跳 = TTL 30 min 的 90+ 倍）；工作区仅 `M .agent/STATE.md`（Executor 未提交的收尾）与外部 `M AGENTS.md`；环境事实见 `.agent/ENV.md`。
 
 ## 一、当前阶段
 
@@ -23,7 +23,7 @@
 - 目标（S1+S2）：接口/编码/单位/坐标系一致；固定场景可复现且 KPI 能识别失败；选定赛制低速闭环可重复完成，停车/失效/重启行为通过。
 - 完成判据：以各 Issue 验收标准为准；其中依赖实车/台架/硬件的条目**不得以仅仿真证据关闭**（见 D-004）。
 - Issue 台账（本 `gh` 实测，共 **15 open**）：ready 2（#60/#61）· in-progress 1（#59，待 Executor 补收尾）· 仓库外阻塞 7（#15–#19 / #23 / #24）· 展示待条件 3（#25/#26/#27 needs-info）· 待实车翻转 1（#37 needs-triage + blocked）· 路线图伞形 1（#20，仅跟踪）。
-- 本轮进展：#59 六标准独立复核全过（未关闭，见 §三）；新立 **#60 / #61**（P3, type:test, ready-for-agent）入 ready 队列；10-09 Nightly 入账；ADR 候选清单按 #59/#60/#61 实际状态更新。
+- 本轮进展：10-10 Nightly（`38086098600`，success）入账；push CI `38039597976`（`8b179ae`，success）；确认 #60/#61 ready 队列维持健全；#59 独立复核证据维持齐备，待下一棒 Executor 补流程收尾；主干与 Nightly 持续全绿。
 
 ## 三、软件侧缺口扫描与近期 CI 事件（本轮更新）
 
@@ -64,11 +64,11 @@
 
 ## 六、CI 状态（本轮核实）
 
-- push CI（main `8c6fd5b`，本轮提交）：**`38038239547` 首次 failure，`--failed` 重跑 success**（同一 commit `8c6fd5b` 验证通过）。
-- **本轮新增并已实证的第三种失败模式：CI 环境准备阶段的 ros2-apt-source 404（与仓库内容无关）。** 首次失败日志：`Prepare ROS 2 jazzy` 步骤（`ros-tooling/setup-ros@v0.7`）内 `curl: (22) The requested URL returned error: 404` → `exit code 22`，发生在 checkout 之后、任何构建/测试/lint 之前。本 commit 只改 `.agent/PLAN.md` + `.agent/DECISIONS.md` 两个 markdown，不可能触发；同签名在 10-06 已出现过一次（`37437488247`，push `08:38Z`，同样 curl 404 + exit 22）。**判定：CI 基础设施间歇性故障，处置 = `gh run rerun <id> --failed`，不立案、不改 ci.yml。**
-- push CI 历史（近 10 次 push/schedule）：`38038239547`（`8c6fd5b`，重跑 success）→ `3797599751`（10-09 Nightly, success）→ `37955949456`（#59 merge `04981c5`, success）→ `37947921737`（chore plan-1455Z）→ `37946760540`（chore exec-1446Z）→ `37942367376` → `37940137342`（#58 merge）→ `37934195755` → `37855491072` → `37769542823`。除本轮 infra 404 外全 success，主干不红。
-- Nightly：**10-09 `3797599751` success（22:08Z）——本轮入账**；10-08 `37855491072` success（22:45Z）；10-07 `37696935383` success。**10-09 Nightly 观察点已清零。**
-- 结论：主干与 Nightly 均绿。下一次 CI 若红，按**三种既有模式**区分：① 真污染（新引入的失败，需定位根因）；② 端点未收敛（`--no-daemon` / 发现收敛家族）；③ **ros2-apt-source 404（本轮新增，环境准备阶段，重跑即可）**。
+- push CI（main `8b179ae`，最新提交）：`38039597976` success；上轮 `38038239547`（`8c6fd5b`）`--failed` 重跑 success 保持绿。
+- **三种失败模式与应对认知维持有效**：① 真污染（新引入失败需排查定位）；② 端点未收敛（`--no-daemon` / 发现收敛家族）；③ ros2-apt-source 404（环境准备阶段间歇性 curl 404，`gh run rerun <id> --failed` 即可）。
+- push CI / Schedule 历史（近 10 次）：`38086098600`（10-10 Nightly, success）→ `38039597976`（chore plan `8b179ae`, success）→ `38038239547`（`8c6fd5b`, 重跑 success）→ `37997599751`（10-09 Nightly, success）→ `37955949456`（#59 merge `04981c5`, success）→ `37947921737`（chore plan-1455Z）→ `37946760540`（chore exec-1446Z）→ `37942367376` → `37940137342`（#58 merge）→ `37934195755`。全 success，主干持续全绿。
+- Nightly：**10-10 `38086098600` success（21:02Z）——本轮入账**；10-09 `37997599751` success（22:08Z）；10-08 `37855491072` success（22:45Z）；10-07 `37696935383` success。连续 4 晚全绿。
+- 结论：主干与 Nightly 持续保持全绿。当前无任何失败需要介入。
 
 ## 七、已知阻塞与原因（均有证据）
 
@@ -105,6 +105,6 @@
 
 - **当前无阻断性 Decision Gate，无待用户决策项；ready 队列 2 项（#60 P3、#61 P3，均为测试增强 + 一处 UB 守卫）。**
 - 下一棒 Executor 建议顺序：**先补 #59 收尾**（label/报告/LOCK/.agent 提交，代码不动，证据 Planner 已备好）→ **#60** → **#61**。#59 的 in-progress 标签在下一棒转移前，请勿新开分支动它的代码（现场已无未完成代码，收尾是纯流程动作）。
-- Nightly 10-09 已入账（success）；10-10 Nightly 22:xxZ 将产生，下一棒若在其后看一眼即可。
+- Nightly 10-10 已入账（`38086098600`，success）；10-11 Nightly 21:xxZ 将产生，下一棒若在其后看一眼即可。
 - 展示范围（#25/#26/#27）：D-007(B) 已生效；#26 仍为完整展示父跟踪（needs-info）。
-- Executor 未在运行（LOCK 过期 16 小时）；外部 `M AGENTS.md` 脏改动非本体系产生，任何一棒都不碰（只读记录）；`.agent/STATE.md` 的未提交改动属 Executor 上一轮收尾，下一棒提交时只 `git add .agent/`。
+- Executor 未在运行（LOCK 过期 >47 小时）；外部 `M AGENTS.md` 脏改动非本体系产生，任何一棒都不碰（只读记录）；`.agent/STATE.md` 的未提交改动属 Executor 上一轮收尾，下一棒提交时只 `git add .agent/`。
