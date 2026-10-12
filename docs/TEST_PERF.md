@@ -348,6 +348,7 @@ colcon test --packages-select ${PKGS[*]} && colcon test-result --verbose
 | --- | --- | --- | --- | --- |
 | 2026-10-12 | 建立本基准文件：本地全量实测 1 次（3215s，5 个 DDS 门禁环境性失败，证据见 2.3）+ CI 历史 12 次运行拆解 | — | 见第一/二节 | 未提交（待用户确认后随首批优化一并提交） |
 | 2026-10-13 | 将 10 项待办建议建为 issue #63–#72（`ready-for-human`），本文件第七节加编号索引与实施顺序 | — | — | 见 #63–#72 |
+| 2026-10-13 | 补立 4 项（审计黄项/阶段三遗漏）：#73 评分核双轨去重、#74 本地快速反馈文档、#75 测试编写规范、#76 colcon-only 下沉伞形 | — | — | 见 #73–#76；文档提交 `c0652e1` 之后 |
 
 ## 七、待办建议（未确认/未实施）
 
@@ -365,9 +366,14 @@ colcon test --packages-select ${PKGS[*]} && colcon test-result --verbose
 | T-8 | F-2 gate_budget_check.py 时长监控 | [#70](https://github.com/zhangjszs/ROS2-LTS-Final/issues/70) | 漂移可见 | 低 | 无 |
 | T-9 | F-6 core_standalone 覆盖率基线 | [#71](https://github.com/zhangjszs/ROS2-LTS-Final/issues/71) | 覆盖率从"未测量"到有基线 | 低 | 阈值策略 |
 | T-10 | F-7 setup-ros 步骤级超时 | [#72](https://github.com/zhangjszs/ROS2-LTS-Final/issues/72) | 少一次 45min 级浪费 | 低 | 验证 step 级 timeout 生效方式 |
+| T-11 | R-1 评分核测试双轨去重（13 个同名用例） | [#73](https://github.com/zhangjszs/ROS2-LTS-Final/issues/73) | 消漂移风险；用例 506→~493 | 低 | 无 |
+| T-12 | F-3 README/CLAUDE.md 本地快速反馈一节 | [#74](https://github.com/zhangjszs/ROS2-LTS-Final/issues/74) | 降低假红时乱改概率 | 低 | 措辞与 #67 对齐 |
+| T-13 | F-4 测试编写规范入库（含 R-2 粒度先例） | [#75](https://github.com/zhangjszs/ROS2-LTS-Final/issues/75) | 审计结论固化为准入清单 | 低 | 无 |
+| T-14 | F-5 伞形：12 个仅 colcon 轨文件下沉 core | [#76](https://github.com/zhangjszs/ROS2-LTS-Final/issues/76) | sanitizer 全覆盖算法逻辑 | 中 | 各子项按 #59 模式单独立项 |
 
 实施顺序建议：#63/#64/#68/#72（低风险 YAML/脚本，可一批）→ #69/#70（可观测性）→
-#65（Nightly 试跑）→ #66（依赖 #65 结论）→ #67 → #71。每项落地后按第五节回写优化记录表。
+#65（Nightly 试跑）→ #66（依赖 #65 结论）→ #67 → #71；测试质量线 #73/#75/#76 与文档线 #74 可随时穿插
+（均不依赖性能线结论）。每项落地后按第五节回写优化记录表。
 
 ---
 
