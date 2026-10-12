@@ -138,91 +138,31 @@ std::vector<Point2D> IcpApfPlanner::ComputeCenterline(const std::vector<common_m
 }
 
 Circle2D IcpApfPlanner::FitCircleTaubin(const std::vector<common_msgs::msg::HuatCone>& cones) {
-    Circle2D result;
-    const int n = static_cast<int>(cones.size());
-    if (n < 3)
-        return result;
-
-    double mean_x = 0.0, mean_y = 0.0;
+    std::vector<Point2D> pts;
+    pts.reserve(cones.size());
     for (const auto& c : cones) {
-        mean_x += c.position_base_link.x;
-        mean_y += c.position_base_link.y;
+        pts.emplace_back(c.position_base_link.x, c.position_base_link.y);
     }
-    mean_x /= n;
-    mean_y /= n;
-
-    // 计算各阶矩（以质心为原点的坐标系）
-    double Mxx = 0, Myy = 0, Mxy = 0, Mxz = 0, Myz = 0, Mzz = 0;
-    for (const auto& c : cones) {
-        double u = c.position_base_link.x - mean_x;
-        double v = c.position_base_link.y - mean_y;
-        double z = u * u + v * v;
-        Mxx += u * u;
-        Myy += v * v;
-        Mxy += u * v;
-        Mxz += u * z;
-        Myz += v * z;
-        Mzz += z * z;
-    }
-    Mxx /= n;
-    Myy /= n;
-    Mxy /= n;
-    Mxz /= n;
-    Myz /= n;
-    Mzz /= n;
-    const double Mz = Mxx + Myy;
-    if (Mz < 1e-10)
-        return result;
-
-    // 构造 B^{-1}*M 矩阵（广义特征值问题的标准化）
-    // B = diag(4*Mz, 1, 1)，B^{-1}*M 的最小正特征值对应最优圆参数
-    Eigen::Matrix3d A;
-    A << Mzz / (4.0 * Mz), Mxz / (4.0 * Mz), Myz / (4.0 * Mz), Mxz, Mxx, Mxy, Myz, Mxy, Myy;
-
-    Eigen::EigenSolver<Eigen::Matrix3d> es(A);
-
-    double min_eval = std::numeric_limits<double>::max();
-    Eigen::Vector3d min_evec = Eigen::Vector3d::Zero();
-    for (int i = 0; i < 3; ++i) {
-        if (std::abs(es.eigenvalues()[i].imag()) > 1e-8)
-            continue;
-        double eval = es.eigenvalues()[i].real();
-        if (eval > 1e-10 && eval < min_eval) {
-            min_eval = eval;
-            min_evec = es.eigenvectors().col(i).real();
-        }
-    }
-    if (min_eval == std::numeric_limits<double>::max())
-        return result;
-
-    const double A_coef = min_evec(0);
-    if (std::abs(A_coef) < 1e-10)
-        return result;
-
-    // 圆心（质心坐标系）：(-B/2A, -C/2A)
-    // 半径²：cx_c² + cy_c² + Mz（其中 D = -A*Mz）
-    const double cx_c = -min_evec(1) / (2.0 * A_coef);
-    const double cy_c = -min_evec(2) / (2.0 * A_coef);
-    const double r_sq = cx_c * cx_c + cy_c * cy_c + Mz;
-    if (r_sq <= 0.0)
-        return result;
-
-    result.cx = cx_c + mean_x;
-    result.cy = cy_c + mean_y;
-    result.r = std::sqrt(r_sq);
-    result.valid = true;
-    return result;
+    return FitCircleTaubinCore(pts);
 }
 
 std::vector<Point2D> IcpApfPlanner::ComputeCircleCenterline(const std::vector<common_msgs::msg::HuatCone>& left,
                                                             const std::vector<common_msgs::msg::HuatCone>& right) {
-    constexpr double kDefaultHalfTrackWidth = 1.5;  // 赛道半宽 ~1.5m
-    constexpr double kMinRadius = 3.0;
-    constexpr double kMaxRadius = 25.0;
+    std::vector<Point2D> left_pts;
+    left_pts.reserve(left.size());
+    for (const auto& c : left) {
+        left_pts.emplace_back(c.position_base_link.x, c.position_base_link.y);
+    }
+    std::vector<Point2D> right_pts;
+    right_pts.reserve(right.size());
+    for (const auto& c : right) {
+        right_pts.emplace_back(c.position_base_link.x, c.position_base_link.y);
+    }
 
-    Circle2D lc = FitCircleTaubin(left);
-    Circle2D rc = FitCircleTaubin(right);
+    const Circle2D lc = FitCircleTaubinCore(left_pts);
+    const Circle2D rc = FitCircleTaubinCore(right_pts);
 
+    constexpr double kDefaultHalfTrackWidth = 1.5;
     Circle2D center_circle;
     if (lc.valid && rc.valid) {
         center_circle.cx = (lc.cx + rc.cx) * 0.5;
@@ -241,34 +181,19 @@ std::vector<Point2D> IcpApfPlanner::ComputeCircleCenterline(const std::vector<co
         center_circle.valid = true;
     }
 
-    if (!center_circle.valid || center_circle.r < kMinRadius || center_circle.r > kMaxRadius) {
-        return {};
+    if (center_circle.valid) {
+        RCLCPP_INFO(
+            rclcpp::get_logger("skidpad_planner"),
+            "[skidpad_planner] Taubin: left(valid=%d r=%.2f) right(valid=%d r=%.2f) center(cx=%.2f cy=%.2f r=%.2f)",
+            lc.valid, lc.r, rc.valid, rc.r, center_circle.cx, center_circle.cy, center_circle.r);
     }
 
-    RCLCPP_INFO(rclcpp::get_logger("skidpad_planner"),
-                "[skidpad_planner] Taubin: left(valid=%d r=%.2f) right(valid=%d r=%.2f) center(cx=%.2f cy=%.2f r=%.2f)",
-                lc.valid, lc.r, rc.valid, rc.r, center_circle.cx, center_circle.cy, center_circle.r);
-
-    // 从车辆当前位置（base_link 原点）出发沿弧线采样
-    // 车辆相对圆心的角度
-    const double start_angle = std::atan2(-center_circle.cy, -center_circle.cx);
-    const double arc_step = path_spacing_ / center_circle.r;
-    auto first_x = [&](double dir) {
-        double angle = start_angle + dir * arc_step;
-        return center_circle.cx + center_circle.r * std::cos(angle);
+    const CenterlineParams params{
+        .max_pair_dist = 6.0,
+        .path_spacing = path_spacing_,
+        .path_lookahead = path_lookahead_,
     };
-    const double dir = (first_x(1.0) >= first_x(-1.0)) ? 1.0 : -1.0;
-    const int num_steps = static_cast<int>(path_lookahead_ / path_spacing_) + 1;
-
-    std::vector<Point2D> path;
-    path.reserve(num_steps);
-    for (int i = 1; i <= num_steps; ++i) {
-        double angle = start_angle + dir * arc_step * static_cast<double>(i);
-        double px = center_circle.cx + center_circle.r * std::cos(angle);
-        double py = center_circle.cy + center_circle.r * std::sin(angle);
-        path.emplace_back(px, py);
-    }
-    return path;
+    return ComputeCircleCenterlineCore(left_pts, right_pts, params);
 }
 
 IcpResult IcpApfPlanner::IcpAlign(const std::vector<Point2D>& src, const std::vector<Point2D>& tgt) {

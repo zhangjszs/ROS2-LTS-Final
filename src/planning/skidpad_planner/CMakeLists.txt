@@ -47,6 +47,8 @@ if(BUILD_TESTING)
   target_link_libraries(test_icp_apf_planner ${PROJECT_NAME}_core)
 
   ament_add_gtest(test_centerline_core test/test_centerline_core.cpp)
+
+  ament_add_gtest(test_circle_centerline_core test/test_circle_centerline_core.cpp)
 endif()
 
 ament_package()
