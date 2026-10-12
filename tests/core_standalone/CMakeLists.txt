@@ -184,6 +184,11 @@ add_core_test(test_centerline_core
     SOURCES
         "${REPO_ROOT}/src/planning/skidpad_planner/test/test_centerline_core.cpp")
 
+# #61：skidpad 圆路径几何核（纯 std/Eigen，header-only）——Taubin 代数拟合与圆弧等间距采样
+add_core_test(test_circle_centerline_core
+    SOURCES
+        "${REPO_ROOT}/src/planning/skidpad_planner/test/test_circle_centerline_core.cpp")
+
 # 排除清单（#40 逐个数过，不靠“碰巧没加”）——这些测试文件本身零 rclcpp，
 # 但传递依赖 ROS 生成消息头或 PCL，无法在“不 source ROS”的入口里编译：
 #   test_command_roundtrip      → pure_pursuit/vehicle_command_encoder.h 组的是

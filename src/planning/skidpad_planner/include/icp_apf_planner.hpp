@@ -9,12 +9,6 @@
 
 namespace skidpad {
 
-struct Circle2D {
-    double cx, cy, r;
-    bool valid;
-    Circle2D() : cx(0.0), cy(0.0), r(0.0), valid(false) {}
-};
-
 struct IcpResult {
     double rotation;  // 旋转角度，单位为弧度
     double tx;
