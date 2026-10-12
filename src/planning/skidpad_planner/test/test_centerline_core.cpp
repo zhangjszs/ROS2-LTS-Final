@@ -122,10 +122,11 @@ TEST(CenterlineCore, LookaheadFiltering) {
         .path_lookahead = 10.0,
     };
 
+    // Midpoint (15.0, 0.0) has dist 15.0 > lookahead 10.0, so it is filtered out.
     std::vector<Point2D> left = {
         {2.0, -1.0},
         {8.0, -1.0},
-        {15.0, -1.0},  // Midpoint (15.0, 0.0) has dist 15.0 > lookahead 10.0
+        {15.0, -1.0},
     };
     std::vector<Point2D> right = {
         {2.0, 1.0},
