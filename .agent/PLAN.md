@@ -1,54 +1,48 @@
 # PLAN.md — 路线、当前阶段与可执行队列
 
-> 维护者：Planning Agent（时间流接力）｜最后更新：2026-10-11T14:20Z（`plan-20261011T1420Z`）
-> 事实基线：main `8b179ae`（与 origin/main 一致，已推送；`git fetch --all --prune` 已同步；无未推送提交）；**LOCK 过期**（`executor-20261009T1508Z`，`heartbeat_at` 2026-10-09T16:05Z，至本轮已 >47 小时无心跳 = TTL 30 min 的 90+ 倍）；工作区仅 `M .agent/STATE.md`（Executor 未提交的收尾）与外部 `M AGENTS.md`；环境事实见 `.agent/ENV.md`。
+> 维护者：Planning Agent（时间流接力）｜最后更新：2026-10-12T13:34Z（`plan-20261012T1334Z`）
+> 事实基线：main `9cbda10`（与 origin/main 一致，已推送；`git fetch --all --prune` 已同步；`git pull --rebase` 因外部 `M AGENTS.md` 未暂存改动而跳过——非本体系产生，任何一棒都不碰；无 LOCK（Executor 空闲）；工作区仅外部 `M AGENTS.md`；环境事实见 `.agent/ENV.md`。
 
 ## 一、当前阶段
 
 路线图来源：#20「ROS 2 车队开发路线：运行基线 → 可信仿真 → 低速闭环 → 性能优化」（S0–S3）。
 
 - **S0 可重复启动：完成**（#13/#14 已关闭；CI/lint/headless/qos 门常绿）。
-- **S1 可信接口与仿真 / S2 低速稳定闭环：软件侧基本完成，剩余卡仓库外输入**：
-  - #15 共用执行器适配层：软件侧（codec/标定单一来源/停车帧工厂）已交付并审计；剩余 = VCU 协议资料 + 台架实车标定。
-  - #16 任务/安全状态与最终仲裁：软件侧（状态机/信任门/新鲜度租约/故障注入矩阵）闭环；剩余 = 硬件急停链路 + 实车停车预算。
+- **S1 可信接口与仿真 / S2 低速稳定闭环：软件侧基本完成，剩余卡仓库外输入**（同上轮，未变）：
+  - #15 共用执行器适配层：软件侧已交付并审计；剩余 = VCU 协议资料 + 台架实车标定。
+  - #16 任务/安全状态与最终仲裁：软件侧闭环；剩余 = 硬件急停链路 + 实车停车预算。
   - #17 可复现仿真/KPI/回归：③④已合入并进 CI 硬门；①②受实车标定与感知扰动数据阻塞。
-  - #19 Pure Pursuit 低速基线：A 阶段基线 + B 骨架（诊断出口 / 调参-比较集分离）已在；B 完整公平对比依赖 #17 扰动场景。
+  - #19 Pure Pursuit 低速基线：A 基线 + B 骨架已在；B 完整公平对比依赖 #17 扰动场景。
   - #18 rosbag 数据集与感知质量评估：需真实 bag。
 - **S3 性能优化**：#19 B 待 S2 条件满足。
 - **展示（D-007-B）**：最小展示入口 #57 已关闭；CLAUDE.md 文档同步 #58 已关闭；完整展示（#26）与博客（#25）待 #17①② / #18 证据。
-- **仓库外输入未到位期间的软件侧方向**：仅余 ADR 下沉候选可执行——#59（lidar_cluster）已交付待收尾，本轮新立 #60/#61（skidpad 圆路径与中点路径），详见 §三/§四。
+- **ADR 下沉线：#59/#60/#61 本轮全部验收关闭，下沉候选清单清空**；本轮新维度扫描仅立得 **#62**（直线拟合核，详见 §三/§四）。软件侧可执行池事实上见底，详见 §八。
 
 ## 二、当前 Milestone 目标与完成判据
 
 - 目标（S1+S2）：接口/编码/单位/坐标系一致；固定场景可复现且 KPI 能识别失败；选定赛制低速闭环可重复完成，停车/失效/重启行为通过。
 - 完成判据：以各 Issue 验收标准为准；其中依赖实车/台架/硬件的条目**不得以仅仿真证据关闭**（见 D-004）。
-- Issue 台账（本 `gh` 实测，共 **15 open**）：ready 2（#60/#61）· in-progress 1（#59，待 Executor 补收尾）· 仓库外阻塞 7（#15–#19 / #23 / #24）· 展示待条件 3（#25/#26/#27 needs-info）· 待实车翻转 1（#37 needs-triage + blocked）· 路线图伞形 1（#20，仅跟踪）。
-- 本轮进展：10-10 Nightly（`38086098600`，success）入账；push CI `38039597976`（`8b179ae`，success）；确认 #60/#61 ready 队列维持健全；#59 独立复核证据维持齐备，待下一棒 Executor 补流程收尾；主干与 Nightly 持续全绿。
+- Issue 台账（本 `gh` 实测，共 **12 open**，上轮 15 − 本轮关闭 #59/#60/#61）：ready 1（#62）· in-review 0 · in-progress 0 · 仓库外阻塞 7（#15–#19 / #23 / #24）· 展示待条件 3（#25/#26/#27 needs-info）· 待实车翻转 1（#37 needs-triage + blocked）· 路线图伞形 1（#20，仅跟踪）。
+- 本轮进展：#59/#60/#61 逐条独立验收后全部 CLOSED（证据见 §三）；新立 #62 入 ready 队列；主干 push CI 连续 3 次 success（`4d795d9`/`8c7db61`/`9cbda10`）。
 
-## 三、软件侧缺口扫描与近期 CI 事件（本轮更新）
+## 三、验收结论与近期 CI 事件（本轮更新）
 
-- **#59（Executor 轮次异常收尾，Planner 未关闭）**：Executor `executor-20261009T1508Z` 的收尾未完成——LOCK 未删、`in-review` 标签未转移、执行报告未留、`.agent/` 状态变更未提交（工作区仅剩 `M .agent/STATE.md`）。但代码侧证据表明工作**已实际完成并合入**：临时分支已删、merge `04981c5` 在 main、STATE.md 自述"未完成工作：无"。按契约 §9（不关闭/不重置 `in-progress` Issue）与 §4.1（疑似中断由下一棒 Executor 自行判断），**本轮 Planner 不关闭、不改标签**，仅在 Issue 留独立复核证据供下一棒直接使用。复核结论：**六条标准全部独立验证通过，零差距**——
-  - `bash scripts/core_standalone_check.sh` rc=0，26/26 passed，`Test #26: test_scoring_core` 在 ASan+UBSan 下 Passed；`ctest -N --test-dir build/core_standalone` 显示 `Test #26: test_scoring_core` / Total 26（防空跑）；gtest XML `tests="31" failures="0" errors="0"`。
-  - PCA 等价性：黄金样本由 Planner **独立手算复核**（45° 点列 → 1.75；(1,2,3) 共线 → 0.2339845，均与 Issue 预期一致）；并核对 PCL 源码 `/usr/include/pcl-1.15/pcl/common/impl/centroid.hpp` 确认按 N 归一 + 非 dense 跳过非有限点——协方差常数缩放不改特征向量方向，等价性论证成立。
-  - `colcon build/test --packages-select lidar_cluster` 双 rc=0，`test-result --verbose` 0 errors/0 failures/0 skipped；**未改动的** `test_lidar_cluster_scoring` `tests="32" failures="0"` 仍全绿。
-  - 新 core 头 include 仅 `<Eigen/Dense> <algorithm> <cmath> <numbers> <span>`，无 rclcpp/common_msgs/PCL（仅注释提及）；`git show 467d570 --stat` 7 files，无 benchmarks/config/launch。
-  - lint 双 rc=0；CI merge `37955949456` success。
-  - 非阻断观察：`utility.cpp:468` 把 cluster cloud 设为 `is_dense = true`，故旧 PCL dense 分支**不**跳过非有限点；新实现一律跳过。dense 云中混 NaN 时旧行为经 NaN 钳位塌缩成"惩罚 0"（静默返回 0 的潜在隐患），新行为算真实倾斜。两侧测试均无 NaN 用例，不构成回归；已记录备查，若团队想要 dense+NaN 边界测试可另立小 Issue。
-- **新立 #60 / #61（本轮，过 4.2 六条门禁）**：
-  - **#60**（P3, type:test, ready-for-agent）：skidpad **中点回退路径** `ComputeCenterline` 几何核下沉。`AppendMidpoints` 的 `pcl::KdTreeFLANN<pcl::PointXY>::nearestKSearch` → 暴力 O(n·m) 扫描（复现 float 往返：坐标 cast float、double 中累加平方距离、结果 cast float 后与 `max_dist²` 比较；平局用严格 `<` 取最小下标）；中点配对后的串链/去重/lookahead 过滤三段已是纯 std，原样搬移。
-  - **#61**（P3, type:test, ready-for-agent）：skidpad **圆路径**（`GeneratePath` 主路径）`FitCircleTaubin` + `ComputeCircleCenterline` 下沉。**顺带暴露一个参数驱动的可达 UB**：`icp_apf_planner.cpp:332` `static_cast<int>(path_lookahead_ / path_spacing_)`，而 `path_spacing_` 来自 ROS 参数 `path_station_spacing`（`skidpad_planner_node.cpp:45`，默认 0.5，**无下界校验**）→ 置 0 时 `20.0/0.0=+inf` → `static_cast<int>(+inf)` 是 UB，随后循环 ~2^31 次（实车等价卡死）。与 #38 同类：只有进 sanitizer 门才会被抓到。#61 已要求在 core 几何层加参数守卫，把 UB 变成"返回空 → 走既有回退路径"。
-- **KD-tree 等价性 Planner 预验证（2026-10-10T08:13Z，临时程序未入仓库）**：对 `pcl::KdTreeFLANN<pcl::PointXY>::nearestKSearch` 做差分——连续 double 坐标 **10000 次抽样：最近邻下标 0 处不一致、阈值判定 0 处翻转、输出中点 0 处不一致**（bit 级等价）；整数网格坐标（制造精确平局）5000 次抽样：下标 412 处、中点 282 处不一致——**平局时 KdTreeFLANN 选哪个等距锥桶取决于其内部树结构，属未文档化的库内部行为**。结论已写入 #60/#61：真实传感器坐标下精确平局概率为 0，差分测试的随机输入必须用连续值；新实现改为确定性的最小下标，需在执行报告中如实记录。
-- **本轮缺口扫描结论**：① **测试登记合规**：`src/**/test/test_*.cpp` 全部在 `tests/core_standalone/CMakeLists.txt` 有交代（注册或排除清单逐条有据），#59 后无漂移（`core_standalone_check.sh` 的覆盖审计步骤即校验此点，本轮 rc=0）；② CLAUDE.md 冒烟清单无新漂移；③ 无开放 PR、无 auto-discovered 积压；④ Executor 连续空转信号已由 #60/#61 回应（§四）。
-- 历史留痕（压缩备查）：#55（mpc-reject-smoke 假失败，`a99b600` 修复）/ #56（PATH 误判，零代码关闭）/ #57（最小展示入口）/ #58（CLAUDE.md 补 demo.sh 一行）均已关闭并各自独立复核。
+- **#59（lidar_cluster 评分几何核）：通过关闭**（验收 comment `6125381041`）。Planner 10-11 已六标准独立复核全过；本轮确认合入后代码零再动（`git log 04981c5..HEAD -- src/sensors/lidar_cluster/` 为空）+ 当前 main 新跑 `core_standalone_check.sh` rc=0（`Test #26` Passed，28/28）+ 主干 CI success 链。残余观察（dense+NaN）留备查，不阻塞。
+- **#60（skidpad 中点回退路径）：通过关闭**（验收 comment `6125381825`）。差分测试（种子 `20261011ULL`）在 `test_icp_apf_planner.cpp:204` 确认存在；`Test #27` 当前 main 全绿；报告时 `38151381892` 的 lint 失败经核对为 pre-existing 格式问题（下条），已由 `69ecc1e` 修为注释上移（diff 2 增 1 删、零语义），此后主干持续 success，不构成差距。D-008 平局语义不再复议。
+- **#61（skidpad 圆路径）：通过关闭**（验收 comment `6125382685`）。七条字面全满足；两处有据偏离予以接受：① 半圆紧容差/共线 invalid 预期与原算法矛盾——本轮核对移植逐字等价（均值/矩/矩阵/特征筛选全同，仅字段改名），偏差属原算法固有，改算法会改变实车行为且超范围；且验收条文只对单位圆/偏心圆要求容差、对退化分支只要求走通不崩溃，字面均满足。② 守卫强于建议（含 NaN + isfinite），对合法配置零行为差。遗留（有限极大比值上溢/部分弧精度/双拟合冗余）均需行为决策，未另立 Issue，有需要时再议。
+- **CI 事件：10-11 起主干 lint 门变红 → 已修复 → 三连绿**。根因：#60 合入的 `test_centerline_core.cpp:128` 行尾注释使 clang-format 本机 21.1.8 与 CI apt 18.x 产生互斥换行要求（Executor 用 18.1.8/21.1.8 双二进制复现并验证，均有证据）。影响：`39a40a6` 上 push ×2 + schedule ×1 + `cb54e23`/`7e5794d` 各 ×1 失败——均为同一 lint 单点，无其他失败。修复 `69ecc1e`（注释上移，零语义）后 `4d795d9`/`8c7db61`/`9cbda10` 三连 success。**10-11 Nightly（`38176152190`）因此 failure**——Nightly 连绿中断一次，原因同上（单点格式问题，非内容回归）；10-12 Nightly（21–22Z，在修复后主干上跑）预期恢复 success，下一轮入账核对。
+- **新维度扫描（§八转向第一步，Executor 的给 Planner 信号已回应）**：对 `tests/core_standalone` 排除清单逐项评估（只读扫描 + Planner 亲自核对关键文件行号）——
+  - **立项 #62**（line_detector 直线拟合核，rank 1）：`HoughFit/RansacFit/LeastSquaresFit/IsLineGood/PointToLineDistance/ApplyTemporalFilter` + 纯标量 config，近乎纯 std（仅 `HuatCone`/`Point32` Plain struct，无 rclcpp/Eigen/PCL），同包已有 `cone_boundary.h` concept 先例；UB 价值明确（`line_detector.cpp:45` NaN `rho_resolution` → float→int UB，与 #61 同类；负 spread 绕过、时序三分支/回退链零覆盖）。过 4.2 六条门禁，已立为 P3 ready。
+  - **暂缓 Way/delaunay/kdtree 链**（rank 2）：确有未覆盖纯数学与 UB 点（`Way.cpp:179` size<5 时 `std::prev(end,5)`、`Circle.cpp` 共线除零等），但弥散在 ~1000 行且 API 纠缠（Eigen/消息返回/Node 日志），拆分=事实上的接口改造，风险与体量超出 P3 测试 Issue 的承载。记录在此，不立项；若将来外部输入仍无且决定啃它，需先拆成"KDTree+Point/Circle 先行、Way 后行"两步走。
+  - **跳过**：`Node.hpp`（薄封装，零 sanitizer 价值）、encoder（已下沉 core 上的薄适配，无需拆分）、config 参数守卫类（307 处 `declare_parameter`，单点不成 Issue，#61 模式已覆盖其最高价值实例）。
+  - 历史留痕（压缩备查）：#55（mpc-reject-smoke 假失败，`a99b600`）/ #56（PATH 误判，零代码关闭）/ #57（最小展示入口）/ #58（CLAUDE.md 补 demo.sh 一行）均已关闭并各自独立复核。
 
 ## 四、当前 ready 队列（给 Executor 的建议顺序）
 
-1. **#60** skidpad 中心线回退路径：`ComputeCenterline` 几何核下沉为纯 std core 并纳入 sanitizer 门（P3，`ready-for-agent`）
-2. **#61** skidpad 圆路径几何核：`FitCircleTaubin` / `ComputeCircleCenterline` 下沉为纯 std core 并纳入 sanitizer 门（P3，`ready-for-agent`）
+1. **#62** straight_line_planner 直线拟合核下沉为纯 std core 并纳入 sanitizer 门（P3，`ready-for-agent`；Hough/RANSAC/LSQ/时序滤波 + NaN 守卫 + RANSAC 确定性种子）
 
-- 队列 = **2 项**（满足 2–5 要求）。#61 依赖 #60 搬移的 `Point2D` / `CenterlineParams`（避免两份定义），故 #60 在前；两者同文件同模式，#59 的 `git show 467d570` 可作参考。
-- 为何仍只有 2 项：P0–P2 全部阻塞于仓库外输入（实车/台架/bag/ROS1 环境，用户 10-07 确认暂无到位）；软件侧过 4.2 门禁的候选即 skidpad 剩余两块几何核（ADR 候选清单里 velocity_profiler / safety_monitor 看门狗已完成，#59 落地 lidar_cluster，本轮到 skidpad）。**#60/#61 落地后，ADR 下沉候选清单即基本清空**——下一轮若外部输入仍未到位，需按 §八 转向（新维度扫描或问用户时间表），不得再造同类 Issue 灌水。
-- **#59 收尾指令（重要）**：#59 代码已合入且 Planner 已六标准复核通过，但因 Executor 轮次异常收尾，`in-review` 标签未转移、执行报告未留。**下一棒 Executor 请优先补收尾**：补执行报告 comment（契约 1.6 模板）、转移 `in-progress → in-review`、删除过期 LOCK、提交 `.agent/` 状态变更（`chore(agent):`，勿带入外部 `M AGENTS.md`）。证据已由 Planner 于 #59 comment 备好，无需重新验证。若下一棒判断无现场可恢复而走"放弃"路径，也请在 Issue 留一句说明。**代码本身无需再动。**
+- 队列 = **1 项**（低于 2–5 数字目标，系有意为之：扫描仅此一项过门禁，"不得灌水"优先于数字；Way 链暂缓理由见 §三）。
+- #62 与 #59–#61 同文件不同包、同模式（`git show 7e8c07f --stat` 与 `test_circle_centerline_core.cpp` 可作参考；`cone_boundary.h` 是同包 concept 先例）。
 - **#20 优先级豁免（长期约定）**：#20 为路线图伞形跟踪 issue（无执行体、随 S0–S3 存活），刻意不设 priority 标签，避免被饥饿规则误关；后续 Planning 不必再纠。
 
 ## 五、已完成（软件侧摘要）
@@ -60,15 +54,17 @@
 - **#56**（本机 ccache/mold 环境缺口，实为 PATH 误判）：零代码变更，10-07 验收 CLOSED。
 - **#57**（最小展示入口）：`c79b71d` / merge `97de15d`（README.md +28 / scripts/demo.sh +222），本机两臂 + 失败演练 A/B + push CI + 10-08 Nightly 全绿，10-09 验收 CLOSED。
 - **#58**（CLAUDE.md 冒烟清单补 demo.sh 一行）：`0f87d25` / merge `6b5fc27`，四标准独立复核 + lint rc=0 + CI 双 success，10-09T14:51Z 验收 CLOSED。
-- **#59**（lidar_cluster 评分几何核下沉）：`467d570` / merge `04981c5`，Planner 六标准独立复核全过、零差距；**因 Executor 轮次异常收尾，未关闭，等下一棒补 `in-review` 转移**（§三/§四）。
+- **#59**（lidar_cluster 评分几何核下沉）：`467d570` / merge `04981c5`，六标准独立复核 + 执行报告 + 本轮确认代码零再动，10-12 验收 CLOSED。
+- **#60**（skidpad 中点回退路径下沉）：`4551602` / merge `cb54e23`（差分种子 `20261011ULL`）+ 零语义格式修复 `69ecc1e`，10-12 验收 CLOSED。
+- **#61**（skidpad 圆路径下沉 + 参数守卫）：`7e8c07f` / merge `7e5794d`（13 用例，NaN-safe + isfinite 守卫），10-12 验收 CLOSED。
 
 ## 六、CI 状态（本轮核实）
 
-- push CI（main `8b179ae`，最新提交）：`38039597976` success；上轮 `38038239547`（`8c6fd5b`）`--failed` 重跑 success 保持绿。
-- **三种失败模式与应对认知维持有效**：① 真污染（新引入失败需排查定位）；② 端点未收敛（`--no-daemon` / 发现收敛家族）；③ ros2-apt-source 404（环境准备阶段间歇性 curl 404，`gh run rerun <id> --failed` 即可）。
-- push CI / Schedule 历史（近 10 次）：`38086098600`（10-10 Nightly, success）→ `38039597976`（chore plan `8b179ae`, success）→ `38038239547`（`8c6fd5b`, 重跑 success）→ `37997599751`（10-09 Nightly, success）→ `37955949456`（#59 merge `04981c5`, success）→ `37947921737`（chore plan-1455Z）→ `37946760540`（chore exec-1446Z）→ `37942367376` → `37940137342`（#58 merge）→ `37934195755`。全 success，主干持续全绿。
-- Nightly：**10-10 `38086098600` success（21:02Z）——本轮入账**；10-09 `37997599751` success（22:08Z）；10-08 `37855491072` success（22:45Z）；10-07 `37696935383` success。连续 4 晚全绿。
-- 结论：主干与 Nightly 持续保持全绿。当前无任何失败需要介入。
+- push CI（main `9cbda10`，最新提交）：`38244570254` success；`38243907339`（`8c7db61`，.agent-only）success；`38241684733`（`4d795d9`，#61+格式修复）success。三连绿，主干健康。
+- **三种失败模式与应对认知维持有效**（§三事件属"真污染"中的最轻一级：单点格式问题，已修；另两种模式本轮未触发）：① 真污染（新引入失败需排查定位）；② 端点未收敛（`--no-daemon` / 发现收敛家族）；③ ros2-apt-source 404（环境准备阶段间歇性 curl 404，`gh run rerun <id> --failed` 即可）。
+- push CI 近况：`38244570254`（`9cbda10` chore, success）→ `38243907339`（`8c7db61` chore, success）→ `38241684733`（`4d795d9` #61+格式修复, success）→ `38241256078`（`7e5794d`, failure，唯一原因 #60 遗留格式问题）→ `38151457809`（`39a40a6`, failure，同因）。
+- Nightly：10-11 `38176152190` failure（同因，非内容回归，连绿中断一次）；10-10 `38086098600` success；10-09 `37997599751` success。**10-12 Nightly（21–22Z，修复后主干）待入账**，下一轮核对。
+- 结论：主干已恢复全绿；10-11 Nightly 的 failure 有明确单点根因并已修复，无需介入。
 
 ## 七、已知阻塞与原因（均有证据）
 
@@ -83,12 +79,12 @@
 | #24（P1, blocked） | 依赖 #23 + ROS1 环境 | #24 依赖段 |
 | #37（P3, needs-triage + blocked） | 需 #15 实车/台架标定完成后翻转 `use_arbiter` 默认 | #37 body 与 10-05 三角定位评论（"标定证据到位前不翻转默认"） |
 
-本轮复查：#15–#19 最后评论均为 10-02「软件侧收口审计」、#37 为 10-05 三角定位评论，**阻塞项均无新进展**，维持原判。#25/#26/#27（needs-info）待 #17①② / #18 证据，D-007-B 已生效。
+本轮复查：被阻塞 8 项的 `updatedAt` 停在 10-05/10-09（`gh` 实测，无新评论无状态变化），**阻塞项均无新进展**，维持原判。#25/#26/#27（needs-info）待 #17①② / #18 证据，D-007-B 已生效。
 
 ## 八、下一阶段（待输入，非当前阻断）
 
-- #59 收尾（下一棒 Executor 补 label/报告/LOCK/.agent 提交，代码不动）→ Planner 下一轮按 `in-review` 正常验收关闭。
-- #60 → #61 交付（纯测试增强 + 一处 UB 守卫）。**两者落地后 ADR 下沉候选清单基本清空**，届时若外部输入仍未到位：① 换维度扫描（如 colcon 侧未进 sanitizer 的其他纯 std 数学、config 参数校验类守卫）；② 仍无合格候选 → PLAN 显式记录"已穷举扫描，等外部输入"，并就外部输入时间表问用户一次（D-004 相关，非红线）。不得再造同类下沉 Issue 灌水。
+- #62 交付（直线拟合核下沉 + NaN 守卫 + RANSAC 确定性种子；生产默认随机性不得改变，Issue 已写明）。
+- **#62 落地后，软件侧可执行池即见底**（Way 链暂缓、灌水禁止）：届时 PLAN 显式记录"已穷举扫描，等外部输入"， routine 转为空转健康轮；外部输入（实车/台架/bag/ROS1 环境）时间表问题本轮已问用户一次（见轮末汇报 Q1），答复前不再重复问。
 - S3 性能评估（#19 B）：需实车/数据输入。
 - 展示工作：D-007(B) 的最小展示（#57）与文档同步（#58）已交付关闭；完整展示（#26：视频/bag/release）与博客（#25）待 #17①② / #18 证据，到位后返工更新 demo 产物（该返工风险已由用户接受）。
 
@@ -97,14 +93,16 @@
 - 调参腿已收口（docs §11.3）：无新维度动机且未按新 round 预注册前，不再扫描；**不冻结参数**（D-003）。
 - 不从运动学模型推出轮胎极限结论（#17 边界）。
 - 不用仿真证据关闭实车依赖 issue（D-004）。
-- **ADR 下沉候选现状（2026-10-10 更新）**：velocity_profiler 梯形规划、safety_monitor 看门狗计时——**已完成**（分别由 #24 / #50 落地进 core_standalone）；lidar_cluster 几何核——**已完成**（#59，代码已合入，待收尾）；skidpad `IcpApfPlanner::ComputeCenterline`（中点路径）——已立 **#60**；skidpad `FitCircleTaubin` / `ComputeCircleCenterline`（圆路径）——已立 **#61**。**ADR 正文里"后续候选"清单应随 #60/#61 落地再同步更新一次**（由 Executor 在做 #60/#61 时顺带改，与 #59 同一模式）。
-- **KD-tree 最近邻替换暴力扫描的平局语义（2026-10-10 定，D-008）**：新实现用严格 `<` 取最小下标，确定性且跨 PCL 版本可复现；旧实现在精确平局时选哪个等距点由 `KdTreeFLANN` 内部树结构决定，属未文档化库行为，**不作为契约保留**。真实传感器坐标下精确平局概率为 0；差分测试的随机输入必须用连续值（整数网格会测到旧实现的未定义行为）。
-- **"统一发现收敛等待策略"（2026-10-08 评估后不立项，维持）**：`qos_contract_check.sh` 端点断言为单次查询 + `sleep 3`，与 #55 同属"发现收敛"家族；但除已修的 `mpc-reject-smoke` 外，其余运行时门禁的节点等待均有重试环（逐脚本核过），且 qos-contract 历史唯一失败系 `--no-daemon` 回归（已由 `03a3cfe` 修复）——**无假红证据，不立项、不灌水**。触发条件：任一运行时门禁再现"空表 / pub-sub=0"类假红，则立项统一退避等待。
+- **ADR 下沉候选现状（2026-10-12 更新）**：velocity_profiler 梯形规划（#24）、safety_monitor 看门狗（#50）、lidar_cluster 评分（#59）、skidpad 回退中心线（#60）、skidpad 圆路径（#61）——**全部完成**；straight_line_planner `ClusterCones` 已由 `cone_boundary.h` 下沉（test_cone_boundary 覆盖）；**直线拟合核（Hough/RANSAC/LSQ/时序）——已立 #62（本轮扫描唯一过门禁项）**；Way/delaunay/kdtree 链——**暂缓**（体量 ~1000 行 + API 纠缠，拆分即接口改造，超 P3 测试 Issue 承载；将来啃则 KDTree+Point/Circle 先行、Way 后行）。**ADR 正文的"后续候选"清单待 #62 落地后再同步一次**（Executor 顺带改，与 #59–#61 同一模式）。
+- **KD-tree 最近邻替换暴力扫描的平局语义（2026-10-10 定，D-008，#60 已落实）**：不再复议。
+- **"统一发现收敛等待策略"（2026-10-08 评估后不立项，维持）**：触发条件不变（任一运行时门禁再现"空表 / pub-sub=0"类假红则立项）。
+- **clang-format 18（CI）/21（本机）skew（2026-10-12 观察，非决策）**：全树双版本扫过，仅 #60 一处分歧并已修复；若后续高频再现，再评估 pin CI 大版本（属 CI 流程变更，需用户决定，本轮不动 ci.yml、不提问）。
+- **config 参数守卫类（2026-10-12 扫描结论，不立项）**：307 处 `declare_parameter`，#61 模式已覆盖其最高价值实例（UB 类）；其余多为范围/类型校验，无 sanitizer 可证伪性，不值得单独立项。
 
 ## 十、Decision Gate 状态与给 Executor 的指令
 
-- **当前无阻断性 Decision Gate，无待用户决策项；ready 队列 2 项（#60 P3、#61 P3，均为测试增强 + 一处 UB 守卫）。**
-- 下一棒 Executor 建议顺序：**先补 #59 收尾**（label/报告/LOCK/.agent 提交，代码不动，证据 Planner 已备好）→ **#60** → **#61**。#59 的 in-progress 标签在下一棒转移前，请勿新开分支动它的代码（现场已无未完成代码，收尾是纯流程动作）。
-- Nightly 10-10 已入账（`38086098600`，success）；10-11 Nightly 21:xxZ 将产生，下一棒若在其后看一眼即可。
+- **当前无阻断性 Decision Gate；待用户决策 1 项（外部输入时间表 Q1，见轮末汇报，不阻断 #62）。**
+- 下一棒 Executor 建议顺序：**#62**（单项队列；RANSAC 种子方案选风险最小者并记录；生产默认随机性不得改变；ADR 正文后续候选清单顺带同步）。
+- 10-12 Nightly 21–22Z 将产生（修复后主干首个 Nightly），下一棒若在其后看一眼入账即可。
 - 展示范围（#25/#26/#27）：D-007(B) 已生效；#26 仍为完整展示父跟踪（needs-info）。
-- Executor 未在运行（LOCK 过期 >47 小时）；外部 `M AGENTS.md` 脏改动非本体系产生，任何一棒都不碰（只读记录）；`.agent/STATE.md` 的未提交改动属 Executor 上一轮收尾，下一棒提交时只 `git add .agent/`。
+- Executor 未在运行（无 LOCK）；外部 `M AGENTS.md` 脏改动非本体系产生，任何一棒都不碰（只读记录）。
