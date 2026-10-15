@@ -1,28 +1,28 @@
 # TASKS.md — Issue 本地镜像（权威：GitHub Issue；本文件由 Planner 每轮整体重写）
 
-> 维护者：Planning Agent｜最后更新：2026-10-13（`plan-20261013` 轮：Issue 可用，共 **27 open**；本文件首次建立——此前从未存在，以 Issue 实测为准整体重写）
+> 维护者：Planning Agent｜最后更新：2026-10-15（`plan-20261015` 轮：Issue 可用，共 **27 open**，与上轮持平，逐项核对一致后整体重写）
 > 规则：本文件只读镜像，Executor 改状态时先改 Issue 再同步对应行；冲突以 Issue 为准。
-> 说明：`.agent/DIARY/` 从未建立、`TASKS.md` 此前缺失——日报链以 `HANDOFF.md` + `STATE.md` + git log 代行（见 PLAN §三）。
+> 说明：`.agent/DIARY/` 仍未建立、10-14 无 Executor 活动——昨日输入以 `HANDOFF.md` + `STATE.md` + git log 代行（见 PLAN §三）。
 
-## 今日队列（2026-10-13，给 Executor 的建议顺序）
+## 今日队列（2026-10-15，给 Executor 的建议顺序）
 
-1. **#62** straight_line_planner 直线拟合核下沉为纯 std core 并纳入 sanitizer 门（P3，ready-for-agent）——唯一 ready，未动（0 comment），过 4.2 门禁，细节见 PLAN §四。
+1. **#62** straight_line_planner 直线拟合核下沉为纯 std core 并纳入 sanitizer 门（P3，ready-for-agent）——唯一 ready（0 comment，`updatedAt` 停在 2026-10-12T13:39Z，本轮复核无变化），过 4.2 门禁，细节见 PLAN §四。
 
 ## ready（可执行，1）
 
 | Issue | 标题 | 优先级 | 状态确认 |
 |---|---|---|---|
-| #62 | straight_line_planner 直线拟合核：Hough/RANSAC/LSQ/时序滤波下沉为纯 std core 并纳入 sanitizer 门 | P3 | ready-for-agent，2026-10-12T13:39Z 后无变化 |
+| #62 | straight_line_planner 直线拟合核：Hough/RANSAC/LSQ/时序滤波下沉为纯 std core 并纳入 sanitizer 门 | P3 | ready-for-agent，2026-10-12T13:39Z 后无变化（本轮复核） |
 
 ## in-review（待验收，0）
 
-（空——#59/#60/#61 已于 2026-10-12 验收关闭；#62 尚未开工。）
+（空——#59/#60/#61 已于 2026-10-12 验收关闭，无 reopen；#62 尚未开工。）
 
 ## in-progress（0）
 
-（空。）
+（空，本轮 `gh` 实测。）
 
-## 仓库外阻塞（8，无变化，updatedAt 停在 10-05/10-09）
+## 仓库外阻塞（8，无变化，updatedAt 停在 10-05/10-09，本轮复核）
 
 | Issue | 标题 | 阻塞原因 |
 |---|---|---|
@@ -72,5 +72,5 @@
 
 ## 已关闭（近期备查）
 
-- #59 / #60 / #61（2026-10-12 验收关闭，comment `6125381041` / `6125381825` / `6125382685`）。
+- #59 / #60 / #61（2026-10-12 验收关闭，comment `6125381041` / `6125381825` / `6125382685`，本轮复核无 reopen）。
 - #55（假失败）/ #56（PATH 误判零代码关闭）/ #57（最小展示入口）/ #58（CLAUDE.md 补一行）。
