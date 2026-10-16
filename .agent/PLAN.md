@@ -1,7 +1,8 @@
 # PLAN.md — 路线、当前阶段与可执行队列
 
-> 维护者：Planning Agent（时间流接力）｜最后更新：2026-10-15（`plan-20261015` 轮：跨天无 Executor 活动、无 in-review 待验收、Nightly 10-13/10-14 success 入账、`TASKS.md` 按 Issue 实测重写刷新、今日队列仍为 #62 单项）
-> 事实基线：main `2ca0556`（本地领先 origin/main 3 个提交 `c0652e1`/`3208ae4`/`2ca0556`，均为 docs/.agent-only，**已提交未 push**——push 待用户决策，本轮 `.agent/` 提交暂存本地不推送；`git pull --rebase` 因外部 `M AGENTS.md` 未暂存改动而跳过——该文件是外部展开的本地指引（Build/Validate/Runtime/QoS/CMake 等节，内容与现有纪律一致），任何一棒都不碰；无 LOCK（Executor 空闲）；`.agent/DIARY/` 仍缺失，昨日输入以 HANDOFF/STATE/git log/Issue 反推；环境事实见 `.agent/ENV.md`。
+> 维护者：Planning Agent（时间流接力）｜最后更新：2026-10-16（`plan-20261016` 轮：**项目纳入每日循环**、跨天仍无 Executor 活动、无 in-review 待验收、Nightly 10-15 success 入账（连绿第 4 次）、`TASKS.md` 按 Issue 实测重写刷新（27 open 持平）、今日队列仍 #62 单项、**补建 `.agent/DIARY/`**、**把悬空 3 天的 push 决策正式登记为 D-010 pending**）
+> 事实基线：main `33d852f`（**本地领先 origin/main `66a8d26` 共 4 个提交** `c0652e1`/`3208ae4`/`2ca0556`/`33d852f`，均为 docs/.agent-only，**已提交未 push**——该决策自 10-13 悬空至今，本轮已登记为 **D-010 pending**（含默认方案与三日转正规则），见 §十与 DECISIONS.md；`git pull --rebase` 因外部 `M AGENTS.md` 未暂存改动而跳过——该文件是外部展开的本地指引（Build/Validate/Runtime/QoS/CMake 等节，内容与现有纪律一致），任何一棒都不碰、也不代提交；无 LOCK（Executor 空闲）；`.agent/DIARY/` **本轮已补建**（此前从未建立 ⇒ 契约 1.8「日报是 Planner 次日验收唯一输入」的链路一直缺失，现补 README 约定命名与写入者）；环境事实见 `.agent/ENV.md`。
+> ⚠️ **连绿口径精度**：Nightly 10-12/13/14/15 四次 success 的 `head_sha` **全部是 `66a8d26`**（= origin/main），即 CI 验证的是已推送代码，**不含本地未 push 的 4 笔**。这 4 笔为 docs/.agent-only、不携带回归风险，但引用"主干连绿"时不得暗示本地基线已被 CI 验证过。
 
 ## 一、当前阶段
 
@@ -22,10 +23,15 @@
 
 - 目标（S1+S2）：接口/编码/单位/坐标系一致；固定场景可复现且 KPI 能识别失败；选定赛制低速闭环可重复完成，停车/失效/重启行为通过。
 - 完成判据：以各 Issue 验收标准为准；其中依赖实车/台架/硬件的条目**不得以仅仿真证据关闭**（见 D-004）。
-- Issue 台账（本 `gh` 实测，共 **27 open**，与上轮持平）：ready-for-agent 1（#62，0 comment，`updatedAt` 停在 10-12）· in-review 0 · in-progress 0 · 仓库外阻塞 8（#15–#19 / #23 / #24 / #37，`updatedAt` 停在 10-05/10-09，无变化）· 展示待条件 3（#25/#26/#27 needs-info）· ready-for-human 14（#63–#76，用户跟进）· 路线图伞形 1（#20，仅跟踪）。
-- 本轮进展：自 `2ca0556`（plan-20261013）起 git 零新提交、#62 零 comment——10-14 无 Executor 活动（连续第二轮无验收对象）；Nightly 10-13/10-14 success 入账（主干连绿延续）；`TASKS.md` 按 Issue 实测重写刷新（27 项核对一致）；今日队列仍 #62 单项。
+- Issue 台账（本 `gh` 实测，共 **27 open**，与上轮持平）：ready-for-agent 1（#62，0 comment，`updatedAt` 停在 10-12T13:39Z，**已连续 4 天未被领取**）· in-review 0 · in-progress 0 · 仓库外阻塞 8（#15–#19 / #23 / #24 / #37，`updatedAt` 停在 10-05/10-09，无新评论 ⇒ D-009 的"输入到位即返工"触发条件未命中）· 展示待条件 3（#25/#26/#27 needs-info）· ready-for-human 14（#63–#76，用户跟进，均无变化）· 路线图伞形 1（#20，仅跟踪，优先级豁免见 §四）。
+- 本轮进展：自 `33d852f`（plan-20261015）起 git 零新提交、#62 零 comment、27 项 Issue 的 `updatedAt` 无一变动——**10-15→10-16 仍无 Executor 活动**（连续第三轮无验收对象）。Nightly 10-15 success 入账（连绿第 4 次）。本轮三项治理动作：① 补建 `.agent/DIARY/`（修契约 1.8 链路缺失）；② 把悬空 3 天的 push 决策登记为 **D-010 pending**（此前只散落在 PLAN 散文里，无编号/选项/默认项/天数计数，不符 §6.3/§6.4）；③ 项目正式纳入每日循环（用户 10-16 决定"今天跑一次"，不搞自动调度）。
 
 ## 三、验收结论与近期 CI 事件（本轮更新）
+
+- **`plan-20261016` 轮验收结论：无待验收项（连续第三轮）**。证据：`git log 33d852f..HEAD` 为空；`gh` 实测 27 open 的 `updatedAt` 逐项与上轮一致（#62 仍停 `2026-10-12T13:39Z`、0 comment）；in-review 0、in-progress 0；#59/#60/#61 仍 CLOSED 无 reopen。**零产出即零报告义务**，不构成验收缺口，但说明**循环没转起来**：Planner 每天给出 1 项 ready，Executor 连续 4 天没领。本轮已把该事实作为最突出问题写在 §十 给 Executor 的指令里。
+- **`.agent/DIARY/` 本轮补建**（此前从未建立，git 历史无记录）：契约 1.8 规定日报是 Planner 次日验收的**唯一输入**，该链路此前一直靠 HANDOFF/STATE/git log 代行。补 `.agent/DIARY/README.md` 写明命名（`YYYY-MM-DD.md`）、写入者（Executor）、追加不覆写与「更正：<原文> → <更正为>」规则。**Planner 不代写日报内容**（所有权属 Executor）。
+- **Nightly 10-15 success 入账**（`created_at 2026-10-15T20:51Z`，head `66a8d26`）：自 10-12 修复 lint 单点后**连绿 4 次**（10-12 / 10-13 ×2 / 10-14 / 10-15，注：10-13 有两次运行）。⚠️ 口径精度：四次 `head_sha` 全为 `66a8d26` = **origin/main**，即 CI 验证的是已推送代码，**不含本地未 push 的 4 笔 docs/.agent 提交**；引用"主干连绿"时不得暗示本地基线已被 CI 覆盖。
+- **push 决策登记为 D-010 pending（本轮治理修正）**：该决策自 10-13 HANDOFF 起悬空（"用户睡前未定"），10-13/10-15 两轮 PLAN §十 反复写"push 待用户决策"却**从未在 DECISIONS.md 建条目**——无编号、无选项、无默认项、无询问天数，不符 §6.3/§6.4。本轮补齐并按 6.3 起算 pending（第 1 天），默认方案 = **推送**（理由与代价见 D-010）。**在用户答复前仍不推**。
 
 - **跨天间隙（10-13→10-15）验收结论：无待验收项**。自 `2ca0556` 起 git 零新提交；#62 零 comment、`updatedAt` 停在 2026-10-12T13:39Z；`gh` 实测 in-review 0、in-progress 0。#59/#60/#61 仍为 CLOSED，无 reopen、无新评论。连续第二轮无验收对象——属 D-009 前夜的预期内空转（#62 未被领取）。
 - **昨日日报缺失（延续），已用 HANDOFF + STATE + git log + Issue 反推**：`.agent/DIARY/` 仍从未建立；HANDOFF 顶部仍为 `test-perf-20261013` 轮（10-13 后无新 Executor 轮）。反推结论：10-14 无执行活动，无证据断裂（零产出即零报告义务）。
@@ -69,11 +75,11 @@
 
 ## 六、CI 状态（本轮核实）
 
-- push CI（origin/main `66a8d26`）：`38258621269`（push，cancelled——非失败，同 sha Nightly success 反证主干健康，无需介入）；`38257427111`（`a71951d` .agent-only，success）；`38244570254` success；`38243907339` success；`38241684733` success。主干 health：本地 `2ca0556` 领先 origin 3 提交未 push（docs + .agent-only，无 CI 运行；push 后预期一次全量 CI ≈14min，可作 #63 前旧配置基线，但 push 待用户决策，本轮不推）。
+- push CI（origin/main `66a8d26`）：最后一次 push CI 事件为 `38258621269`（cancelled，非失败）→ `38257427111` / `38244570254` / `38243907339` / `38241684733` success。**10-13 起再无新 CI run**——因本地 4 笔提交未 push、origin 无新提交，属预期而非异常。本地基线：`33d852f` 领先 origin/main `66a8d26` **4 个提交**（`c0652e1` docs TEST_PERF + `3208ae4` docs 索引 + `2ca0556` plan-20261013 + `33d852f` plan-20261015），均 docs/.agent-only；push 后预期一次全量 CI ≈14min，可作 #63 落地前**旧配置的最后基线**，但 push 决策现为 **D-010 pending**，用户答复前不推。
 - **三种失败模式与应对认知维持有效**（§三事件属"真污染"中的最轻一级：单点格式问题，已修；另两种模式本轮未触发）：① 真污染（新引入失败需排查定位）；② 端点未收敛（`--no-daemon` / 发现收敛家族）；③ ros2-apt-source 404（环境准备阶段间歇性 curl 404，`gh run rerun <id> --failed` 即可）。
 - push CI 近况：`38244570254`（`9cbda10` chore, success）→ `38243907339`（`8c7db61` chore, success）→ `38241684733`（`4d795d9` #61+格式修复, success）→ `38241256078`（`7e5794d`, failure，唯一原因 #60 遗留格式问题）→ `38151457809`（`39a40a6`, failure，同因）。
-- Nightly：10-14 `38638548262` success；10-13 `38476242083` success；10-12 `38325320159` success（修复后三连绿）；10-11 `38176152190` failure（单点格式问题，非内容回归）；10-10 `38086098600` success；10-09 `37997599751` success。
-- 结论：主干全绿；本地未 push 的 3 提交均为 docs/.agent-only，不携带回归风险。
+- Nightly：**10-15 success 本轮入账（`created_at 2026-10-15T20:51Z`）**；10-14 `38638548262` success；10-13 `38476242083` success（另有 `00:03Z` 一次亦 success）；10-12 `38325320159` success（修复后恢复）；10-11 `38176152190` failure（单点格式问题，非内容回归）；10-10 `38086098600` success；10-09 `37997599751` success。四次连绿的 head **均为 `66a8d26`**（= origin/main，不含本地未 push 提交，见文首口径提示）。注：本轮 `gh api …run_id` 取数渲染为 `null`（同 ENV 记过的 ID 输出陷阱），故新入账以 `created_at` + `head_sha` + `conclusion` 三项组合作为可复核标识，历史 id 保留不删。
+- 结论：**origin 主干全绿**；本地未 push 的 4 提交均为 docs/.agent-only，不携带回归风险，但也**未被 CI 验证过**——真正的风险不是回归，而是**单点丢失**（只存在于这台机器）。这是 D-010 默认方案取"推送"的主因。
 
 ## 七、已知阻塞与原因（均有证据）
 
@@ -110,8 +116,11 @@
 
 ## 十、Decision Gate 状态与给 Executor 的指令
 
-- **当前无阻断性 Decision Gate；无 pending 项（D-009 维持模式生效中，但 #62 未交付前不进入空转）。**
+- **pending 项：D-010（push 决策，本轮登记，第 1 天）**——本地 4 笔 docs/.agent-only 提交要不要推 origin。默认方案 = **推送**（详见 `DECISIONS.md` D-010）。**用户答复前任何一棒都不要 push**；连续 3 天无答复且默认运行无异常则按 §6.3 默认转正。
+- **无阻断性 Decision Gate**；D-009 维持模式生效中，但 **#62 未交付前不进入空转**（维持模式的"每轮只做健康看护"是从 #62 交付之后才起算）。
 - 下一棒 Executor 建议顺序：**#62**（单项队列；RANSAC 种子方案选风险最小者并记录；生产默认随机性不得改变；ADR 正文后续候选清单顺带同步）。
-- 本地领先 origin 3 提交（`c0652e1` docs + `3208ae4` 索引 + `2ca0556` 上轮 plan，push 待用户决策）：Executor 开工前若用户已决定 push，先 `git pull --rebase`（注意外部 `M AGENTS.md` 未暂存，rebase 会失败——仍不碰该文件，记录即可）；若用户未决定，就在本地基线上开工 #62，不以 push 为前置。
+- ⚠️ **本轮最突出的事实是循环没转**：#62 自 10-12 立为 ready 后**连续 4 天零 comment、未被领取**，且 10-14/10-15/10-16 三轮规划均无 Executor 活动。这不是任务问题（#62 过 4.2 门禁、细节完整），而是**执行轮没被发起来**。若下一棒仍是 Planner 而无人跑 Executor，请如实向用户指出"该项目只有规划没有执行"，不要继续用"空转确认"掩盖。
+- 本地领先 origin 4 提交（`c0652e1` docs + `3208ae4` 索引 + `2ca0556` plan-20261013 + `33d852f` plan-20261015）：Executor 开工前若用户已决定 push，先 `git pull --rebase`（注意外部 `M AGENTS.md` 未暂存，rebase 会失败——仍不碰该文件，记录即可）；若用户未决定（当前状态），就在本地基线上开工 #62，**不以 push 为前置**。
 - 展示范围（#25/#26/#27）：D-007(B) 已生效；#26 仍为完整展示父跟踪（needs-info）。
-- Executor 未在运行（无 LOCK）；外部 `M AGENTS.md` 脏改动非本体系产生，任何一棒都不碰（只读记录）。
+- Executor 未在运行（无 LOCK）；外部 `M AGENTS.md` 脏改动非本体系产生，任何一棒都不碰、也不代提交（只读记录）。
+- **日报义务自本轮起生效**：`.agent/DIARY/` 已补建，Executor 每轮收尾须写 `.agent/DIARY/YYYY-MM-DD.md`（一天一条、追加不覆写），这是次日 Planner 验收的唯一输入；漏写会直接打断跨天链路。
