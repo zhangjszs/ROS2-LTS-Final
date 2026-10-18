@@ -1,6 +1,6 @@
 # TASKS.md — Issue 本地镜像（权威：GitHub Issue；本文件由 Planner 每轮整体重写）
 
-> 维护者：Planning Agent｜最后更新：2026-10-18（`plan-20261018` 轮：Issue 可用，共 **27 open**；逐项 `updatedAt` 复核**零变动** ⇒ 10-17→10-18 无 Executor 活动；**#62 正文已按实测更正技术前提**；整体重写刷新）
+> 维护者：Planning Agent｜最后更新：2026-10-18（`plan-20261018` 轮后：Issue 可用，共 **27 open**；逐项 `updatedAt` 复核零变动 ⇒ 10-17→10-18 无 Executor 活动；**#62 正文已按实测更正**；**D-010 已由用户拍板并完成 push**；D-012 确立每日循环节奏；整体重写刷新）
 > 规则：本文件只读镜像，Executor 改状态时先改 Issue 再同步对应行；冲突以 Issue 为准。
 > 说明：`.agent/DIARY/` 已建（10-16，含命名与写入者约定）；本日至检查时无 Executor 轮，故无 `DIARY/YYYY-MM-DD.md`——Executor 下一轮收尾务必写当日日报（次日验收的唯一输入）。
 > ⚠️ **连续第 6 天零执行**：#62 自 2026-10-12 立为 ready 后 0 comment、从未被领取；10-13 起各轮规划均无 Executor 活动。本轮已第三次向用户如实上报"只有规划、没有执行"（见 PLAN §十）。
@@ -87,7 +87,7 @@
 - **`gh` 正常**：本轮 `issue list` / `run list` / `issue view` / `issue comment` / `issue edit` / `pr list` 全部一次通过。
 - 网络经本地代理（`http://127.0.0.1:7890`）可达 `api.github.com`（实测 200）；`git fetch` 直连可用。
 - **外部 `M AGENTS.md` 脏改动仍在**（非本体系产生）：不碰、不代提交；提交 `.agent/` 时只 `git add` 指定文件，严禁 `-a` / `-A`。
-- **`git pull --rebase` 仍因该未暂存改动无法执行**：`git fetch --all --prune` 实测 origin 无新提交（`--left-right --count` = `0 6`），分叉仅在"本地领先"一侧，如实记录即可（不碰该文件）。
-- **本地领先 origin 6 提交未推**（`c0652e1` / `3208ae4` / `2ca0556` / `33d852f` / `f704480` / `1687e2a`；本轮提交后 7 笔）：决策现为 **D-010 pending（第 3 天）**，默认 B = 推送，用户答复前不推。
+- `git fetch --all --prune` 本轮实测 origin 无新提交；push 后本地与 origin 0/0 同步，`git pull --rebase` 虽仍会因外部脏改动报错，但**已无分叉需要 rebase**，不构成阻塞。
+- ✅ **已 push**（2026-10-18 用户亲选 D-010=B 并授权立即执行）：`66a8d26..c2978bd`，7 笔 docs/.agent-only 提交全部进入远端，本地与 origin **0/0 同步**。外部 `M AGENTS.md` 脏改动不再阻塞 rebase（已无落后提交）。
 - **Nightly 六连绿**（10-12 → 10-17，含 10-13 两次），`head_sha` 均为 `66a8d26` = origin/main；10-18 本轮实测（02:19Z）未到调度点，属正常。
 - **gh 评论反引号陷阱**（沿用上轮记录）：`--body` 双引号传反引号会被 shell 吞掉，一律 `--body-file`。
