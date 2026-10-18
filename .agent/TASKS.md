@@ -1,13 +1,14 @@
 # TASKS.md — Issue 本地镜像（权威：GitHub Issue；本文件由 Planner 每轮整体重写）
 
-> 维护者：Planning Agent｜最后更新：2026-10-17（`plan-20261017` 轮：Issue 可用，共 **27 open**；逐项 `updatedAt` 复核**零变动** ⇒ 10-16→10-17 无 Executor 活动；整体重写刷新）
+> 维护者：Planning Agent｜最后更新：2026-10-18（`plan-20261018` 轮：Issue 可用，共 **27 open**；逐项 `updatedAt` 复核**零变动** ⇒ 10-17→10-18 无 Executor 活动；**#62 正文已按实测更正技术前提**；整体重写刷新）
 > 规则：本文件只读镜像，Executor 改状态时先改 Issue 再同步对应行；冲突以 Issue 为准。
 > 说明：`.agent/DIARY/` 已建（10-16，含命名与写入者约定）；本日至检查时无 Executor 轮，故无 `DIARY/YYYY-MM-DD.md`——Executor 下一轮收尾务必写当日日报（次日验收的唯一输入）。
-> ⚠️ **连续第 5 天零执行**：#62 自 2026-10-12 立为 ready 后 0 comment、从未被领取；10-13 起各轮规划均无 Executor 活动。本轮已按要求如实向用户上报"只有规划、没有执行"（见 PLAN §十）。
+> ⚠️ **连续第 6 天零执行**：#62 自 2026-10-12 立为 ready 后 0 comment、从未被领取；10-13 起各轮规划均无 Executor 活动。本轮已第三次向用户如实上报"只有规划、没有执行"（见 PLAN §十）。
+> 🆕 **本轮治理动作**：复核 #62 时发现其背景技术断言失实（详见 PLAN §〇），已更正 Issue 正文 + 留证评论 `issuecomment-6245035826`。#62 仍 ready，但**领取前必读该更正块**。
 
-## 今日队列（2026-10-17，给 Executor 的建议顺序）
+## 今日队列（2026-10-18，给 Executor 的建议顺序）
 
-1. **#62** straight_line_planner 直线拟合核下沉为纯 std core 并纳入 sanitizer 门（P3，ready-for-agent）——唯一 ready。`updatedAt` 停在 2026-10-12T13:39Z、0 comment，**已连续 5 天未被领取**；本轮复核仍过 4.2 门禁，细节见 PLAN §四/§三。
+1. **#62** straight_line_planner 直线拟合核下沉为纯 std core 并纳入 sanitizer 门（P3，ready-for-agent）——唯一 ready。`updatedAt` 停在 2026-10-12T13:39Z、0 comment，**已连续 6 天未被领取**；本轮复核仍过 4.2 门禁，并**更正了其失实的技术前提**（被测 UB 从 `hough_rho_resolution` 改为 `line_detector.cpp:87` 的 `hough_min_inlier_ratio`；所有 Hough 用例须显式 `enable_hough=true`，否则假绿）。
 
 > 队列 = **1 项**，低于 2–5 的常规区间，属有意为之：D-009 维持模式生效中（#62 交付后不再为找活而扫描），且本轮复核无新增过门禁项。**不为填队列制造任务。**
 
@@ -15,11 +16,11 @@
 
 | Issue | 标题                                                                                            | 优先级 | 状态确认                                                     |
 | ----- | ----------------------------------------------------------------------------------------------- | ------ | ------------------------------------------------------------ |
-| #62   | straight_line_planner 直线拟合核：Hough/RANSAC/LSQ/时序滤波下沉为纯 std core 并纳入 sanitizer 门 | P3     | ready-for-agent；2026-10-12T13:39Z 后无变化（本轮 `gh` 复核） |
+| #62   | straight_line_planner 直线拟合核：Hough/RANSAC/LSQ/时序滤波下沉为纯 std core 并纳入 sanitizer 门 | P3     | ready-for-agent；2026-10-12T13:39Z 后无变化（本轮 `gh` 复核）；**正文已于 10-18 更正** |
 
 ## in-review（待验收，0）
 
-（空——#59/#60/#61 保持 CLOSED，无 reopen、无新评论，本轮复核。）
+（空——#59/#60/#61 保持 CLOSED，无 reopen、无新评论，本轮复核 `updatedAt` 均停在 10-12T13:36-37Z。）
 
 ## in-progress（0）
 
@@ -78,13 +79,15 @@
 
 ## 已关闭（近期备查）
 
-- #59 / #60 / #61（2026-10-12 验收关闭；本轮复核仍 CLOSED、无 reopen、无新评论）。
+- #59 / #60 / #61（2026-10-12 验收关闭；本轮复核仍 CLOSED、`updatedAt` 无变动、无 reopen）。
 - #55（假失败）/ #56（PATH 误判零代码关闭）/ #57（最小展示入口）/ #58（CLAUDE.md 补一行）。
 
 ## 环境与流程注意（本轮实测）
 
-- **`gh` 正常**：本轮 `issue list` / `run list` / `issue view` / `pr list` 全部一次通过。
-- 网络间歇抖动：`api.github.com` 偶发 TLS EOF，所有 `gh` 调用须带重试；重试后仍失败才按"环境阻塞"记录，不得静默跳过或当作"无事发生"。
+- **`gh` 正常**：本轮 `issue list` / `run list` / `issue view` / `issue comment` / `issue edit` / `pr list` 全部一次通过。
+- 网络经本地代理（`http://127.0.0.1:7890`）可达 `api.github.com`（实测 200）；`git fetch` 直连可用。
 - **外部 `M AGENTS.md` 脏改动仍在**（非本体系产生）：不碰、不代提交；提交 `.agent/` 时只 `git add` 指定文件，严禁 `-a` / `-A`。
-- **本地领先 origin 5 提交未推**（`c0652e1` / `3208ae4` / `2ca0556` / `33d852f` / `f704480`；本轮提交后 6 笔）：决策现为 **D-010 pending（第 2 天）**，默认 B = 推送，用户答复前不推。
-- `git pull --rebase` 因外部 `M AGENTS.md` 未暂存改动持续无法执行：fetch 实测 origin 无新提交，仅"本地领先"一侧分叉，如实记录即可（不碰该文件）。
+- **`git pull --rebase` 仍因该未暂存改动无法执行**：`git fetch --all --prune` 实测 origin 无新提交（`--left-right --count` = `0 6`），分叉仅在"本地领先"一侧，如实记录即可（不碰该文件）。
+- **本地领先 origin 6 提交未推**（`c0652e1` / `3208ae4` / `2ca0556` / `33d852f` / `f704480` / `1687e2a`；本轮提交后 7 笔）：决策现为 **D-010 pending（第 3 天）**，默认 B = 推送，用户答复前不推。
+- **Nightly 六连绿**（10-12 → 10-17，含 10-13 两次），`head_sha` 均为 `66a8d26` = origin/main；10-18 本轮实测（02:19Z）未到调度点，属正常。
+- **gh 评论反引号陷阱**（沿用上轮记录）：`--body` 双引号传反引号会被 shell 吞掉，一律 `--body-file`。
