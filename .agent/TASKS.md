@@ -88,6 +88,6 @@
 - 网络经本地代理（`http://127.0.0.1:7890`）可达 `api.github.com`（实测 200）；`git fetch` 直连可用。
 - **外部 `M AGENTS.md` 脏改动仍在**（非本体系产生）：不碰、不代提交；提交 `.agent/` 时只 `git add` 指定文件，严禁 `-a` / `-A`。
 - `git fetch --all --prune` 本轮实测 origin 无新提交；push 后本地与 origin 0/0 同步，`git pull --rebase` 虽仍会因外部脏改动报错，但**已无分叉需要 rebase**，不构成阻塞。
-- ✅ **已 push**（2026-10-18 用户亲选 D-010=B 并授权立即执行）：`66a8d26..c2978bd`，7 笔 docs/.agent-only 提交全部进入远端，本地与 origin **0/0 同步**。外部 `M AGENTS.md` 脏改动不再阻塞 rebase（已无落后提交）。
+- ✅ **已 push**（2026-10-18 用户亲选 D-010=B 并授权立即执行）：`66a8d26..c2978bd`，7 笔 docs/.agent-only 提交全部进入远端。本地此前与 origin 0/0 同步；本轮 `.agent/` 提交后再 push 一次即可。外部 `M AGENTS.md` 脏改动不再阻塞 rebase（已无落后提交）。
 - **Nightly 六连绿**（10-12 → 10-17，含 10-13 两次），`head_sha` 均为 `66a8d26` = origin/main；10-18 本轮实测（02:19Z）未到调度点，属正常。
 - **gh 评论反引号陷阱**（沿用上轮记录）：`--body` 双引号传反引号会被 shell 吞掉，一律 `--body-file`。
