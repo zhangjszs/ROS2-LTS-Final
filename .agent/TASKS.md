@@ -1,60 +1,61 @@
 # TASKS.md — Issue 本地镜像（权威：GitHub Issue；本文件由 Planner 每轮整体重写）
 
-> 维护者：Planning Agent｜最后更新：2026-10-19（`plan-20261019` 轮后：**Issue 可用，共 28 open**（新增 #77）；**#23 的 `blocked` 前提经实测判定部分失效 → 拆分：#23 转 `needs-info`、新建 #77 为 P1 `ready-for-agent`**；#62 更正内容已独立实测复现；昨日待入账的 CI/Nightly 已全部收口）
+> 维护者：Planning Agent｜最后更新：2026-10-20（`plan-20261020` 轮后：**#77/#62 验收关闭、#23 关闭；新立 #78/#79/#80；主线切至 S2a 直线加速事件闭环**；共 **28 open**）
 > 规则：本文件只读镜像，Executor 改状态时先改 Issue 再同步对应行；冲突以 Issue 为准。
-> 日报：`.agent/DIARY/` 仍仅 README（无 Executor 轮故无日报，属预期）。Executor 下一轮收尾务必写 `DIARY/YYYY-MM-DD.md`（次日验收的唯一输入）。
-> ⚠️ **连续第 7 天零执行**：#62 自 2026-10-12 立为 ready 后从未被领取；10-13→10-19 各轮均无 Executor 活动。**但本轮队列不再是"只有 1 项旧任务"**——见下行。
-> 🆕 **本轮实质产出**：为 8 项阻塞中的 **P1 #23** 排除了源码对照部分障碍（实测证明其「需 ROS1 环境」前置对本机已满足），拆出 **#77**。**这是 7 天内第一次给队列加入新的可执行 P1。**
+> 日报：`.agent/DIARY/2026-10-19.md` 已由上一执行轮产出（本轮验收已引用）；10-20 尚无 Executor 轮。Executor 收尾务必写 `DIARY/YYYY-MM-DD.md`（一天一条、追加不覆写）。
+> 🆕 **本轮变化**：用户三项决策落定——**D-014 直线加速 / D-015 暂缓复杂定位后端 / D-016 底盘自建**；D-017 明确支持环境（ROS2 Jazzy/lyrical，入口 `scripts/drive_gates.sh`）。#23 关闭，赛制与定位的不确定性消除，队列首次拥有**面向端到端闭环**的 P1 任务。
 
-## 今日队列（2026-10-19，给 Executor 的建议顺序）
+## 今日队列（2026-10-20，给 Executor 的建议顺序）
 
-1. **#77** 列出 ROS1(LTS)→ROS2 功能与接口迁移覆盖清单（源码对照，不含产品决策）（P1，`ready-for-agent`）——**本轮新建**，依赖=无，输入为本机两个固定提交（两侧基线与全部引用路径已实测可达）。纯文档，零 `src/` 变更。
-2. **#62** straight_line_planner 直线拟合核下沉为纯 std core 并纳入 sanitizer 门（P3，`ready-for-agent`）——10-18 更正的技术前提，**本轮已逐条独立实测复现**（`line_detector.cpp:40` 有守卫 / `:87` 无守卫 / `node.cpp:68` 对外暴露 / `hpp:36`+`yaml:22` 默认 false），评论 `issuecomment-6258394574`。领取前必读正文顶部更正块。
+1. **#80** 直线加速完赛判定：跨越 x=75 终点线 + 25 m 缓冲区（x≤100）内停稳 + benchmark JSON 字段与门禁（P1，`ready-for-agent`）——**S2a 唯一阻塞项**，依赖=无；落点 `src/simulation/track_benchmark/`。必须包含**可证伪红/绿对照**（移除制动时门禁必须红），并重生成 `benchmarks/baseline/acceleration.acceleration-75m.v1.json`（现行基线 `stopped=false` 即缺陷证据）。
+2. **#79** `vehicle_state::GeodeticToEnu` 下沉纯 std core + 无 ROS 确定性夹具（P3，`ready-for-agent`）——#24 第 1 条的切片（comment `6273165395`）。现状：私有成员（`vehicle_state_estimator.h:94` / `.cpp:65`），头文件引 rclcpp/common_msgs/tf2，测试仅 4 例守卫用例。要求行为逐位一致（差分用例），不改节点对外接口。
+3. **#78** `hough_min_inlier_ratio` 超大有限值守卫（P3，`ready-for-agent`）——`line_fit_core.hpp:212` 的 `static_cast<int>(std::ceil(...))` 对 `1e300` 触发 UBSan float→int 溢出。**先红后绿**：先复现 `1e+301 is outside the range...` 再修，补 `1e300` 用例。
 
-> 队列 = 2 项，回到 2–5 区间。**不为灌水加项**：#77 来自真实阻塞的拆分，非扫描发明。建议顺序把 P1 #77 置于 P3 #62 之前。
+> 队列 = 3 项，在 2–5 区间。顺序：P1 #80 优先；#79/#78 可穿插批次执行，但 **#80 不得被挤到轮末**。三项均无外部依赖、不触 1.10 红线。
 
-## ready（可执行，0）
+## ready（可执行，3）
+
+| Issue | 标题 | 优先级 | 依赖 / 要点 |
+| --- | --- | --- | --- |
+| #80 | 直线加速完赛判定（终点线 + 缓冲区停车） | P1 | 无；benchmark 基线重生成；可证伪性为硬验收 |
+| #79 | vehicle_state GeodeticToEnu 纯 std 核 + 无 ROS 夹具 | P3 | 无；行为逐位一致；不得改接口契约 |
+| #78 | Hough `hough_min_inlier_ratio` 超大有限值 UB 守卫 | P3 | 无；UBSan 先红后绿；`line_fit_core.hpp:212` |
+
+## in-review（待验收，0）
 
 （空）
-
-## in-review（待验收，2）
-
-| Issue | 标题 | 优先级 | 状态确认 |
-| --- | --- | --- | --- |
-| #77 | 列出 ROS1(LTS)→ROS2 功能与接口迁移覆盖清单（源码对照，不含产品决策） | P1 | `in-review`；815d292 (merge ab1ad6e) @ main 已推送；28 处引用全部抽验通过 (rc=0)；留有完整执行报告 |
-| #62 | straight_line_planner 直线拟合核下沉纯 std core + sanitizer 门 | P3 | `in-review`；8169e86 (merge 3ca7930) @ main 已推送；ASan+UBSan 29 门全绿、colcon 556 tests 全绿；留有完整执行报告 |
 
 ## in-progress（0）
 
 （空）
-## 仓库外阻塞（7，本轮减少 1 项：#23 已拆出）
 
-| Issue | 标题 | 阻塞原因 | 本轮复核 |
+## 仓库外阻塞（7）
+
+| Issue | 标题 | 阻塞原因（D-013 分类） | 本轮复核 |
 | --- | --- | --- | --- |
-| #15 | 共用执行器适配层与车辆标定配置（P1） | VCU 协议资料、台架标定实值 | `updatedAt` 停在 10-05，无新评论 |
-| #16 | 统一任务与安全状态、最终指令仲裁（P1） | 硬件急停链路、实车停车预算 | 同上 |
-| #17 | 可复现仿真场景、可信 KPI 与自动回归（P1） | 模型速度范围实测、感知扰动量化 | 同上 |
-| #19 | Pure Pursuit 低速基线与 MPC 公平对比（P1） | 依赖 #17 扰动场景 | 同上 |
-| #18 | rosbag 数据集与感知质量评估（P2） | 真实 bag | 同上 |
-| #24 | 跨 ROS 版本语义差分回放与故障回归（P1） | **需 ROS1 运行时**（非源码）：验收第 2 条要求"分别运行 ROS1/ROS2 适配层" | 本轮实测：本机 `/opt/ros` 仅 `lyrical`、无 docker ⇒ 运行时阻塞**依然成立**；但第 1 条（无 ROS 合成夹具）与其全部源码依据已本机可达，#77 交付后可提前铺数据 |
-| #37 | 翻转 use_arbiter 默认（P3，needs-triage + blocked） | 需 #15 实车/台架标定 | 停在 10-09，无新评论 |
+| #15 | 共用执行器适配层与车辆标定配置（P1） | **资料缺失**：VCU 协议文档、台架标定实值（D-016 已确认非外部代码缺失） | `updatedAt` 10-19（本轮记录 D-016）；性质澄清，仍不可执行 |
+| #16 | 统一任务与安全状态、最终指令仲裁（P1） | **资料缺失**：硬件急停链路、实车停车预算 | `updatedAt` 10-05，无新评论 |
+| #17 | 可复现仿真场景、可信 KPI 与自动回归（P1） | **资料缺失**：模型速度范围实测、感知扰动量化 | 同上 |
+| #19 | Pure Pursuit 低速基线与 MPC 公平对比（P1） | **资料缺失**：依赖 #17 扰动场景 | 同上 |
+| #18 | rosbag 数据集与感知质量评估（P2） | **资料缺失**：真实 bag | 同上 |
+| #24 | 跨 ROS 版本语义差分回放与故障回归（P1） | **运行时缺失**：验收第 2 条需 ROS1 运行环境（本机无 Noetic、无 docker）；第 1 条已拆给 #79 | `updatedAt` 10-19（拆分记录） |
+| #37 | 翻转 use_arbiter 默认（P3，needs-triage + blocked） | **资料缺失**：需 #15 标定完成 | `updatedAt` 10-09，无新评论 |
 
-> D-009 的返工触发条件本轮**未命中**（6 项 `updatedAt` 无变化）。#24 的阻塞原因已按实测改写为精确表述——原先笼统的"需 ROS1 环境"经核对只成立于"运行时"，不成立于"源码"。
+> D-009 返工触发本轮**未命中**（无外部输入到位）。D-013 复查进度：已覆盖 #23（→决策缺失，已关闭）、#24（运行时缺失）、#15（资料缺失）；**剩余 #16/#17/#18/#19/#37 每轮查 1–2 个**。
 
-## needs-info / 待条件（4，本轮新增 #23）
+## needs-info / 待条件（3）
 
 | Issue | 标题 | 等待 |
 | --- | --- | --- |
-| **#23** | **ROS1→ROS2 功能与接口迁移清单（父单，保留决策部分）** | **用户 3 项决策 + 1 项外部事实**：① 首个端到端赛制选哪个（产品决策）② 定位后端保留/简化/替换/暂缓（架构决策）③ 明确支持环境与已验证入口（需运行时）④ 底盘外部驱动是否存在（仓库外事实）。机械对照部分已拆给 #77。comment `issuecomment-6258394241` |
 | #25 | 技术博客系列（P2） | #17①② / #18 证据 |
 | #26 | 完整项目展示（P2，父跟踪） | 同上 |
 | #27 | 跨仓库路线总入口（P2） | 同上 |
 
-## ready-for-human（14，用户跟进中，无变化）
+## ready-for-human（14，用户跟进，无变化）
 
 #63 CI 路径过滤与并发取消（P2）· #64 `check_cpp20.sh` 参数统一（P2）· #65 closed-loop-fault 六臂并行（P2）· #66 CI job 三段拆分（P2）· #67 `affected_gates.sh`（P3）· #68 ccache 键头文件通配（P3）· #69 DDS 环境性失败区分（P2）· #70 门禁时长预算监控（P3）· #71 core_standalone 覆盖率基线（P3）· #72 Prepare ROS 2 步骤超时（P3）· #73 评分核测试双轨去重（P3）· #74 本地快速反馈文档（P3）· #75 测试编写规范入库（P3）· #76 伞形：12 个仅 colcon 轨测试下沉（P3）
 
-> **本轮更新 #63**：补齐了它立项时缺失的「before」实测基线（comment `issuecomment-6258394941`）——纯 docs/.agent 推送在旧配置下跑满 **842 s**（`39096092650` @ `c2978bd`）与 **693 s**（`39096263035` @ `bf26487`），且 04:09/04:12 相隔 3 分钟连跑两次。实施时可直接把「docs-only 推送 ≤1 min 或跳过」写成可判定验收项。
+> #63 的「before」实测基线仍有效：纯 docs/.agent 推送在旧配置下跑满 842 s / 693 s（comment `issuecomment-6258394941`）。
 
 ## 路线图伞形（1，长期跟踪，无优先级标签系有意豁免）
 
@@ -64,14 +65,17 @@
 
 ## 已关闭（近期备查）
 
-- #59 / #60 / #61（2026-10-12 验收关闭，复核仍 CLOSED）；#55 / #56 / #57 / #58。
+- **#77**（2026-10-20 验收关闭，7/7；`815d292`/merge `ab1ad6e`；comment `6273158492`）
+- **#62**（2026-10-20 验收关闭，9/9；`8169e86`/merge `3ca7930`；comment `6273160633`；残余 UB → #78）
+- **#23**（2026-10-20 决策收口关闭；comment `6273231512`；缺口 → #78/#79/#80/#15/#17/#19）
+- #59 / #60 / #61（2026-10-12）；#55 / #56 / #57 / #58。
 
 ## 环境与流程注意（本轮实测）
 
-- **`gh` 正常**：`issue list/view/create/comment/edit`、`run list/view` 全部通过；账号 `zhangjszs`。`gh` **无** `milestone` 子命令（本体系未使用 milestone，勿再试）。
-- **`gh issue list --json` 不接受 `commentCount` 字段**（会使输出为空）；用 `--json number,updatedAt,labels,title` + 单独 `gh issue view --json comments`。
-- **`gh run view --json jobs` 偶发空输出**：需重试循环（本轮第 1 次失败、第 2 次成功）。
-- 基线：`main` = `bf26487` = `origin/main`（**0/0 同步**，无分叉）。工作区仅外部 `M AGENTS.md`（非本体系产生，不碰、不代提交；提交 `.agent/` 只 `git add` 指定文件，严禁 `-a`/`-A`）。
-- **两个本机 ROS1/ROS2 对照源（本轮新确认的事实，跨轮有效）**：`FSAC/2025` = `zhangjszs/ROS1-LTS-Final`，**非浅克隆**（README 记载有误），175 提交，含 #23/#24 全部 ROS1 引用；`FSAC/2024` = `HUAT-FSAC/ROS1_FIN_VERSION`，**不含** `HUAT_PathLimits.msg`、**无** `vehicle_interface_*` 包 ⇒ 不是 #23/#24 的对照基线。
-- Nightly **七连绿**（10-12/13×2/14/15/16/17/18）；10-18 起 head 为 `bf26487`（**首次覆盖含 `.agent/` 规划记录的新基线**，旧口径限定不再需要）。
-- 10-19 实测时刻 02:25Z：当日 Nightly 未到调度点（约 20:00–22:00Z），属正常，下一轮入账。
+- 基线：`main` = `76c3414` = `origin/main`（**0/0 同步**，无分叉）。工作区仅外部 `M AGENTS.md`（非本体系产生，不碰、不代提交；提交 `.agent/` 只 `git add` 指定文件，严禁 `-a`/`-A`）。
+- 支持环境（D-017）：CI = ROS 2 **Jazzy**，本机 = **lyrical**；验证入口唯一为 `bash scripts/drive_gates.sh`（`QUICK=1` 快速轨）。**ROS1 运行时不在支持范围内**（仅源码对照基线 `FSAC/2025`）。
+- **`gh` 正常**：`issue list/view/create/comment/close`、`run list/view` 全部可用；账号 `zhangjszs`。`gh` **无** `milestone` 子命令（勿再试）。
+- **`gh issue list --json` 不接受 `commentCount` 字段**（输出为空）；用 `--json number,updatedAt,labels,title` + `gh issue view --json comments`。
+- **`gh run view --json jobs` 偶发空输出**：需重试。
+- CI：`76c3414` 的 push CI `39195951665` success；同分支 `ab1ad6e`/`3ca7930` 亦 success。
+- Nightly **七连绿**（10-12/13×2/14/15/16/17/18），最新 `39161165288` @`bf26487` success（784 s）。10-19 的 Nightly 在本轮实测时刻（`2026-10-19T17:33Z`）未到调度点（约 20:00Z），**下一轮入账**。
