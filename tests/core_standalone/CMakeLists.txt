@@ -16,8 +16,8 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 option(CORE_ASAN "Enable AddressSanitizer + UndefinedBehaviorSanitizer" ON)
 if(CORE_ASAN)
-    add_compile_options(-fsanitize=address,undefined -fno-omit-frame-pointer -fno-sanitize-recover=all)
-    add_link_options(-fsanitize=address,undefined)
+    add_compile_options(-fsanitize=address,undefined,float-cast-overflow -fno-omit-frame-pointer -fno-sanitize-recover=all)
+    add_link_options(-fsanitize=address,undefined,float-cast-overflow)
 endif()
 
 find_package(GTest REQUIRED)
@@ -188,6 +188,11 @@ add_core_test(test_centerline_core
 add_core_test(test_circle_centerline_core
     SOURCES
         "${REPO_ROOT}/src/planning/skidpad_planner/test/test_circle_centerline_core.cpp")
+
+# #62：straight_line_planner 直线拟合核（纯 std，header-only）——Hough / RANSAC / LSQ / 时序滤波
+add_core_test(test_line_fit_core
+    SOURCES
+        "${REPO_ROOT}/src/planning/straight_line_planner/test/test_line_fit_core.cpp")
 
 # 排除清单（#40 逐个数过，不靠“碰巧没加”）——这些测试文件本身零 rclcpp，
 # 但传递依赖 ROS 生成消息头或 PCL，无法在“不 source ROS”的入口里编译：

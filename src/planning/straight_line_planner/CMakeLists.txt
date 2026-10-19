@@ -44,6 +44,8 @@ if(BUILD_TESTING)
   target_link_libraries(test_line_detector ${PROJECT_NAME}_core)
   # #22：core 头（cone_boundary.h）为纯 std，测试刻意不链接本包 ROS 库，证明可脱离 ROS 独立编译
   ament_add_gtest(test_cone_boundary test/test_cone_boundary.cpp)
+  # #62：直线拟合核纯 std core（line_fit_core.hpp）测试，双轨注册
+  ament_add_gtest(test_line_fit_core test/test_line_fit_core.cpp)
 endif()
 
 ament_package()
