@@ -55,11 +55,12 @@ ROS 1 基线的算法逻辑与中间件强耦合（catkin 构建、节点内联�
 | `lidar_cluster/scoring_core.hpp` | #59 置信度评分几何核（长宽/尺寸惩罚、手写协方差 PCA 倾斜惩罚、置信度合成，header-only） | `lidar_cluster_scoring.cpp`（仅做 `pcl::PointCloud`→点集转换） | `test_scoring_core` |
 | `skidpad_planner/centerline_core.hpp` | #60 中心线回退路径几何核（暴力最近邻中点配对、从原点串链、去重、lookahead 过滤，header-only） | `icp_apf_planner.cpp`（仅做 `HuatCone` 适配与参数填充） | `test_centerline_core` |
 | `skidpad_planner/centerline_core.hpp` | #61 圆路径几何核（Taubin 代数拟合、圆弧等间距采样、防 +inf 浮点转换参数守卫，header-only） | `icp_apf_planner.cpp`（仅做 `HuatCone` 适配与日志） | `test_circle_centerline_core` |
+| `straight_line_planner/line_fit_core.hpp` | #62 直线拟合核（Hough/RANSAC/LSQ/时序滤波、参数防 UB 守卫、可注入种子，header-only） | `line_detector.cpp`（仅做 `HuatCone` 适配） | `test_line_fit_core` |
 
 ## 仍依赖中间件的模块
 
 - 各 `*_node.cpp` 适配层（参数/QoS/时钟/发布/日志），属设计内边界，不视为残留耦合。
-- 后续候选（各自独立、行为可证等价后再动）：skidpad_planner `ClusterCones`。（velocity_profiler 梯形规划已由 #24、safety_monitor 看门狗已由 #50、lidar_cluster 评分已由 #59、skidpad 回退中心线已由 #60、skidpad 圆路径已由 #61 下沉，见上表。）
+- 后续候选（各自独立、行为可证等价后再动）：skidpad_planner `ClusterCones`。（velocity_profiler 梯形规划已由 #24、safety_monitor 看门狗已由 #50、lidar_cluster 评分已由 #59、skidpad 回退中心线已由 #60、skidpad 圆路径已由 #61、straight_line_planner 直线拟合核已由 #62 下沉，见上表。）
 
 ## 后果与边界
 

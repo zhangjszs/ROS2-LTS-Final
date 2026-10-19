@@ -31,238 +31,29 @@ void LineDetector::ClusterCones(const std::vector<common_msgs::msg::HuatCone>& c
 }
 
 LineParams LineDetector::HoughFit(const std::vector<common_msgs::msg::HuatCone>& cones) {
-    if (cones.size() < 2)
-        return LineParams();
-
-    const double kThetaMinDeg = 60.0;
-    const double kThetaMaxDeg = 120.0;
-    const double kThetaStepDeg = 1.0;
-    const double rho_resolution = std::max(0.05, cfg_.hough_rho_resolution);
-    const double kRhoMin = -10.0;
-    const double kRhoMax = 10.0;
-
-    int theta_bins = static_cast<int>((kThetaMaxDeg - kThetaMinDeg) / kThetaStepDeg) + 1;
-    int rho_bins = static_cast<int>((kRhoMax - kRhoMin) / rho_resolution);
-
-    std::vector<std::vector<int>> accumulator(theta_bins, std::vector<int>(rho_bins, 0));
-
-    for (const auto& c : cones) {
-        double x = c.position_base_link.x;
-        double y = c.position_base_link.y;
-        for (int t = 0; t < theta_bins; ++t) {
-            double theta_deg = kThetaMinDeg + t * kThetaStepDeg;
-            double theta_rad = theta_deg * std::numbers::pi_v<double> / 180.0;
-            double rho = x * std::cos(theta_rad) + y * std::sin(theta_rad);
-            int r = static_cast<int>((rho - kRhoMin) / rho_resolution);
-            if (r >= 0 && r < rho_bins) {
-                ++accumulator[t][r];
-            }
-        }
-    }
-
-    // 3x1 沿 rho 邻域投票累加 -> 容忍锥桶噪声，使用 std::ranges::max_element 配合成员投影寻找投票峰值
-    struct HoughVoteCandidate {
-        int t;
-        int r;
-        int votes;
-    };
-    std::vector<HoughVoteCandidate> candidates;
-    candidates.reserve(static_cast<size_t>(theta_bins) * static_cast<size_t>(std::max(0, rho_bins - 2)));
-    for (int t = 0; t < theta_bins; ++t) {
-        for (int r = 1; r < rho_bins - 1; ++r) {
-            int s = accumulator[t][r - 1] + accumulator[t][r] + accumulator[t][r + 1];
-            candidates.push_back({t, r, s});
-        }
-    }
-
-    if (candidates.empty()) {
-        return LineParams();
-    }
-
-    auto best_cand = std::ranges::max_element(candidates, {}, &HoughVoteCandidate::votes);
-    int best_t = best_cand->t;
-    int best_r = best_cand->r;
-    int best_votes = best_cand->votes;
-
-    int dynamic_min = static_cast<int>(std::ceil(cfg_.hough_min_inlier_ratio * static_cast<double>(cones.size())));
-    int adaptive_thresh = std::max(3, dynamic_min);
-
-    if (best_votes < adaptive_thresh || best_t < 0) {
-        return LineParams();
-    }
-
-    double theta_deg = kThetaMinDeg + best_t * kThetaStepDeg;
-    double theta_rad = theta_deg * std::numbers::pi_v<double> / 180.0;
-    double rho = kRhoMin + best_r * rho_resolution;
-
-    double sin_t = std::sin(theta_rad);
-    double cos_t = std::cos(theta_rad);
-    if (std::abs(sin_t) < 1e-6)
-        return LineParams();
-
-    double slope = -cos_t / sin_t;
-    double intercept = rho / sin_t;
-    if (std::abs(slope) > cfg_.ransac_max_abs_slope) {
-        return LineParams();
-    }
-    return LineParams(slope, intercept);
+    return slp_core::HoughFitCore(std::span<const common_msgs::msg::HuatCone>{cones}, cfg_);
 }
 
 bool LineDetector::IsLineGood(const LineParams& line, const std::vector<common_msgs::msg::HuatCone>& cones,
                               double thresh) {
-    if (!line.valid || cones.empty())
-        return false;
-    auto inliers = std::ranges::count_if(
-        cones, [thresh](double d) { return d < thresh; },
-        [&](const common_msgs::msg::HuatCone& c) {
-            return PointToLineDistance(c.position_base_link, line.slope, line.intercept);
-        });
-    if (inliers < cfg_.ransac_min_inliers)
-        return false;
-    double ratio = static_cast<double>(inliers) / static_cast<double>(cones.size());
-    return ratio >= cfg_.ransac_min_inlier_ratio;
+    return slp_core::IsLineGoodCore(line, std::span<const common_msgs::msg::HuatCone>{cones}, thresh, cfg_);
 }
 
 LineParams LineDetector::RansacFit(const std::vector<common_msgs::msg::HuatCone>& cones) {
-    if (cones.size() < 2)
-        return LineParams();
-
-    static thread_local std::mt19937 gen{std::random_device{}()};
-    std::uniform_int_distribution<size_t> dist(0, cones.size() - 1);
-
-    LineParams best;
-    size_t best_inliers = 0;
-
-    for (int iter = 0; iter < cfg_.ransac_max_iter; ++iter) {
-        size_t i1 = dist(gen);
-        size_t i2 = dist(gen);
-        if (i1 == i2)
-            continue;
-
-        const auto& p1 = cones[i1].position_base_link;
-        const auto& p2 = cones[i2].position_base_link;
-        double dx = p2.x - p1.x;
-        if (std::abs(dx) < cfg_.ransac_min_x_spread)
-            continue;
-
-        double m = (p2.y - p1.y) / dx;
-        if (std::abs(m) > cfg_.ransac_max_abs_slope)
-            continue;
-        double b = p1.y - m * p1.x;
-
-        size_t inliers = static_cast<size_t>(std::ranges::count_if(
-            cones, [this](double d) { return d < cfg_.ransac_inlier_threshold; },
-            [&](const common_msgs::msg::HuatCone& c) { return PointToLineDistance(c.position_base_link, m, b); }));
-        if (inliers > best_inliers) {
-            best_inliers = inliers;
-            best = LineParams(m, b);
-        }
-    }
-
-    if (!best.valid)
-        return LineParams();
-    if (static_cast<int>(best_inliers) < cfg_.ransac_min_inliers)
-        return LineParams();
-
-    // 用最佳内点集做最小二乘精化，比直接返回两点采样直线更准
-    std::vector<common_msgs::msg::HuatCone> inlier_cones;
-    inlier_cones.reserve(best_inliers);
-    std::ranges::copy_if(
-        cones, std::back_inserter(inlier_cones), [this](double d) { return d < cfg_.ransac_inlier_threshold; },
-        [&best](const common_msgs::msg::HuatCone& c) {
-            return PointToLineDistance(c.position_base_link, best.slope, best.intercept);
-        });
-    // 使用 std::ranges::sort 按 x 坐标投影排序，保证最小二乘计算具有确定性的数值稳定性
-    std::ranges::sort(inlier_cones, {}, [](const common_msgs::msg::HuatCone& c) { return c.position_base_link.x; });
-
-    if (static_cast<int>(inlier_cones.size()) >= cfg_.ransac_min_inliers) {
-        LineParams refined = LeastSquaresFit(inlier_cones);
-        if (refined.valid)
-            return refined;
-    }
-    return best;
+    return slp_core::RansacFitCore(std::span<const common_msgs::msg::HuatCone>{cones}, cfg_);
 }
 
 LineParams LineDetector::LeastSquaresFit(const std::vector<common_msgs::msg::HuatCone>& cones) {
-    if (cones.size() < 2)
-        return LineParams();
-
-    double sum_x = 0.0, sum_y = 0.0, sum_xy = 0.0, sum_x2 = 0.0;
-    size_t n = cones.size();
-    for (const auto& c : cones) {
-        double x = c.position_base_link.x;
-        double y = c.position_base_link.y;
-        sum_x += x;
-        sum_y += y;
-        sum_xy += x * y;
-        sum_x2 += x * x;
-    }
-
-    double denom = n * sum_x2 - sum_x * sum_x;
-    if (std::abs(denom) < 1e-9)
-        return LineParams();
-
-    double m = (n * sum_xy - sum_x * sum_y) / denom;
-    double b = (sum_y * sum_x2 - sum_x * sum_xy) / denom;
-    if (std::abs(m) > cfg_.ransac_max_abs_slope)
-        return LineParams();
-    return LineParams(m, b);
+    return slp_core::LeastSquaresFitCore(std::span<const common_msgs::msg::HuatCone>{cones}, cfg_);
 }
 
 double LineDetector::PointToLineDistance(const geometry_msgs::msg::Point32& p, double m, double b) {
-    return std::abs(m * p.x - p.y + b) / std::sqrt(m * m + 1.0);
+    return slp_core::PointToLineDistanceCore(p, m, b);
 }
 
 LineParams LineDetector::ApplyTemporalFilter(const LineParams& current, LineParams& prev, bool& has_prev, int& prev_age,
                                              const char* /*side_name*/) {
-    if (!cfg_.enable_temporal_filter) {
-        if (current.valid) {
-            prev = current;
-            has_prev = true;
-            prev_age = 0;
-        }
-        return current;
-    }
-
-    if (!current.valid) {
-        // 在放弃前继续使用之前的拟合结果几帧
-        if (has_prev && prev_age < cfg_.prev_max_age_frames) {
-            ++prev_age;
-            return prev;
-        }
-        has_prev = false;
-        prev_age = 0;
-        return current;
-    }
-
-    if (!has_prev) {
-        prev = current;
-        has_prev = true;
-        prev_age = 0;
-        return current;
-    }
-
-    double dslope = std::abs(current.slope - prev.slope);
-    double dintercept = std::abs(current.intercept - prev.intercept);
-    if (dslope > cfg_.temporal_filter_jump_threshold || dintercept > cfg_.temporal_filter_intercept_jump) {
-        if (prev_age < cfg_.prev_max_age_frames) {
-            ++prev_age;
-            return prev;
-        }
-        // 连续拒绝次数过多：直接接受新值，避免陷入停滞
-        prev = current;
-        prev_age = 0;
-        return current;
-    }
-
-    double a = cfg_.temporal_filter_alpha;
-    LineParams filtered;
-    filtered.slope = a * current.slope + (1.0 - a) * prev.slope;
-    filtered.intercept = a * current.intercept + (1.0 - a) * prev.intercept;
-    filtered.valid = true;
-    prev = filtered;
-    prev_age = 0;
-    return filtered;
+    return slp_core::ApplyTemporalFilterCore(current, prev, has_prev, prev_age, cfg_);
 }
 
 DetectedBoundaries LineDetector::Detect(const std::vector<common_msgs::msg::HuatCone>& cones) {
