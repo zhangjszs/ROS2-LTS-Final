@@ -13,21 +13,20 @@
 
 > 队列 = 2 项，回到 2–5 区间。**不为灌水加项**：#77 来自真实阻塞的拆分，非扫描发明。建议顺序把 P1 #77 置于 P3 #62 之前。
 
-## ready（可执行，2）
+## ready（可执行，0）
+
+（空）
+
+## in-review（待验收，2）
 
 | Issue | 标题 | 优先级 | 状态确认 |
 | --- | --- | --- | --- |
-| #77 | 列出 ROS1(LTS)→ROS2 功能与接口迁移覆盖清单（源码对照，不含产品决策） | P1 | `ready-for-agent`；2026-10-19 新建，7 条验收标准 + 「明确不包含」已写；两侧基线 sha 与引用路径均实测存在 |
-| #62 | straight_line_planner 直线拟合核下沉纯 std core + sanitizer 门 | P3 | `ready-for-agent`；连续 7 天未被领取；**技术前提已两轮独立实测确认为真** |
-
-## in-review（待验收，0）
-
-（空——#59/#60/#61 保持 CLOSED，无 reopen、无新评论。）
+| #77 | 列出 ROS1(LTS)→ROS2 功能与接口迁移覆盖清单（源码对照，不含产品决策） | P1 | `in-review`；815d292 (merge ab1ad6e) @ main 已推送；28 处引用全部抽验通过 (rc=0)；留有完整执行报告 |
+| #62 | straight_line_planner 直线拟合核下沉纯 std core + sanitizer 门 | P3 | `in-review`；8169e86 (merge 3ca7930) @ main 已推送；ASan+UBSan 29 门全绿、colcon 556 tests 全绿；留有完整执行报告 |
 
 ## in-progress（0）
 
-（空，本轮 `gh` 实测；无 LOCK、无 stash、无本地/远程特性分支，仅 `main`。）
-
+（空）
 ## 仓库外阻塞（7，本轮减少 1 项：#23 已拆出）
 
 | Issue | 标题 | 阻塞原因 | 本轮复核 |
