@@ -1,25 +1,32 @@
 # TASKS.md — Issue 本地镜像（权威：GitHub Issue；本文件由 Planner 每轮整体重写）
 
-> 维护者：Planning Agent｜最后更新：2026-10-20（`plan-20261020` 轮后：**#77/#62 验收关闭、#23 关闭；新立 #78/#79/#80；主线切至 S2a 直线加速事件闭环**；共 **28 open**）
+> 维护者：Planning Agent｜最后更新：2026-10-20（`plan-20261020` 轮后：**#77/#62 验收关闭、#23 关闭；主线切至 S2a 直线加速事件闭环**；随后按用户要求**扩充队列，新增 #81–#85**；共 **33 open**）
 > 规则：本文件只读镜像，Executor 改状态时先改 Issue 再同步对应行；冲突以 Issue 为准。
 > 日报：`.agent/DIARY/2026-10-19.md` 已由上一执行轮产出（本轮验收已引用）；10-20 尚无 Executor 轮。Executor 收尾务必写 `DIARY/YYYY-MM-DD.md`（一天一条、追加不覆写）。
-> 🆕 **本轮变化**：用户三项决策落定——**D-014 直线加速 / D-015 暂缓复杂定位后端 / D-016 底盘自建**；D-017 明确支持环境（ROS2 Jazzy/lyrical，入口 `scripts/drive_gates.sh`）。#23 关闭，赛制与定位的不确定性消除，队列首次拥有**面向端到端闭环**的 P1 任务。
+> 🆕 **本轮变化**：用户三项决策落定——**D-014 直线加速 / D-015 暂缓复杂定位后端 / D-016 底盘自建**；D-017 明确支持环境（ROS2 Jazzy/lyrical，入口 `scripts/drive_gates.sh`）。#23 关闭，赛制与定位的不确定性消除，队列首次拥有**面向端到端闭环**的 P1 任务。随后按用户要求补充立项 **#81–#85**（赛道元数据、ROS 闭环、死参数、参数守卫、迁移文档回填）。
 
 ## 今日队列（2026-10-20，给 Executor 的建议顺序）
 
-1. **#80** 直线加速完赛判定：跨越 x=75 终点线 + 25 m 缓冲区（x≤100）内停稳 + benchmark JSON 字段与门禁（P1，`ready-for-agent`）——**S2a 唯一阻塞项**，依赖=无；落点 `src/simulation/track_benchmark/`。必须包含**可证伪红/绿对照**（移除制动时门禁必须红），并重生成 `benchmarks/baseline/acceleration.acceleration-75m.v1.json`（现行基线 `stopped=false` 即缺陷证据）。
-2. **#79** `vehicle_state::GeodeticToEnu` 下沉纯 std core + 无 ROS 确定性夹具（P3，`ready-for-agent`）——#24 第 1 条的切片（comment `6273165395`）。现状：私有成员（`vehicle_state_estimator.h:94` / `.cpp:65`），头文件引 rclcpp/common_msgs/tf2，测试仅 4 例守卫用例。要求行为逐位一致（差分用例），不改节点对外接口。
-3. **#78** `hough_min_inlier_ratio` 超大有限值守卫（P3，`ready-for-agent`）——`line_fit_core.hpp:212` 的 `static_cast<int>(std::ceil(...))` 对 `1e300` 触发 UBSan float→int 溢出。**先红后绿**：先复现 `1e+301 is outside the range...` 再修，补 `1e300` 用例。
+1. **#81** 赛道元数据补齐：acceleration 的 `finish_x=75` / `runout_end_m=100` 进入 TrackDefinition 与 `tracks.json`（P2，`ready-for-agent`）——**无前置**，是 #80/#82 的共同输入；不改几何、不重录 baseline。
+2. **#80** 直线加速完赛判定：跨越 x=75 终点线 + 25 m 缓冲区（x≤100）内停稳 + benchmark JSON 字段与门禁（P1，`ready-for-agent`）——依赖 #81；落点 `src/simulation/track_benchmark/`。必须包含**可证伪红/绿对照**（移除制动时门禁必须红），并重生成 `benchmarks/baseline/acceleration.acceleration-75m.v1.json`（现行基线 `stopped=false` 即缺陷证据）。依赖说明见 comment `issuecomment-6273468400`。
+3. **#82** ROS 闭环直线加速完赛：过线发布 `finish` 任务事件 → 锁存停 → 25 m 缓冲区内停稳（P2，`ready-for-agent`）——依赖 #81/#80；复用既有 `/system/task_event` 与 `/system/stop` 契约，扩展 `closed_loop_sim_smoke.sh` 并纳入 `drive_gates.sh`，需可证伪开关。
+4. **#79** `vehicle_state::GeodeticToEnu` 下沉纯 std core + 无 ROS 确定性夹具（P3，`ready-for-agent`）——#24 第 1 条的切片（comment `6273165395`）。要求行为逐位一致（差分用例），不改节点对外接口。
+5. **#78** `hough_min_inlier_ratio` 超大有限值守卫（P3，`ready-for-agent`）——`line_fit_core.hpp:212` 的 `static_cast<int>(std::ceil(...))` 对 `1e300` 触发 UBSan float→int 溢出。**先红后绿**：先复现 `1e+301 is outside the range...` 再修，补 `1e300` 用例。
 
-> 队列 = 3 项，在 2–5 区间。顺序：P1 #80 优先；#79/#78 可穿插批次执行，但 **#80 不得被挤到轮末**。三项均无外部依赖、不触 1.10 红线。
+> 队列 = 5 项，在 2–5 区间上限。顺序由依赖决定：#81 → #80 → #82 是 S2a 主链；#79/#78 为并行加固。**#83/#84/#85 已就绪但不在今日队列**（P3 积压：#83 死参数、#84 参数 NaN 守卫、#85 迁移文档回填），待主链消化后由下一轮排入。
 
-## ready（可执行，3）
+## ready（可执行，8）
 
 | Issue | 标题 | 优先级 | 依赖 / 要点 |
 | --- | --- | --- | --- |
-| #80 | 直线加速完赛判定（终点线 + 缓冲区停车） | P1 | 无；benchmark 基线重生成；可证伪性为硬验收 |
+| #81 | 赛道元数据补齐：finish_x / runout_end_m 进入 TrackDefinition 与 tracks.json | P2 | 无前置；#80/#82 的共同输入；不改几何/baseline |
+| #80 | 直线加速完赛判定（终点线 + 缓冲区停车） | P1 | 依赖 #81；benchmark 基线重生成；可证伪性为硬验收 |
+| #82 | ROS 闭环直线加速完赛：finish 事件 → 锁存停 → 缓冲区停稳 | P2 | 依赖 #81/#80；复用既有 task_event/stop 契约 |
 | #79 | vehicle_state GeodeticToEnu 纯 std 核 + 无 ROS 夹具 | P3 | 无；行为逐位一致；不得改接口契约 |
 | #78 | Hough `hough_min_inlier_ratio` 超大有限值 UB 守卫 | P3 | 无；UBSan 先红后绿；`line_fit_core.hpp:212` |
+| #83 | `hough_threshold` 死参数（节点/YAML 暴露但算法未使用） | P3 | 无；实测 0 与 1000 输出逐位相同；方案 A 删除 / B 接线 |
+| #84 | temporal_filter_* 与 kCenterMargin 的 NaN/越界静默失效 | P3 | 无；实测 alpha=NaN 输出 NaN 且 valid=true |
+| #85 | MIGRATION_BASELINE 回填 D-014/15/16 并挂入文档入口 | P3 | 无；仅 docs/；不改变结论边界 |
 
 ## in-review（待验收，0）
 
