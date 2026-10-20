@@ -4,6 +4,7 @@
 
 #include <cmath>
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -49,8 +50,18 @@ struct TrackDefinition {
     double track_width{3.0};
     double total_length{0.0};
 
+    // #81：终点/缓冲区元数据（机读）。完赛判定的消费方（离线 runner、ROS 闭环门禁）
+    // 必须从这里取值，不得再硬编码 75/100，也不得从 RED 锥桶反推终点位置。
+    // 闭合赛道没有「终点线」语义 → 保持空值（hasFinish() 为 false）。
+    std::optional<double> finish_x;      // 终点线 X 坐标 (m)
+    std::optional<double> runout_end_m;  // 终点后停车缓冲区末端 X 坐标 (m)
+
     // 写入报告/回归基线的版本串（单一构造点）。
     [[nodiscard]] std::string versionedId() const { return id + "/" + version; }
+
+    // #81：终点语义是否完整（终点线与缓冲区末端同时存在）。消费者据此决定
+    // 「本赛道能否做直线赛完赛判定」，而不是各自去猜字段是否存在。
+    [[nodiscard]] bool hasFinish() const noexcept { return finish_x.has_value() && runout_end_m.has_value(); }
 };
 
 /**
