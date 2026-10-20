@@ -147,6 +147,13 @@ add_core_test(test_track_generator
         "${REPO_ROOT}/src/simulation/track_benchmark/test/test_track_generator.cpp"
         "${REPO_ROOT}/src/simulation/track_benchmark/src/track_generator.cpp")
 
+# #80：直线赛完赛判据（终点线 / 停车区 / 到达速度上限反推）——header-only 纯 std
+# （track_generator.cpp 同上：用例从赛道元数据取终点位置，不得硬编码）
+add_core_test(test_finish_judge
+    SOURCES
+        "${REPO_ROOT}/src/simulation/track_benchmark/test/test_finish_judge.cpp"
+        "${REPO_ROOT}/src/simulation/track_benchmark/src/track_generator.cpp")
+
 # 安全：停车状态机（锁存/重启语义，纯 std 共用层）
 add_core_test(test_stop_state_machine
     SOURCES

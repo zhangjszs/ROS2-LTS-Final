@@ -317,6 +317,10 @@ std::string KpiEvaluator::GenerateMarkdownReport(const KpiSummary& s) {
     // #39：拒收的不可解释转角指令（只入 markdown，不入 fsac.benchmark.kpi/v1 JSON）。
     ss << std::format("\n> ⚠️ *拒收指令：转角 raw 不在标定量程内共 **{}** 条，未计入转角/KPI 样本。*\n",
                       static_cast<unsigned long long>(s.rejected_steering_cmds));
+    // #80：直线赛完赛判据（越线时刻 / 停车位置 / 是否停稳）；闭合赛道为缺省值。
+    ss << std::format("> 🏁 *完赛判据：越线={}，越线时刻 {:.2f} s，停车位置 {:.2f} m（终点后 {:.2f} m），停稳={}。*\n",
+                      s.finish_crossed ? "是" : "否", s.finish_time_s, s.stop_position_m, s.stop_distance_m,
+                      s.stopped ? "是" : "否");
     ss << "\n> 💡 *提示：本基准数据可直接用于后续 MPC 与 Pure Pursuit 的量化性能对比！*\n";
     return ss.str();
 }
@@ -334,6 +338,11 @@ std::string KpiEvaluator::GenerateJsonReport(const KpiSummary& s) {
     j += "  \"finished\": " + std::string(s.finished ? "true" : "false") + ",\n";
     j += "  \"timed_out\": " + std::string(s.timed_out ? "true" : "false") + ",\n";
     j += "  \"stopped\": " + std::string(s.stopped ? "true" : "false") + ",\n";
+    // #80：直线赛完赛判据（终点线 + 终点后停车缓冲区）。闭合赛道无终点语义 → 恒为缺省值。
+    j += "  \"finish_crossed\": " + std::string(s.finish_crossed ? "true" : "false") + ",\n";
+    j += std::format("  \"finish_time_s\": {:.6},\n", s.finish_time_s);
+    j += std::format("  \"stop_position_m\": {:.6},\n", s.stop_position_m);
+    j += std::format("  \"stop_distance_m\": {:.6},\n", s.stop_distance_m);
     j += "  \"valid_laps\": " + std::to_string(s.valid_laps) + ",\n";
     j += "  \"completed_laps\": " + std::to_string(s.completed_laps) + ",\n";
     j += std::format("  \"best_valid_lap_time_s\": {:.6},\n", s.best_valid_lap_time_s);

@@ -122,6 +122,13 @@ if(BUILD_TESTING)
   target_link_libraries(test_track_generator
     track_benchmark_lib
   )
+  # #80：直线赛完赛判据（终点线 + 终点后停车缓冲区）——判据边界回归
+  ament_add_gtest(test_finish_judge
+    test/test_finish_judge.cpp
+  )
+  target_link_libraries(test_finish_judge
+    track_benchmark_lib
+  )
 endif()
 
 ament_export_include_directories(include)

@@ -77,6 +77,16 @@ struct KpiSummary {
     // 只进 markdown 报告，**故意不进** fsac.benchmark.kpi/v1 的 JSON 字段集：那份 schema
     // 是三条 v1 基线的口径，加字段属于口径变更，必须显式重录基线才能做。
     uint64_t rejected_steering_cmds{0};
+    // #80：直线赛完赛判据（终点线 + 终点后停车缓冲区）。语义：
+    //   finish_crossed  是否越过终点线; finish_time_s 越线时刻（仿真时间 s）;
+    //   stop_position_m 停稳位置（纵向 m，未停稳则 0）; stop_distance_m 从终点线算起的
+    //   停车距离（m，未停稳则 0）。stopped 为上方既有字段，本单起它才真正被置位。
+    // 这四个字段进 fsac.benchmark.kpi/v1 的 JSON 字段集 = 口径变更，故 acceleration 基线
+    // 已按 #80 显式重录；闭合赛道恒为缺省值（无终点语义）。
+    bool finish_crossed{false};
+    double finish_time_s{0.0};
+    double stop_position_m{0.0};
+    double stop_distance_m{0.0};
 };
 
 /**
