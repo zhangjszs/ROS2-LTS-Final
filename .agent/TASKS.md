@@ -2,25 +2,24 @@
 
 > 维护者：Planning Agent｜最后更新：2026-10-20（`plan-20261020` 轮后：**#77/#62 验收关闭、#23 关闭；主线切至 S2a 直线加速事件闭环**；随后按用户要求**扩充队列，新增 #81–#85**；共 **33 open**）
 > 规则：本文件只读镜像，Executor 改状态时先改 Issue 再同步对应行；冲突以 Issue 为准。
-> 日报：`.agent/DIARY/2026-10-19.md` 已由上一执行轮产出（本轮验收已引用）；10-20 尚无 Executor 轮。Executor 收尾务必写 `DIARY/YYYY-MM-DD.md`（一天一条、追加不覆写）。
+> 日报：`.agent/DIARY/2026-10-19.md` 已由上一执行轮产出（本轮验收已引用）；**`.agent/DIARY/2026-10-20.md` 已由本执行轮产出**（#81 + #80 两单）。
 > 🆕 **本轮变化**：用户三项决策落定——**D-014 直线加速 / D-015 暂缓复杂定位后端 / D-016 底盘自建**；D-017 明确支持环境（ROS2 Jazzy/lyrical，入口 `scripts/drive_gates.sh`）。#23 关闭，赛制与定位的不确定性消除，队列首次拥有**面向端到端闭环**的 P1 任务。随后按用户要求补充立项 **#81–#85**（赛道元数据、ROS 闭环、死参数、参数守卫、迁移文档回填）。
-> 🔄 **Executor 轮（2026-10-20）状态更新**：**#81 已完成并转 `in-review`**（提交 `1aae347` / merge `0f48b3a`，已推送 origin/main；报告 comment `6289660599`）。
+> 🔄 **Executor 轮（2026-10-20）状态更新**：**#81 已完成并转 `in-review`**（提交 `1aae347` / merge `0f48b3a`，已推送 origin/main；报告 comment `6289660599`）。**#80 已完成并转 `in-review`**（提交 `3870249` / merge `126cc83`，已推送 origin/main；报告 comment `6290203705`）。
 
 ## 今日队列（2026-10-20，给 Executor 的建议顺序）
 
 1. **#81** ✅ **已完成（转 `in-review`）**：赛道元数据补齐：acceleration 的 `finish_x=75` / `runout_end_m=100` 进入 TrackDefinition 与 `tracks.json`（P2）—— 提交 `1aae347` / merge `0f48b3a`；消费方改用 `track->finish_x` / `track->runout_end_m` / `hasFinish()`，不得新增硬编码。
-2. **#80** 直线加速完赛判定：跨越 x=75 终点线 + 25 m 缓冲区（x≤100）内停稳 + benchmark JSON 字段与门禁（P1，`ready-for-agent`）——依赖 #81（已就位）；落点 `src/simulation/track_benchmark/`。必须包含**可证伪红/绿对照**（移除制动时门禁必须红），并重生成 `benchmarks/baseline/acceleration.acceleration-75m.v1.json`（现行基线 `stopped=false` 即缺陷证据）。依赖说明见 comment `issuecomment-6273468400`。
+2. **#80** ✅ **已完成（转 `in-review`）**：直线加速完赛判定：跨越 x=75 终点线 + 25 m 缓冲区（x≤100）内停稳 + benchmark JSON 字段与门禁（P1）——提交 `3870249` / merge `126cc83`；新增纯 std 判据核 `finish_judge.hpp`（到达速度上限反推 + 越线/停稳状态机）+ 11 例单测 + 门禁第 9 节（JSON 字段断言 + 指令时间线断言 + `--no-post-finish-braking` 可证伪负样本）；重录 `acceleration` 基线（`stopped` false→true）。skidpad/trackdrive 基线文件未改（输出仅多 4 个缺省字段，测量值逐位未变）。⚠ 触及 D-003 调参冻结（acceleration 口径变化，待 Planner 判定是否重声明轮次），详见 comment `6290203705`。
 3. **#82** ROS 闭环直线加速完赛：过线发布 `finish` 任务事件 → 锁存停 → 25 m 缓冲区内停稳（P2，`ready-for-agent`）——依赖 #81/#80；复用既有 `/system/task_event` 与 `/system/stop` 契约，扩展 `closed_loop_sim_smoke.sh` 并纳入 `drive_gates.sh`，需可证伪开关。
 4. **#79** `vehicle_state::GeodeticToEnu` 下沉纯 std core + 无 ROS 确定性夹具（P3，`ready-for-agent`）——#24 第 1 条的切片（comment `6273165395`）。要求行为逐位一致（差分用例），不改节点对外接口。
 5. **#78** `hough_min_inlier_ratio` 超大有限值守卫（P3，`ready-for-agent`）——`line_fit_core.hpp:212` 的 `static_cast<int>(std::ceil(...))` 对 `1e300` 触发 UBSan float→int 溢出。**先红后绿**：先复现 `1e+301 is outside the range...` 再修，补 `1e300` 用例。
 
 > 队列 = 5 项，在 2–5 区间上限。顺序由依赖决定：#81 → #80 → #82 是 S2a 主链；#79/#78 为并行加固。**#83/#84/#85 已就绪但不在今日队列**（P3 积压：#83 死参数、#84 参数 NaN 守卫、#85 迁移文档回填），待主链消化后由下一轮排入。
 
-## ready（可执行，7）
+## ready（可执行，6）
 
 | Issue | 标题 | 优先级 | 依赖 / 要点 |
 | --- | --- | --- | --- |
-| #80 | 直线加速完赛判定（终点线 + 缓冲区停车） | P1 | 依赖 #81（已就位）；benchmark 基线重生成；可证伪性为硬验收 |
 | #82 | ROS 闭环直线加速完赛：finish 事件 → 锁存停 → 缓冲区停稳 | P2 | 依赖 #81/#80；复用既有 task_event/stop 契约 |
 | #79 | vehicle_state GeodeticToEnu 纯 std 核 + 无 ROS 夹具 | P3 | 无；行为逐位一致；不得改接口契约 |
 | #78 | Hough `hough_min_inlier_ratio` 超大有限值 UB 守卫 | P3 | 无；UBSan 先红后绿；`line_fit_core.hpp:212` |
@@ -28,15 +27,16 @@
 | #84 | temporal_filter_* 与 kCenterMargin 的 NaN/越界静默失效 | P3 | 无；实测 alpha=NaN 输出 NaN 且 valid=true |
 | #85 | MIGRATION_BASELINE 回填 D-014/15/16 并挂入文档入口 | P3 | 无；仅 docs/；不改变结论边界 |
 
-## in-review（待验收，1）
+## in-review（待验收，2）
 
 | Issue | 标题 | 提交 | 报告 |
 | --- | --- | --- | --- |
 | #81 | 赛道元数据补齐：finish_x / runout_end_m 进入 TrackDefinition 与 tracks.json | `1aae347` / merge `0f48b3a` | comment `6289660599` |
+| #80 | 直线加速完赛判定（终点线 + 终点后缓冲区停稳 + benchmark 门禁） | `3870249` / merge `126cc83` | comment `6290203705` |
 
 ## in-progress（0）
 
-（空）
+无（本轮 #80 已完成并转 `in-review`）。
 
 ## 仓库外阻塞（7）
 
@@ -81,10 +81,10 @@
 
 ## 环境与流程注意（本轮实测）
 
-- 基线：`main` = `76c3414` = `origin/main`（**0/0 同步**，无分叉）。工作区仅外部 `M AGENTS.md`（非本体系产生，不碰、不代提交；提交 `.agent/` 只 `git add` 指定文件，严禁 `-a`/`-A`）。
+- 基线：`main` = `126cc83`（#80 merge）= `origin/main`（**0/0 同步**，无分叉）。工作区仅外部 `M AGENTS.md`（非本体系产生，不碰、不代提交；提交 `.agent/` 只 `git add` 指定文件，严禁 `-a`/`-A`）。**该外部改动全程未碰**：diff 指纹 `e3f516afc0ff87182cf499e3b6cdbfdb` 前后一致。
 - 支持环境（D-017）：CI = ROS 2 **Jazzy**，本机 = **lyrical**；验证入口唯一为 `bash scripts/drive_gates.sh`（`QUICK=1` 快速轨）。**ROS1 运行时不在支持范围内**（仅源码对照基线 `FSAC/2025`）。
 - **`gh` 正常**：`issue list/view/create/comment/close`、`run list/view` 全部可用；账号 `zhangjszs`。`gh` **无** `milestone` 子命令（勿再试）。
 - **`gh issue list --json` 不接受 `commentCount` 字段**（输出为空）；用 `--json number,updatedAt,labels,title` + `gh issue view --json comments`。
 - **`gh run view --json jobs` 偶发空输出**：需重试。
-- CI：`76c3414` 的 push CI `39195951665` success；同分支 `ab1ad6e`/`3ca7930` 亦 success。
-- Nightly **七连绿**（10-12/13×2/14/15/16/17/18），最新 `39161165288` @`bf26487` success（784 s）。10-19 的 Nightly 在本轮实测时刻（`2026-10-19T17:33Z`）未到调度点（约 20:00Z），**下一轮入账**。
+- CI：`0f48b3a` 的 push CI `39413891086` success；**#80 merge `126cc83` 的 CI `39416500750` 本轮实测仍 `in_progress`**（结论待 Planner 复核，run id 已写入 #80 执行报告）。
+- Nightly **八连绿**（10-12/13×2/14/15/16/17/18/19），最新 `39331301871` @`b27fc64` success（10-19 调度点已过，本轮入账）。
