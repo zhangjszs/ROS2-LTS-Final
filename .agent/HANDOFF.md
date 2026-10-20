@@ -36,9 +36,9 @@ exec-20261020 的**会话 3**（跨午夜至 10-21T00:05 收尾）。本轮只�
 | `colcon build/test --packages-select track_benchmark` + `test-result` | **0** | `586 tests, 0 errors, 0 failures, 0 skipped` |
 | `bash scripts/lint_cpp.sh` / `bash scripts/lint_shell.sh` | **0** / **0** | clang-format 0 violations（新文件曾违规，`clang-format -i` 后复跑为 0）；`bash -n 16 shell scripts clean`；无 `--no-daemon` 断言查询 |
 | `git log --name-only 90dd749..40673b0 \| grep -E "^(config\|launch\|benchmarks)/\|interface_contract\|\.msg$"` | 1（无命中） | 受限目录与契约文件零改动；合计 5 文件 +556/−1 |
-| CI `39441369149` @ `e5f9998` | — | **success** |
+| CI `39441369149` @ `e5f9998` / `39453577195` @ `40673b0` | — | **均 success**（#82 代码提交 CI 全绿） |
 
-**未执行**：`shellcheck`（本机未装，advisory 层，CI 已装）。CI `39453577195` @ `40673b0` 收尾时仍 `in_progress`，**请 Planner 复核**。
+**未执行**：`shellcheck`（本机未装，advisory 层，CI 已装）。CI **已全部复核**：#82 的 `e5f9998`（`39441369149`）与 `40673b0`（`39453577195`）**均 success**，本轮无因本次变更导致的 CI 失败需修复。
 
 ## 风险与注意事项
 
@@ -67,5 +67,5 @@ exec-20261020 的**会话 3**（跨午夜至 10-21T00:05 收尾）。本轮只�
   1. **是否把 daemon 显式预热回填到其余 5 个 runtime 脚本**（我的默认方案：不回填，合并进 #69 定级）。
   2. **D-003 调参冻结**（沿用前两轮）：#80 改变了 acceleration 赛道口径；本单又多一处"脚本传 `max_velocity`"。是否重新声明调参轮次 + 重录 `acceleration_v1` 基线？
 - **请优先复核 #82 的更正性质**：上一轮我给了 Planner 一份"环境阻塞"报告并附建议拆 #82a/#82b。那份报告的诊断和结论都**是错的**。如果 Planner 昨天已经据此调整了路线图（例如把多节点门禁判为长期不可用），需要回滚该判断——本机 runtime 门禁**完全可用**。
-- **五单已全部转 `in-review`**，报告八字段齐全，可逐条验收；CI 仅 `39453577195` 待复核（其余全 success）。
+- **五单已全部转 `in-review`**，报告八字段齐全，可逐条验收；**#82 的代码提交 CI 已经 Executor 复核为全 success**（`e5f9998`/`40673b0`），无需再查。
 - **无 `auto-discovered` 新问题上报**（本轮的"误判"属自身方法缺陷，已按更正流程记录，不构成仓库缺陷）。

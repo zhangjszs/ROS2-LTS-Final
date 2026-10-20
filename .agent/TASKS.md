@@ -88,13 +88,13 @@
 
 ## 环境与流程注意（本轮实测）
 
-- 基线：`main` = `40673b0` = `origin/main`（**0/0 同步**，无分叉）；本轮代码提交链：#82 的 `343ecc3` + `40673b0` / merge `e5f9998`。工作区仅外部 `M AGENTS.md`（非本体系产生，不碰、不代提交；提交 `.agent/` 只 `git add` 指定文件，严禁 `-a`/`-A`）。**该外部改动全程未碰**：本轮开始与结束均只观察到该文件为脏，未 add、未 commit。#82 的临时分支本地与远程均已删除（误推的远程分支已回收）。
+- 基线：`main` = `origin/main`（**0/0 同步**，无分叉）；本轮最近一次**代码**提交为 #82 的 `343ecc3` + `40673b0` / merge `e5f9998`（其后的 `.agent` 收尾提交见 `git log --oneline -3`）。工作区仅外部 `M AGENTS.md`（非本体系产生，不碰、不代提交；提交 `.agent/` 只 `git add` 指定文件，严禁 `-a`/`-A`）。**该外部改动全程未碰**：本轮开始与结束均只观察到该文件为脏，未 add、未 commit。#82 的临时分支本地与远程均已删除（误推的远程分支已回收）。
 - **远程遗留分支**：远端仍有 `agent/issue-81-track-metadata`（#81 的分支，已合入 main `0f48b3a` 却未删）；契约 1.9 要求合回主干后删除临时分支，Executor 在 #81 收尾时遗漏。本轮未擅自删（属前序遗留，删除远程分支影响面小但需 Planner 知悉）。
 - 支持环境（D-017）：CI = ROS 2 **Jazzy**，本机 = **lyrical**；验证入口唯一为 `bash scripts/drive_gates.sh`（`QUICK=1` 快速轨）。**ROS1 运行时不在支持范围内**（仅源码对照基线 `FSAC/2025`）。
 - **`gh` 正常**：`issue list/view/create/comment/close`、`run list/view` 全部可用；账号 `zhangjszs`。`gh` **无** `milestone` 子命令（勿再试）。
 - **`gh issue list --json` 不接受 `commentCount` 字段**（输出为空）；用 `--json number,updatedAt,labels,title` + `gh issue view --json comments`。
 - **`gh run view --json jobs` 偶发空输出**：需重试。
-- CI：`0f48b3a` 的 push CI `39413891086` success；`126cc83` 的 CI `39416500750` **success**（13m31s）；`f5008d5` 的 CI `39418221488` **success**；#78 merge `a71b548` 的 CI `39422351603` **success**；#79 merge `ea5e19b` 的 CI `39423649207` **success**；.agent 收尾 `8bc9e19` 的 CI `39424306720` **success**；`.agent` 补记 `90dd749` 的 CI `39426424030` **success**；**#82 merge `e5f9998` 的 CI `39441369149` success**；#82 尾提交 `40673b0` 的 CI `39453577195` 本报告写出时仍 `in_progress`（**待 Planner 复核**）。
+- CI：`0f48b3a` 的 push CI `39413891086` success；`126cc83` 的 CI `39416500750` **success**（13m31s）；`f5008d5` 的 CI `39418221488` **success**；#78 merge `a71b548` 的 CI `39422351603` **success**；#79 merge `ea5e19b` 的 CI `39423649207` **success**；.agent 收尾 `8bc9e19` 的 CI `39424306720` **success**；`.agent` 补记 `90dd749` 的 CI `39426424030` **success**；**#82 的两条代码提交 CI 均已复核 success**：merge `e5f9998` → `39441369149` **success**；尾提交 `40673b0` → `39453577195` **success**。本轮无因本次变更导致的 CI 失败需修复。
 - Nightly **八连绿**（10-12/13×2/14/15/16/17/18/19），最新 `39331301871` @`b27fc64` success（10-19 调度点已过，本轮入账）。
 - **更正（推定于本行原有的结论）——本机并没有“DDS 发现失效”，真因是 ros2cli daemon 未启动**：
   原文：“本机 DDS 发现失效（影响所有多节点 runtime 门禁）：`ros2 node list` 恒为空；8 组环境组合矩阵全败；40 s 收到 0 条 `/localization/vehicle_state`”
