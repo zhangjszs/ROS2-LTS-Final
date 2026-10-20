@@ -87,4 +87,4 @@
 - **远程遗留分支**：`origin/agent/issue-81-track-metadata`（#81 已合入 `0f48b3a` 却未删，违契约 1.9）**仍在**。上轮未擅自删除（属前序 Executor 遗留分支）；已亲验该分支 tip `1aae347` 为 main 祖先，**删除安全**；**请下一执行轮清理**，PLAN「给 Executor 的指令」已提示。
 - **支持环境（D-017）**：CI = ROS 2 **Jazzy**，本机 = **lyrical**；验证入口唯一 `bash scripts/drive_gates.sh`（`QUICK=1` 快速轨）。**ROS1 运行时不在支持范围**（对照基线 `FSAC/2025`）。
 - `gh` 正常（账号 `zhangjszs`）；`gh` **无** `milestone` 子命令；`gh issue list --json` 不接受 `commentCount`。
-- CI/Nightly（本轮核实 2026-10-21T07:24+08:00）：HEAD `9c46174` CI `39463759166` **success**；Nightly 10-20 `39498071564` @ `main` **success**（上轮“下一轮入账”已结清，连续 6 次 success）。
+- CI/Nightly（本轮核实 2026-10-21T07:24+08:00）：HEAD `9c46174` CI `39463759166` **success**；Nightly 10-20 `39498071564` @ `main` **success**（上轮“下一轮入账”已结清，连续 9 次 success）。
