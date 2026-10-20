@@ -70,10 +70,22 @@ target_link_libraries(benchmark_runner
   common_msgs::common_msgs
 )
 
+# #82：直线加速 ROS 闭环的终点事件源（订阅 vehicle_state → 首次越线恰好一次发 finish）。
+# 判据本体复用 #80 的纯 std 核 finish_judge.hpp（header-only，经 track_benchmark_lib 导出 include），
+# 本可执行只是它的 ROS 适配层 —— 符合 Core/ROS 边界 ADR（docs/CORE_ROS_BOUNDARY_ADR.md）。
+add_executable(finish_event_node src/finish_event_node.cpp)
+target_link_libraries(finish_event_node
+  track_benchmark_lib
+  rclcpp::rclcpp
+  common_msgs::common_msgs
+  std_msgs::std_msgs
+)
+
 install(TARGETS
   track_benchmark_lib
   track_benchmark_node
   benchmark_runner
+  finish_event_node
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION lib/${PROJECT_NAME}

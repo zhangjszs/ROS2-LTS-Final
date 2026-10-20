@@ -53,6 +53,8 @@ bash scripts/closed_loop_sim_smoke.sh   # #17: sim→profiler→PP→sim really 
 bash scripts/closed_loop_fault_smoke.sh # #17: 闭环内注入 越界/持续碰撞/反向/未完赛/超时，断言 KpiEvaluator 报告命中失败判据
 bash scripts/fault_injection_smoke.sh   # #16: 10 software fault cases judged from /system/state + /vehicle_command (no RViz/log eyeballing)
 bash scripts/mpc_reject_smoke.sh <out> <reject|normal>  # #50: MPC 持续拒解出口两臂冒烟（注入→rejecting 锁存+安全侧保持；默认→永不点亮）
+bash scripts/acceleration_finish_smoke.sh [<out>]        # #82: 直线加速 ROS 闭环完赛（仲裁器链）——finish 恰好一次→REQUEST 锁存停→停进 runout 缓冲区；
+#                                                        ENABLE_FINISH_EVENT=0 是可证伪负样本臂（必须非 0 退出）；finish_x/runout_end_m 只从 tracks.json 取
 bash scripts/demo.sh                    # #57: one-click normal-vs-fault demo (chains closed-loop + fault-injection arms; simulation evidence only)
 ```
 
