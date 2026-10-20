@@ -1,32 +1,34 @@
 # TASKS.md — Issue 本地镜像（权威：GitHub Issue；本文件由 Planner 每轮整体重写）
 
-> 维护者：Planning Agent｜最后更新：2026-10-21（`plan-20261021` 轮：**验收关闭 #78/#79/#80/#81/#82 五单 ⇒ Milestone S2a「直线加速事件闭环」达成**；主线暂歇，今日队列切至 P3 积压 **#83/#84/#85**；共 **28 open**）
+> 维护者：Planning Agent｜最后更新：2026-10-21T07:30+08:00（`plan-20261021b` **同日复入轮**：S2a 验收结论维持；今日队列 = P3 积压 **#83/#84/#85 + 新增 #86**；共 **29 open**）
 > 规则：本文件只读镜像，Executor 改状态时先改 Issue 再同步对应行；冲突以 Issue 为准。
-> 日报：`.agent/DIARY/2026-10-20.md`（三会话 + 补记）已由上一执行轮产出，本轮验收已逐条引用并独立复核。
-> 🆕 **本轮变化**：昨日五单全部通过验收并关闭（独立复核证据见 PLAN §三）。Planner 裁 **D-018**（`acceleration_v1` 口径变更对 D-003 的传导：今日不重声明调参轮次，转为未来 round 预注册义务）；新建 **pending D-019**（S2a 后方向，默认 B）——用户当日亲选 **B** 已转正式决策；把 daemon 预热回填 5 脚本并入既有 **#69**（comment `6296201990`）。
+> 日报：`.agent/DIARY/2026-10-20.md`（三会话 + 补记）已由上一执行轮产出，上轮验收已逐条引用并独立复核。**10-21 尚无日报**（无执行轮）。
+> 🆕 **本轮变化**：`main` 前进到 `9c46174`（仅用户 `docs(agents)` 提交，无代码）；Nightly 10-20 与 HEAD CI 入账；新增 **#86**（AGENTS.md/CLAUDE.md 的 daemon「自动重建」表述与 #82 实测冲突，docs-only）；#83/#84 验收命令收紧为 `core_standalone_check.sh` / `QUICK=1 drive_gates.sh`；裁 **D-020**（文档纠错不并入 #69）。
 > ✅ **验收性质说明**：五单报告均**属实**，无「报告失实」项；且 #82 会话 3 主动更正了会话 2 一份**失实的 `blocked` 报告**（误判「本机 DDS 不可用」→ 真因 ros2cli daemon 未显式启动），本轮以门禁留痕独立验证更正为真（closed-loop/fault/closed-loop-fault 三门均 PASS）。
 
 ## 今日队列（2026-10-21，给 Executor 的建议顺序）
 
-> 主线 S2a 已闭环，今日为 P3 积压清理。**⚠ #83 与 #84 同处 `src/planning/straight_line_planner/include/line_fit_core.hpp` 与 `test/test_line_fit_core.cpp` 文件族**：该文件已含 #78 落地的 `hough_min_inlier_ratio > 1.0` 守卫，改动时**不得覆盖**；两单**必须串行**（先其一合入、`git pull --rebase` 后再做其二），不可并行开分支。#85 为纯 docs，风险最低，可任意时机。
+> 主线 S2a 已闭环，今日为 P3 积压清理。**⚠ #83 与 #84 同处 `src/planning/straight_line_planner/include/line_fit_core.hpp` 与 `test/test_line_fit_core.cpp` 文件族**：该文件已含 #78 落地的 `hough_min_inlier_ratio > 1.0` 守卫，改动时**不得覆盖**；两单**必须串行**（先其一合入、`git pull --rebase` 后再做其二），不可并行开分支。#85 与 #86 均为纯 docs 且**文件不重叠**（#85 = `docs/README.md` + `docs/MIGRATION_BASELINE.md`；#86 = `AGENTS.md` + `CLAUDE.md`），风险最低，可任意时机。
 
 1. **#83** `hough_threshold` 死参数（P3）：节点/YAML/`LineDetectorConfig` 三处声明但 `HoughFitCore` 从未读取（Planner 实测 0 vs 1000 输出逐位相同）。**推荐方案 A**（从三处删除，使暴露面与实现一致）；若选 B（接线 `adaptive_thresh=std::max(hough_threshold, dynamic_min)` 且默认设 3）须在报告说明。**硬约束：默认配置下 `HoughFitCore` 输出逐字不变**（用 #62 黄金样本对比）。
-2. **#84** `temporal_filter_*` / `kCenterMargin` 的 NaN/越界静默失效（P3）：实测 alpha=NaN→NaN 且 `valid=true`、jump=NaN→跳变抑制静默关闭、center_margin=NaN→全部锥桶丢弃。在核心边界加参数清洗/校验（回退默认+WARN 或 拒绝帧，二选一），**不得以 `valid=true` 返回含 NaN 的线**、不得静默清空锥桶；补 NaN/±inf/负值/alpha>1 各 ≥1 例。
-3. **#85** `docs/MIGRATION_BASELINE.md` 回填 D-014/15/16 决策引用 + 新增/补 `docs/README.md` 文档索引挂入 5 篇文档入口（P3）：仅 `docs/`；保持五值状态枚举、不改结论边界、不替代实车证据（D-004）。
+2. **#84** `temporal_filter_*` / `kCenterMargin` 的 NaN/越界静默失效（P3）：实测 alpha=NaN→NaN 且 `valid=true`、jump=NaN→跳变抑制静默关闭、center_margin=NaN→全部锥桶丢弃。在核心边界加参数清洗/校验（**推荐 ①回退默认+WARN**；②拒绝帧须说明理由），**不得以 `valid=true` 返回含 NaN 的线**、不得静默清空锥桶；补 NaN/±inf/负值/alpha>1 各 ≥1 例。
+3. **#85** `docs/MIGRATION_BASELINE.md` 回填 D-014/15/16 决策引用 + 新增 `docs/README.md` 文档索引挂入 5 篇文档入口（P3）：仅 `docs/`；保持五值状态枚举、不改结论边界、不替代实车证据（D-004）。
+4. **#86** `AGENTS.md`/`CLAUDE.md` 的 daemon 处置口径纠错（P3，本轮新增）：`AGENTS.md` 现写 “after that calls rebuild it automatically”，与 #82 实测（须显式 `ros2 daemon start` + `sleep 3`）冲突；仅 2 文件、≤8 行，**不碰脚本**（脚本回填仍归 #69）。报告须逐行贴出最终文本供用户复核。
 
-> 队列 = 3 项（2–5 区间内）。做完即 ready-for-agent **见底**——后续方向已由 **D-019（用户亲选 B）** 定：完成 P3 后进入 D-009 维持模式。
+> 队列 = 4 项（2–5 区间内）。做完即 ready-for-agent **见底**——后续方向已由 **D-019（用户亲选 B）** 定：完成 P3 后进入 D-009 维持模式。
 
-## ready（可执行，3）
+## ready（可执行，4）
 
 | Issue | 标题 | 优先级 | 依赖 / 要点 |
 | --- | --- | --- | --- |
 | #83 | `hough_threshold` 死参数（节点/YAML 暴露但算法未使用） | P3 | 无；实测 0 与 1000 输出逐位相同；方案 A 删除 / B 接线；**勿覆盖 #78 守卫** |
 | #84 | temporal_filter_* 与 kCenterMargin 的 NaN/越界静默失效 | P3 | 无；实测 alpha=NaN 输出 NaN 且 valid=true；**与 #83 同文件族，须串行** |
 | #85 | MIGRATION_BASELINE 回填 D-014/15/16 并挂入文档入口 | P3 | 无；仅 docs/；不改变结论边界 |
+| #86 | AGENTS.md/CLAUDE.md 的 daemon 口径纠错（本轮新增） | P3 | 无；仅 2 文件 ≤8 行；不碰脚本；报告贴最终文本供用户复核 |
 
 ## in-review（待验收，0）
 
-无。昨日五单 #81/#80/#78/#79/#82 已于本轮验收关闭（见「已关闭」）。
+无。昨日五单 #81/#80/#78/#79/#82 已于上轮验收关闭（见「已关闭」）。
 
 ## in-progress（0）
 
@@ -75,13 +77,14 @@
 
 ## 环境与流程注意（本轮实测/复核）
 
-- 基线：`main` = `origin/main`（**0/0 同步**，无分叉）。本轮为纯验收轮，**未产生任何代码提交**，只读验证。工作区仅外部 `M AGENTS.md`（非本体系产生，不碰、不代提交；提交 `.agent/` 只 `git add` 指定文件，严禁 `-a`/`-A`）。
+- 基线：`main` = `origin/main` = `9c46174`（**0/0 同步**，无分叉）。上轮验收基线 `761817e`；其后仅用户 `docs(agents)` 一次提交（`9c46174`，01:10，AGENTS.md 重写），**无代码提交**。本轮为纯复核/治理轮，零代码提交；提交 `.agent/` 只 `git add` 指定文件，严禁 `-a`/`-A`。
+- **AGENTS.md 不再是外部脏改动**：已被用户提交（`9c46174`），工作区干净，`git status --short` 为空。但该文件仍存在一条与 #82 实测冲突的表述（“stop 后自动重建”）→ 已立 **#86**。
 - **独立复核证据（本轮 Planner 第一方，非仅采信报告）**：
   - `bash scripts/core_standalone_check.sh` → EXIT=0，**32/32 通过、ASan+UBSan 干净**，含 `test_track_generator`(#81)/`test_finish_judge`(#80)/`test_line_fit_core`(#78)/`test_geodetic_core`(#79)。
   - `build/drive_gates/last.json` 直读 → 完整 drive_gates **12 门全 PASS、hard_fail=0、440s**（含 accel-finish 64s、closed-loop 11s、closed-loop-fault 225s、fault-injection 45s）。
   - `git show 3870249` 亲验 acceleration 基线口径变更；`git log` 亲验 skidpad/trackdrive 基线最近改动为旧提交 `afbfa65`(#17)，本轮三单未触碰。
 - **本机 runtime 门禁可用（关键事实，已推翻上一轮误判）**：真因是 ros2cli daemon 需显式启动（`stop`+`start`+`sleep 3`），非「DDS 发现不可用」。跨进程 DDS 诊断的 pub/sub 必须在**同一次执行**内（分两次沙箱调用永远不通）。
-- **远程遗留分支**：`origin/agent/issue-81-track-metadata`（#81 已合入 `0f48b3a` 却未删，违契约 1.9）。本轮**未擅自删除**（属前序 Executor 遗留分支；删远程分支非验收轮产出范围）。已亲验该分支为 main 祖先（tip `1aae347`），**删除安全**；**请下一执行轮清理**，PLAN「给 Executor 的指令」已提示。
-- 支持环境（D-017）：CI = ROS 2 **Jazzy**，本机 = **lyrical**；验证入口唯一 `bash scripts/drive_gates.sh`（`QUICK=1` 快速轨）。**ROS1 运行时不在支持范围**（对照基线 `FSAC/2025`）。
+- **远程遗留分支**：`origin/agent/issue-81-track-metadata`（#81 已合入 `0f48b3a` 却未删，违契约 1.9）**仍在**。上轮未擅自删除（属前序 Executor 遗留分支）；已亲验该分支 tip `1aae347` 为 main 祖先，**删除安全**；**请下一执行轮清理**，PLAN「给 Executor 的指令」已提示。
+- **支持环境（D-017）**：CI = ROS 2 **Jazzy**，本机 = **lyrical**；验证入口唯一 `bash scripts/drive_gates.sh`（`QUICK=1` 快速轨）。**ROS1 运行时不在支持范围**（对照基线 `FSAC/2025`）。
 - `gh` 正常（账号 `zhangjszs`）；`gh` **无** `milestone` 子命令；`gh issue list --json` 不接受 `commentCount`。
-- CI/Nightly（本轮核实 2026-10-21T00:57Z）：origin/main `761817e` CI `39456608722` success；10-20 执行轮全部代码提交 CI 亦 success（#78/#79/#80/#81/#82）。Nightly 最新 `39331301871` @ `b27fc64`（10-19 调度）success；10-20 夜间任务约 20:00Z 调度，下一轮入账。
+- CI/Nightly（本轮核实 2026-10-21T07:24+08:00）：HEAD `9c46174` CI `39463759166` **success**；Nightly 10-20 `39498071564` @ `main` **success**（上轮“下一轮入账”已结清，连续 6 次 success）。
