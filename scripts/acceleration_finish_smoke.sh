@@ -99,6 +99,15 @@ if [ -z "${FINISH_X:-}" ] || [ -z "${RUNOUT_END:-}" ] || [ -z "${CAP:-}" ]; then
     exit 1
 fi
 echo "=== 元数据（#81）：finish_x=$FINISH_X runout_end_m=$RUNOUT_END → 到达速度上限 cap=${CAP} m/s ==="
+# 速度授权上限：缺省取上面由赛道元数据反推的到达速度 cap（使"能停进缓冲区"成为物理可达的要求）。
+# 可用 MAX_V 覆盖做对照实验（例如 MAX_V=20.0 即 profiler 自身默认上限），以回答
+# “门禁是否仅靠人为限速才能变绿”。注意必须定义在 CAP 就绪之后（set -u 会拒绝未定义变量）。
+MAX_V_OVERRIDE="${MAX_V:-}"   # 置空 = 用元数据反推的 cap；非空则用于对照实验
+if [ -n "$MAX_V_OVERRIDE" ]; then
+    MAX_V="$MAX_V_OVERRIDE"
+else
+    MAX_V="$CAP"
+fi
 
 PIDS=()
 NODE_PIDS=()
@@ -130,12 +139,12 @@ start() {
 }
 
 # ── 2) 拉起闭环（速度上限取 cap：让"能停进缓冲区"成为物理可达的要求，而非事后调参）──
-echo "=== 拉起仲裁器闭环（墙钟预算 ${BUDGET_SEC}s，ENABLE_FINISH_EVENT=$ENABLE_FINISH_EVENT） ==="
+echo "=== 拉起仲裁器闭环（墙钟预算 ${BUDGET_SEC}s，max_velocity=${MAX_V} m/s，ENABLE_FINISH_EVENT=$ENABLE_FINISH_EVENT） ==="
 start "$OUT_DIR/sim.log" ros2 run vehicle_simulator vehicle_simulator_node --ros-args \
     -p use_sim_time:=true -p publish_clock:=true -p seed:=42 -p track_file:="$TRACK_CSV"
 start "$OUT_DIR/safety.log" ros2 run safety_monitor safety_monitor --ros-args -p use_sim_time:=true
 start "$OUT_DIR/profiler.log" ros2 run velocity_profiler velocity_profiler_node --ros-args \
-    -p use_sim_time:=true -p limits.max_velocity:="$CAP"
+    -p use_sim_time:=true -p limits.max_velocity:="$MAX_V"
 start "$OUT_DIR/pp.log" ros2 run pure_pursuit pure_pursuit_controller --ros-args \
     -p use_sim_time:=true -p topics.vehicle_command:=/control/vehicle_command
 start "$OUT_DIR/arbiter.log" ros2 run safety_monitor command_arbiter_node --ros-args \
@@ -174,7 +183,7 @@ done
 echo "OK   $(echo "$EXPECT_NODES" | wc -w) 个节点已注册，开始数据面断言"
 
 # ── 3) 数据面：内联 rclpy 既发布确定性参考路径，也观测并落盘判据 JSON ─────────────
-python3 - "$OUT_DIR" "$FINISH_X" "$RUNOUT_END" "$CAP" "$BUDGET_SEC" "$STOP_EPS" "$ENABLE_FINISH_EVENT" <<'PY'
+python3 - "$OUT_DIR" "$FINISH_X" "$RUNOUT_END" "$MAX_V" "$BUDGET_SEC" "$STOP_EPS" "$ENABLE_FINISH_EVENT" <<'PY'
 import json
 import math
 import sys
@@ -188,7 +197,7 @@ from geometry_msgs.msg import Point
 from std_msgs.msg import String
 
 out_dir = sys.argv[1]
-finish_x, runout_end, cap = float(sys.argv[2]), float(sys.argv[3]), float(sys.argv[4])
+finish_x, runout_end, speed_limit = float(sys.argv[2]), float(sys.argv[3]), float(sys.argv[4])
 budget, stop_eps = float(sys.argv[5]), float(sys.argv[6])
 expect_finish = sys.argv[7] == "1"
 
@@ -284,7 +293,7 @@ snap = {
     "enable_finish_event": expect_finish,
     "finish_x": finish_x,
     "runout_end_m": runout_end,
-    "speed_cap_mps": cap,
+    "speed_limit_mps": speed_limit,
     "state_msgs": w.state_n,
     "raw_path_msgs": w.raw_path_n,
     "x_max": w.x_max,
