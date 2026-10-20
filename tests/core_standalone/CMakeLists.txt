@@ -140,6 +140,13 @@ add_core_test(test_controller_diag
     SOURCES
         "${REPO_ROOT}/src/simulation/track_benchmark/test/test_controller_diag.cpp")
 
+# #81：赛道终点/缓冲区元数据（finish_x / runout_end_m）——生成器 + manifest 一致性
+# （track_generator.cpp 已是纯 std 实现，与 test_kpi_evaluator 同源复用）
+add_core_test(test_track_generator
+    SOURCES
+        "${REPO_ROOT}/src/simulation/track_benchmark/test/test_track_generator.cpp"
+        "${REPO_ROOT}/src/simulation/track_benchmark/src/track_generator.cpp")
+
 # 安全：停车状态机（锁存/重启语义，纯 std 共用层）
 add_core_test(test_stop_state_machine
     SOURCES

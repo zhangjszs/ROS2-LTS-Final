@@ -135,6 +135,32 @@ else
             fail=1
         fi
     done
+
+    # #81：manifest 必须带出终点/缓冲区元数据（消费方只靠元数据拿 75/100，不得硬编码）。
+    # 直线赛道有值，闭合赛道显式 null（显式缺省比缺字段更利于消费方区分两种情况）。
+    manifest_line() {
+        grep -o "\"id\": \"$1\".*" "${EXPORT_DIR}/tracks.json" | head -1
+    }
+    accel_line="$(manifest_line acceleration-75m)"
+    if printf '%s' "${accel_line}" | grep -q '"finish_x": 75.000' &&
+        printf '%s' "${accel_line}" | grep -q '"runout_end_m": 100.000'; then
+        echo "OK   tracks.json: acceleration 带出 finish_x=75.000 / runout_end_m=100.000"
+    else
+        echo "FAIL tracks.json: acceleration 未带出终点元数据（消费方将被迫硬编码 75/100）"
+        echo "       实际行: ${accel_line:-<未找到 acceleration-75m>}"
+        fail=1
+    fi
+    for closed_id in skidpad-figure8 trackdrive-loop; do
+        closed_line="$(manifest_line "${closed_id}")"
+        if printf '%s' "${closed_line}" | grep -q '"finish_x": null' &&
+            printf '%s' "${closed_line}" | grep -q '"runout_end_m": null'; then
+            echo "OK   tracks.json: ${closed_id} 终点元数据为显式 null"
+        else
+            echo "FAIL tracks.json: ${closed_id} 终点元数据应为显式 null"
+            echo "       实际行: ${closed_line:-<未找到 ${closed_id}>}"
+            fail=1
+        fi
+    done
 fi
 
 if [ "${fail}" -ne 0 ]; then

@@ -115,6 +115,13 @@ if(BUILD_TESTING)
   target_link_libraries(test_speed_envelope
     track_benchmark_lib
   )
+  # #81：赛道终点/缓冲区元数据（finish_x / runout_end_m）——生成器与 manifest 的一致性
+  ament_add_gtest(test_track_generator
+    test/test_track_generator.cpp
+  )
+  target_link_libraries(test_track_generator
+    track_benchmark_lib
+  )
 endif()
 
 ament_export_include_directories(include)

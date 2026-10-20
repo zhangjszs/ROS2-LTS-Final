@@ -4,6 +4,8 @@
 #include <iomanip>
 #include <iostream>
 #include <numbers>
+#include <optional>
+#include <ostream>
 #include <sstream>
 
 namespace benchmark {
@@ -11,6 +13,18 @@ namespace benchmark {
 namespace {
 
 constexpr double kPi = std::numbers::pi_v<double>;
+
+// #81：终点后停车缓冲区的长度（m）：越线后必须在该缓冲区内停稳才算完赛。
+constexpr double kAccelerationRunoutM = 25.0;
+
+// #81：可选终点元数据写进 manifest：有值写数值，闭合赛道写显式 null
+// （显式缺省比「不写字段」更利于消费方区分「无终点语义」与「字段缺失」）。
+void write_optional_m(std::ostream& os, const std::optional<double>& v) {
+    if (v.has_value())
+        os << *v;
+    else
+        os << "null";
+}
 
 }  // namespace
 
@@ -88,11 +102,15 @@ TrackDefinition TrackGenerator::GenerateAcceleration(double length, double track
     track.id = "acceleration-75m";
     track.closed_circuit = false;  // 直线赛：到终点即完赛，不计圈
     track.track_width = track_width;
+    // #81：终点/缓冲区元数据随几何一同生成（唯一事实来源）：终点线在 length 处，
+    // 停车缓冲区再往后延伸 kAccelerationRunoutM（与两侧锥桶、中心线的延伸长度一致）。
+    track.finish_x = length;
+    track.runout_end_m = length + kAccelerationRunoutM;
     const double half_w = track_width * 0.5;
     uint32_t cone_id = 1;
 
     // 赛道两侧锥桶 (从 -5m 到 length + 25m)
-    for (double x = -5.0; x <= length + 25.0; x += 3.0) {
+    for (double x = -5.0; x <= length + kAccelerationRunoutM; x += 3.0) {
         track.cones.push_back({.x = x, .y = half_w, .type = huat_cone::BLUE, .id = cone_id++});
         track.cones.push_back({.x = x, .y = -half_w, .type = huat_cone::YELLOW, .id = cone_id++});
     }
@@ -107,7 +125,7 @@ TrackDefinition TrackGenerator::GenerateAcceleration(double length, double track
 
     // 中心参考航路点
     double s = 0.0;
-    for (double x = -5.0; x <= length + 25.0; x += 0.5) {
+    for (double x = -5.0; x <= length + kAccelerationRunoutM; x += 0.5) {
         track.centerline.push_back({.x = x, .y = 0.0, .theta = 0.0, .curvature = 0.0, .s = s});
         s += 0.5;
     }
@@ -217,8 +235,14 @@ bool TrackGenerator::SaveTrackManifest(const std::vector<TrackDefinition>& track
         f << "    {\"id\": \"" << t.id << "\", \"version\": \"" << t.version << "\", \"name\": \"" << t.name
           << "\", \"file\": \"" << filenames[i] << "\", \"cones\": " << t.cones.size()
           << ", \"closed\": " << (t.closed_circuit ? "true" : "false") << ", \"total_length_m\": " << std::fixed
-          << std::setprecision(3) << t.total_length << ", \"geometry_fnv1a64\": \"" << sum.str() << "\"}"
-          << (i + 1 == tracks.size() ? "" : ",") << "\n";
+          << std::setprecision(3) << t.total_length;
+        // #81：终点/缓冲区元数据以附加字段写出（fsac.tracks/v1 保持向后兼容：
+        // 既有消费者只读已知字段，新字段对它们不可见）。
+        f << ", \"finish_x\": ";
+        write_optional_m(f, t.finish_x);
+        f << ", \"runout_end_m\": ";
+        write_optional_m(f, t.runout_end_m);
+        f << ", \"geometry_fnv1a64\": \"" << sum.str() << "\"}" << (i + 1 == tracks.size() ? "" : ",") << "\n";
     }
     f << "  ]\n}\n";
     return f.good();
