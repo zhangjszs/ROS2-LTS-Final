@@ -71,6 +71,11 @@ if(BUILD_TESTING)
     tf2::tf2
     tf2_ros::tf2_ros
   )
+  # #79：大地坐标→ENU 纯 std 核的无 ROS 合成夹具（与 core_standalone 同源双轨）
+  ament_add_gtest(test_geodetic_core
+    test/test_geodetic_core.cpp
+  )
+  target_include_directories(test_geodetic_core PRIVATE include)
 endif()
 
 ament_package()
