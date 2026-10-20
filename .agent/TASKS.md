@@ -81,7 +81,7 @@
   - `build/drive_gates/last.json` 直读 → 完整 drive_gates **12 门全 PASS、hard_fail=0、440s**（含 accel-finish 64s、closed-loop 11s、closed-loop-fault 225s、fault-injection 45s）。
   - `git show 3870249` 亲验 acceleration 基线口径变更；`git log` 亲验 skidpad/trackdrive 基线最近改动为旧提交 `afbfa65`(#17)，本轮三单未触碰。
 - **本机 runtime 门禁可用（关键事实，已推翻上一轮误判）**：真因是 ros2cli daemon 需显式启动（`stop`+`start`+`sleep 3`），非「DDS 发现不可用」。跨进程 DDS 诊断的 pub/sub 必须在**同一次执行**内（分两次沙箱调用永远不通）。
-- **远程遗留分支**：`origin/agent/issue-81-track-metadata`（#81 已合入 `0f48b3a` 却未删，违契约 1.9）。本轮**未擅自删除**（属前序 Executor 遗留分支；删远程分支非验收轮产出范围）。**请下一执行轮清理**；本轮已在 PLAN「给 Executor 的指令」提示。
+- **远程遗留分支**：`origin/agent/issue-81-track-metadata`（#81 已合入 `0f48b3a` 却未删，违契约 1.9）。本轮**未擅自删除**（属前序 Executor 遗留分支；删远程分支非验收轮产出范围）。已亲验该分支为 main 祖先（tip `1aae347`），**删除安全**；**请下一执行轮清理**，PLAN「给 Executor 的指令」已提示。
 - 支持环境（D-017）：CI = ROS 2 **Jazzy**，本机 = **lyrical**；验证入口唯一 `bash scripts/drive_gates.sh`（`QUICK=1` 快速轨）。**ROS1 运行时不在支持范围**（对照基线 `FSAC/2025`）。
 - `gh` 正常（账号 `zhangjszs`）；`gh` **无** `milestone` 子命令；`gh issue list --json` 不接受 `commentCount`。
-- CI/Nightly：本轮无代码提交故不触发 CI。Nightly 由 `main` 定时调度，下轮入账核对。
+- CI/Nightly（本轮核实 2026-10-21T00:57Z）：origin/main `761817e` CI `39456608722` success；10-20 执行轮全部代码提交 CI 亦 success（#78/#79/#80/#81/#82）。Nightly 最新 `39331301871` @ `b27fc64`（10-19 调度）success；10-20 夜间任务约 20:00Z 调度，下一轮入账。
