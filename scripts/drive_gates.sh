@@ -32,8 +32,14 @@ mkdir -p "${TMPDIR}"
 # 运行时门禁靠 ros2cli daemon 持续维护的图（`ros2 topic info --no-daemon` 会从零发现、
 # 端点未收敛就返回 0 —— 已在 Jazzy CI 实测导致误报，故不得改走 --no-daemon）。
 # 残留/空转的 daemon 会让 `ros2 node list` 返回空表、把全部节点误判为未注册；
-# 这里先停一次，后续调用会自动按当前 TMPDIR/ROS_HOME 重建（CI 上无旧 daemon，等于空操作）。
+# 这里先停一次，再**显式启动**：只 stop 而指望后续调用自动重建，在“每次执行都新建
+# 进程/会话”的环境（容器 / agent 沙箱）里不可靠——daemon 随父进程退出，`ros2 node list`
+# 会一直超时返回空表。#82 本机实测差异：仅 stop → 查询 rc=124(超时)、空表；显式 start + sleep
+# → 同会话内 node list 正常上图且 topic echo 能吃到 HuatCarstate。CI 上无旧 daemon，
+# start 等同于后续调用自动创建，无副作用。
 timeout 20 ros2 daemon stop >/dev/null 2>&1 || true
+timeout 40 ros2 daemon start >/dev/null 2>&1 || true
+sleep 3
 
 started_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 t0=$(date +%s)
@@ -128,6 +134,10 @@ if [ "${QUICK:-0}" != 1 ]; then
     run_gate fault-injection 1 bash scripts/fault_injection_smoke.sh
     # #50：MPC 持续拒解出口冒烟（两臂：注入必点亮+安全侧保持；默认参数必不点亮）。
     run_gate mpc-reject-smoke 1 bash -c 'bash scripts/mpc_reject_smoke.sh build/mpc_reject reject && bash scripts/mpc_reject_smoke.sh build/mpc_reject normal'
+    # #82：直线加速 **ROS 闭环**完赛（仲裁器链，两臂）：正样本需越线 + finish 恰好一次 +
+    # REQUEST 锁存停 + 停进缓冲区；ENABLE_FINISH_EVENT=0 时**必须非 0 退出**——这一臂把
+    # “靠看门狗/后门停车也能过”从门禁里排除掉，没有它整场门禁只是自证。
+    run_gate accel-finish 1 bash -c 'bash scripts/acceleration_finish_smoke.sh build/accel_finish positive && ! ENABLE_FINISH_EVENT=0 bash scripts/acceleration_finish_smoke.sh build/accel_finish negative'
 fi
 
 elapsed=$(( $(date +%s) - t0 ))
