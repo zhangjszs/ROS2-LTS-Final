@@ -1,31 +1,23 @@
 # PLAN.md — 路线、当前阶段与可执行队列
 
-> 维护者：Planning Agent（时间流接力）｜最后更新：2026-10-20（`plan-20261020` 轮：**验收 #77/#62 判 pass 并关闭；用户三项决策落定（D-014 直线加速 / D-015 纯 INS 基线 / D-016 底盘自建）；#23 关闭；新立 #78/#79/#80——主线切换为 S2a「直线加速事件闭环」；随后按用户要求补充立项 #81–#85**）
-> 事实基线：`main` = `76c3414` = `origin/main`（0/0 同步）；无 LOCK、无 stash、无特性分支；工作区仅外部 `M AGENTS.md`（非本体系产生，不碰、不代提交）。本轮 `.agent/` 提交后 push 至 origin。环境事实见 `.agent/ENV.md`（D-017 口径）。
+> 维护者：Planning Agent（时间流接力）｜最后更新：2026-10-21（`plan-20261021` 轮：**验收关闭 #78/#79/#80/#81/#82 五单 ⇒ Milestone S2a「直线加速事件闭环」达成**；裁 D-018（`acceleration_v1` 口径变更→D-003 传导）；新建 pending D-019（S2a 后方向）；daemon 回填并入 #69）
+> 事实基线：`main` = `761817e` = `origin/main`（0/0 同步）；本轮为**纯验收轮，零代码提交**；工作区仅外部 `M AGENTS.md`（非本体系产生，不碰、不代提交）。本轮 `.agent/` 提交后 push 至 origin。环境事实见 `.agent/ENV.md`（D-017 口径）。
 > 文档体量约定：本文件只写**当前**状态与结论；历史以 `git log -- .agent/PLAN.md` 与各 Issue 评论为准。
 
-## 〇、本轮结论：赛制决策落定，主线切换为 S2a「直线加速事件闭环」
+## 〇、本轮结论：Milestone S2a「直线加速事件闭环」达成
 
-用户 2026-10-20 亲答三项悬置决策（台账 D-014/D-015/D-016），#23 的 4 项待决全部收口并**已关闭**（comment `6273231512`）：
+本轮（`plan-20261021`）验收昨日 5 单并全部关闭 ⇒ **S2a 四条完成判据全部达成**（独立复核见 §三）：
 
-| 决策 | 用户选择 | 对规划的影响 |
+| 判据 | 承接单 | 结论 |
 | --- | --- | --- |
-| 首个端到端赛制 | **直线加速** | 里程碑改为 S2a；新立 **#80**（P1）事件判定；八字/高速暂不进 `ready` |
-| 定位后端 | **暂缓 mapper/ESKF/GTSAM，纯 INS 基线** | 仅保留 `vehicle_state` 的纯 std 核化加固（#79）；不引入 SLAM/ESKF，不改接口契约 |
-| 底盘外部驱动 | **不存在，需自建** | #15 维持 `blocked`，但阻塞性质澄清为「资料缺失」（VCU 协议 + 台架标定），不再等外部代码（comment `6273234491`） |
+| 离线 benchmark 完赛门禁（finish/runout + 停稳） | **#81**（元数据）+ **#80**（判据核） | ✓ 达成 |
+| ROS 多节点闭环完赛门禁（finish 事件恰好一次 + 锁存停 + accel-finish 硬门） | **#82** | ✓ 达成（含对旧 `blocked` 误判的更正） |
+| 可证伪性（负样本 + 对照臂） | **#80**（`--no-post-finish-braking`）+ **#82**（`ENABLE_FINISH_EVENT=0`、`MAX_V=20`） | ✓ 达成 |
+| 定位/感知加固收尾（纯 std 核 + UB 守卫） | **#79** + **#78** | ✓ 达成 |
 
-本轮验收：#77 与 #62 均判 **pass** 并关闭（详见 §三）。#62 验收中发现**残余 UB**（`hough_min_inlier_ratio=1e300` 通过既有守卫后仍在 `line_fit_core.hpp:212` 触发 float→int 溢出），按 §3「部分通过」口径关闭原单并新立 **#78** 承接。
+⇒ 主线切换后的第一个端到端里程碑（D-014 直线加速）完成：仿真「感知→规划→控制→仿真」闭环 + 可证伪门禁均已落 main 且 CI 全绿。
 
-**按用户要求扩充队列 → 补充立项 #81–#85**（每条均经源码核对，缺陷类经 /tmp 实测，详见各 Issue）：
-
-- **#81**（P2）赛道元数据补齐：`TrackDefinition`/`tracks.json` 增加 `finish_x`/`runout_end_m`，消除消费方硬编码 75/100；
-- **#80**（P1，本轮早先已立）离线直线加速完赛判定，**依赖 #81**（comment `issuecomment-6273468400`）；
-- **#82**（P2）ROS 闭环完赛：过线发布 `finish` 任务事件 → 锁存停 → 25 m 缓冲区内停稳，复用既有 `task_event`/`stop` 契约；
-- **#83**（P3）`hough_threshold` 死参数：节点/YAML 暴露但 `HoughFitCore` 从未读取（实测 0 vs 1000 输出逐位相同）；
-- **#84**（P3）参数守卫：`temporal_filter_alpha=NaN` 产出 NaN 且 `valid=true`，跳变阈值 NaN 静默关闭跳变抑制，`kCenterMargin=NaN` 丢弃全部锥桶（均实测复现）；
-- **#85**（P3）迁移文档回填 D-014/D-015/D-016 并挂入 `docs/README.md` 入口。
-
-依赖链：**#81 → #80 → #82**；#79/#78 并行；#83–#85 为 P3 积压，不进今日队列。
+**本轮 Planner 决策/治理**：裁 **D-018**（#80 改变 `acceleration_v1` 比较集口径，客观触及 D-003 冻结——结论：今日不重声明调参轮次（无活动轮、参数未冻结），转为「下一轮声明时须预注册声明此口径断裂」的长期约束）；daemon 预热回填 5 脚本并入 **#69**（ready-for-human）；新建 **pending D-019**（S2a 后方向，默认 B = 完成 P3 积压后进入 D-009 维持模式）。
 
 ## 一、当前阶段
 
@@ -39,79 +31,80 @@
   - #19 Pure Pursuit 低速基线：B 完整公平对比依赖 #17 扰动场景。
   - #18 rosbag 数据集与感知质量评估：需真实 bag。
   - #24 跨版本差分回放：需 ROS1 运行时（源码对照已由 #77 交付）。
-- **S2a 直线加速事件闭环：0/3（本轮新开，主线）**——见 §二。
+- **S2a 直线加速事件闭环：✅ 完成（2026-10-21，4/4 判据达成）**——#81/#80/#82/#79/#78 五单验收关闭，见 §二/§三。
 - **S2b 八字绕环 / S3 高速与性能**：待 S2a 闭环后按新证据评估（D-014、#19 B 仍依赖 S2b 条件）。
 - **展示（D-007-B）**：最小展示入口 #57、文档同步 #58 已关闭；完整展示（#26）与博客（#25）待 #17①② / #18 证据。
 - **ADR 下沉线：全部完成**——#59/#60/#61/#62 均关闭，无剩余高价值候选（KD-tree/Way/delaunay 链维持暂缓，见 §九）。
 
-## 二、Milestone S2a 目标与完成判据
+## 二、Milestone S2a「直线加速事件闭环」：✅ 已达成（2026-10-21）
 
 - **目标**：在可复现仿真中完成直线加速闭环——车辆从起点加速、跨越 x=75 m 终点线、在 x≤100 m 的 25 m 缓冲区内停稳；**离线 benchmark** 与 **ROS 多节点闭环**两层输出都可判定「是否过线、何时过线、停在哪、是否停稳」。
-- **现状（实测）**：赛道 `GenerateAcceleration` 已有终点 x=75 与延伸至 x=100 的 25 m 缓冲（`track_generator.cpp:85-116`）；但 `benchmark_runner.cpp:421-423` 在中心线末端即结束，**不过线判定、不制动**。基线 `benchmarks/baseline/acceleration.acceleration-75m.v1.json`：`finished=true, stopped=false, max_speed_mps≈24.9979` ⇒ **「跑完」≠「完赛」**，这正是 #80 要补的语义缺口。ROS 侧 `closed_loop_sim_smoke.sh` 只跑 trackdrive，无 finish/stop 语义（#82）。
-- **完成判据（四条同时为真）**：
-  1. **#81 + #80 交付后离线门禁绿**：赛道元数据提供 finish/runout；baseline 重生成，`finish_crossed=true`、`stopped=true`、`stop_position_m<=100`，新增字段 `finish_time_s` / `stop_distance_m` 有定义且被断言；
-  2. **#82 交付后 ROS 闭环门禁绿**：finish 事件恰好一次、`/system/stop` 锁存、`stop_position_m<=runout_end_m`、末速度 `< ε`；
-  3. **可证伪性**：两层各写明红/绿对照——移除制动或禁用 finish 事件时门禁**必须变红**，并附实测输出（D-011 口径）；
-  4. **#79 / #78 关闭**（P3 加固，不阻断主线，但属本里程碑的收尾项）。
+- **现状（已达成）**：#81 已将 finish_x/runout 进元数据；#80 补 `finish_judge.hpp` 越线判定+缓冲停车，`acceleration` 基线重录 `stopped=true`；#82 补 ROS 闭环 `accel-finish` 硬门。原「跑完≠完赛」语义缺口已消除。
+- **完成判据（四条，本轮已全部独立复核为真 ✅）**：
+  1. ✅ #81 元数据 + #80 离线判据：`acceleration` 基线重录 `stopped=true`/`finish_crossed=true`/`stop_position_m=97.12≤100`/新增 `finish_time_s`+`stop_distance_m`；门禁第 9 节字段+时间线断言；core_standalone 32/32 亲验（`test_finish_judge`）。
+  2. ✅ #82 ROS 闭环：`finish_event_node` 事件恰好 1 次 @x=75.0 + 锁存停 + `stop_position_m=84.7≤100`+`v_final=0`；纳入 drive_gates 为 `accel-finish` 硬门。
+  3. ✅ 可证伪：离线 `--no-post-finish-braking` rc=1；闭环 `ENABLE_FINISH_EVENT=0` rc=1（原因逐字「未停车/越过缓冲区」）；`MAX_V=20` 对照臂证明绿不依赖限速（D-011 口径）。
+  4. ✅ #79（GeodeticToEnu 纯 std 核，位模式零差异）/ #78（hough ratio 上界守卫，先红后绿）关闭。
 - **非目标**：不宣称实车能力（D-004）；不引入 ESKF/SLAM/GTSAM（D-015）；不改控制律/调参（D-003 冻结）；不做八字/高速（D-014）；不改契约话题与 QoS（D-002）。
-- **Issue 台账**（本 `gh` 实测，**33 open**）：ready-for-agent **8**（S2a 主链 #81 P2 → #80 P1 → #82 P2；并行 #79 P3 / #78 P3；积压 #83/#84/#85 P3）· in-review 0 · in-progress 0 · 仓库外阻塞 **7**（#15–#19 / #24 / #37）· needs-info **3**（#25/#26/#27）· ready-for-human 14（#63–#76，不计饥饿规则）· 伞形 1（#20，优先级豁免见 §四）。本轮关闭 #77 / #62 / #23，新开 #78–#85 共 8 项（净 +5）。
+- **Issue 台账**（本 `gh` 实测，**28 open**）：ready-for-agent **3**（#83/#84/#85，均 P3 积压）· in-review 0 · in-progress 0 · 仓库外阻塞 **7**（#15–#19 / #24 / #37）· needs-info **3**（#25/#26/#27）· ready-for-human 14（#63–#76，不计饥饿规则）· 伞形 1（#20，优先级豁免见 §四）。**本轮关闭 #78/#79/#80/#81/#82 五单（净 −5）**。
 
-## 三、验收结论（本轮）
+## 三、验收结论（本轮：5 单全部通过）
 
-- **#77（P1，迁移覆盖清单）→ pass，已关闭**（comment `6273158492`）。独立复核：提交 `815d292`（merge `ab1ad6e`）文件集仅 `docs/MIGRATION_BASELINE.md`；**32/32** 处 ROS1/ROS2 引用 `git cat-file -e` 全部 rc=0，**0 处行号越界**（逐文件行数校验）；17 条能力项状态全部落在五值枚举内。两条备注（不构成返工）：① 未加 README/文档索引链接——根 README 编辑会违反该单「只含 `docs/`」的验收标准，取舍正确；② `未找到` 行无 ROS2 `path:line` 属语义必然，非缺项。
-- **#62（P3，直线拟合核下沉）→ pass，已关闭**（comment `6273160633`）。独立复核：`core_standalone_check.sh` 29/29（含 ASan+UBSan+float-cast-overflow）；colcon **556 tests 0 failures**；`lint_cpp.sh` / `lint_shell.sh` rc=0；CI `39194926465` @`ab1ad6e`、`39195808005` @`3ca7930`、`39195951665` @`76c3414` 全部 success。
-  - **残余缺陷 → #78**：实测 `hough_min_inlier_ratio=1e300`（有限大值）通过 `isfinite`/非负守卫后，在 `line_fit_core.hpp:212` 的 `static_cast<int>(std::ceil(1e300·n))` 触发 UBSan：`1e+301 is outside the range of representable values of type 'int'`。原单验收标准只枚举 NaN/±inf/负值，故按部分通过口径关闭并立后续单，不重开。
-- **#23（P1，迁移父单）→ 关闭**：4 项待决全部收口（D-014/D-015/D-016 + D-017 支持环境）；缺口映射：#80（赛制事件语义）、#79（定位核夹具）、#78（残余 UB）、#15/#17/#19（外部输入）。#24 拆分提示写入 comment `6273165395`。
-- **待 Executor 验收项：0**——上一轮 #77/#62 已由本轮收口；无 in-progress、无 in-review。
+昨日 in-review 五单逐条独立复核（`git show` + `core_standalone_check.sh` 32/32 + `build/drive_gates/last.json` 直读），**全部 pass 并关闭**：
 
-## 四、当前 ready 队列（给 Executor 的建议顺序）
+- **#81 → pass 关闭**（comment `6296130011`）：`git show --stat 1aae347` 未含 `benchmarks/`/CSV 几何；core_standalone `test_track_generator` 亲验通过；消费方经元数据取 75/100。
+- **#80 → pass 关闭**（comment `6296132845`）：`git show 3870249` 亲验 baseline `stopped` false→true + 4 完赛字段；`--no-post-finish-braking` rc=1；skidpad/trackdrive 基线最近改动为旧提交 `afbfa65`（本轮未触碰）；`test_finish_judge` 亲验通过；未含 config/control/launch。**遗留 → D-018**（口径变更触及 D-003 冻结）。
+- **#78 → pass 关闭**（comment `6296135114`）：`git show f56ff36` 亲验守卫扩至 `ratio>1.0`；core_standalone `test_line_fit_core` 在 float-cast-overflow 下亲验通过；先红后绿 + `[0,1]` 黄金逐字不变。
+- **#79 → pass 关闭**（comment `6296137702`）：`git show 0654d0e:geodetic_core.hpp` grep ROS 依赖 = 0；core_standalone `test_geodetic_core` 亲验通过；位模式差分 `TOTAL_MISMATCH=0`；未含 config/launch。
+- **#82 → pass 关闭**（comment `6296139845`）：`build/drive_gates/accel-finish.log` 直读——正样本 rc=0 + `ENABLE_FINISH_EVENT=0` rc=1（可证伪）+ `MAX_V=20` 对照臂；完整 drive_gates 12 门全 PASS/440s；未含契约/QoS/控制律。
+  - **验收同时确认 #82 的「误判更正」**：会话 2 曾交失实 `blocked` 报告（"本机 DDS 不可用"），会话 3 查明真因为 ros2cli daemon 未显式启动。本轮以 closed-loop/closed-loop-fault/fault-injection 三门留痕均 PASS 独立验证更正为真——本机 runtime 门禁**可用**。§3.4「报告失实须处理」的正向案例。
+- **报告质量**：五单报告均属实，无「报告失实」需回滚者；#82 为 Executor 自我更正前轮失实结论，处理规范。
 
-1. **#81**（P2，`ready-for-agent`）赛道元数据补齐：在 `TrackDefinition` 与 `tracks.json` 增加 `finish_x`/`runout_end_m`（acceleration=75/100，闭合赛道为空），以附加字段保持 `fsac.tracks/v1` 兼容；不改几何、不重录 baseline。**无前置**，是 #80/#82 的共同输入。
-2. **#80**（P1，`ready-for-agent`）直线加速完赛判定：过线 x=75、25 m 缓冲区停车、benchmark JSON 新字段与门禁 + 可证伪红/绿对照——**本里程碑唯一离线判据**；依赖 #81，落点 `src/simulation/track_benchmark/`。**基线 JSON 重生成是本单预期产物**，须在 Issue 评论中说明旧基线为何失效（`stopped=false`）。
-3. **#82**（P2，`ready-for-agent`）ROS 闭环直线加速完赛：从 #81 元数据取终点/缓冲区，过线时向 `/system/task_event` 发布一次 `finish`，经 command_arbiter 锁存停，断言 `stop_position_m <= runout_end_m`；扩展现有 `closed_loop_sim_smoke.sh` 并纳入 `drive_gates.sh`，带禁用 finish 的负样本。依赖 #81/#80。
-4. **#79**（P3，`ready-for-agent`）`vehicle_state::GeodeticToEnu` 下沉为纯 std core + 无 ROS 确定性夹具（#24 第 1 条的切片，comment `6273165395`）。现状实测：实现是私有成员（`vehicle_state_estimator.h:94`，实现 `.cpp:65`），头文件引 rclcpp/common_msgs/tf2，现有测试仅 4 例重复时间戳守卫，且在 `tests/core_standalone/CMakeLists.txt:201` 排除清单中。要求：抽取时**行为逐位一致**（差分用例，固定经纬高/ENU 原点），不改节点对外接口。
-5. **#78**（P3，`ready-for-agent`）`hough_min_inlier_ratio` 超大有限值守卫：在 `line_fit_core.hpp:212` 转换前加上界（Issue 推荐：ratio 超出 `[0,1]` 视为非法并返回空 `LineParams()`，与旧行为一致；等价钳位方案须证明 `[0,1]` 内输出逐字不变），补 `1e300` 用例；**先红后绿**——UBSan 必须先复现报错再修复。
+## 四、当前 ready 队列（今日：P3 积压清理，2026-10-21）
 
-- 队列 = 5 项（2–5 上限）。顺序由依赖决定：#81 → #80 → #82 是 S2a 主链；#79/#78 并行。
-- **P3 积压（已就绪，不进今日队列）**：**#83** `hough_threshold` 死参数（实测 0/1000 输出相同，方案 A 删除或方案 B 接线）；**#84** `temporal_filter_*`/`kCenterMargin` 的 NaN/越界静默失效（实测 alpha=NaN → NaN 且 valid=true）；**#85** MIGRATION_BASELINE 回填 D-014/15/16 并挂入文档入口。下一轮按主链完成情况排入。
-- **#20 优先级豁免（长期约定）**：#20 为路线图伞形跟踪 issue（无执行体、随 S0–S3 存活），刻意不设 priority 标签；后续 Planning 不必再纠。
+主线 S2a 已闭环，ready-for-agent 仅剩 3 个 P3 积压，做完即见底（下一步见 pending D-019）。
+
+1. **#83**（P3）`hough_threshold` 死参数：三处声明但算法未读（实测 0/1000 输出逐位相同）。推荐方案 A（删除使暴露面=实现）；硬约束默认输出逐字不变。落点 `src/planning/straight_line_planner/`。
+2. **#84**（P3）`temporal_filter_*`/`kCenterMargin` NaN/越界静默失效（实测 alpha=NaN→NaN 且 valid=true）：核心边界加参数清洗，非法值定义明确，不得以 valid=true 返回 NaN 线、不得静默清空锥桶。落点同上。
+3. **#85**（P3）MIGRATION_BASELINE 回填 D-014/15/16 引用 + `docs/README.md` 文档索引挂入 5 篇；仅 docs/。
+
+- ⚠ **文件冲突**：#83 与 #84 同处 `line_fit_core.hpp`/`test_line_fit_core.cpp`，且该文件已含 #78 落地的 `hough_min_inlier_ratio>1.0` 守卫——**不得覆盖**；两单**必须串行**（先其一 merge + `git pull --rebase` 再其二），不可并行开分支。#85 纯 docs 可任意时机。
+- 队列 = 3 项（2–5 区间内）。#20 优先级豁免维持（伞形跟踪，无执行体）。
 
 ## 五、已完成（软件侧摘要）
 
-- 已关闭：S0 全部（#13/#14）、#22、#30–#54、#56、#57、#58、#59、#60、#61、#62、#77、#23（父单，决策收口）。
-- 近期：#59（`467d570`/merge `04981c5`）、#60（`4551602`/merge `cb54e23` + `69ecc1e`）、#61（`7e8c07f`/merge `7e5794d`）、**#77（`815d292`/merge `ab1ad6e`）**、**#62（`8169e86`/merge `3ca7930`）**——#77/#62 于 2026-10-20 本轮独立复核后关闭。
+- 已关闭：S0 全部（#13/#14）、#22、#30–#54、#56、#57、#58、#59、#60、#61、#62、#77、#23、**#78、#79、#80、#81、#82（S2a 五单，2026-10-21 验收关闭）**。
+- 近期：**#81（`1aae347`/merge `0f48b3a`）、#80（`3870249`/merge `126cc83`）、#78（`f56ff36`/merge `a71b548`）、#79（`0654d0e`/merge `ea5e19b`）、#82（`343ecc3`+`40673b0`/merge `e5f9998`）——2026-10-21 本轮独立复核（core_standalone 32/32 + drive_gates 12 门全绿）后关闭，达成 S2a 里程碑**；更早 #77/#62（2026-10-20）。
 - #57 最小展示入口（`c79b71d`/merge `97de15d`）、#58 CLAUDE.md 冒烟清单（`0f87d25`/merge `6b5fc27`）。
 - 10-12/13 用户驱动测试性能轮：`docs/TEST_PERF.md` + #63–#76（14 项 `ready-for-human`）。
 
 ## 六、CI 状态（本轮核实）
 
-- **origin/main `76c3414` 全绿**：push CI `39195951665` success；同分支前两笔 `ab1ad6e`/`3ca7930` 的 CI（`39194926465`/`39195808005`）亦 success。
-- **Nightly 七连绿**：10-12 / 10-13 ×2 / 10-14 / 10-15 / 10-16 / 10-17 / 10-18；最新 `39161165288` @`bf26487` success（784 s），head 已含 `.agent/` 提交。
-- 10-19 的 Nightly 在本轮实测时刻（`2026-10-19T17:33Z`）尚未到调度点（约 20:00Z），**下一轮入账**；若届时 red 需按三种失败模式分诊（真污染 / 端点未收敛 / apt-source 404 偶发）。
+- **origin/main `761817e` 全绿**：本轮为纯验收轮、**零代码提交**（不触发新 CI）。S2a 五单代码提交 CI 已复核全 success：#78 `39422351603`·#79 `39423649207`·#80 `39416500750`·#82 merge `39441369149`/尾 `39453577195`；#81 merge `0f48b3a` 亦 success。
+- **Nightly**：主干维持连绿；本轮未跑 gh run 清单，下轮入账核对最新调度点结果。
 - 三种失败模式认知维持有效：① 真污染；② 端点未收敛（勿用 `--no-daemon`，D-005）；③ ros2-apt-source 404（`gh run rerun <id> --failed`）。
 
 ## 七、已知阻塞与原因（均有证据，D-013 口径逐项复验）
 
-| Issue | 阻塞原因（D-013 分类） | 本轮状态 |
+| Issue | 阻塞原因（D-013 分类） | 本轮状态（2026-10-21） |
 |---|---|---|
-| #15（P1） | **资料缺失**：VCU 协议文档、台架标定实值（D-016 已确认非外部代码缺失） | `updatedAt` 10-19（本轮记录 D-016）；性质澄清，仍不可执行 |
+| #15（P1） | **资料缺失**：VCU 协议文档、台架标定实值（D-016 已确认非外部代码缺失） | `updatedAt` 10-19；无新外部输入，仍不可执行 |
 | #16（P1） | **资料缺失**：硬件急停链路、实车停车预算 | 无变化（10-05） |
 | #17（P1） | **资料缺失**：模型速度范围实测、感知扰动量化 | 无变化（10-05） |
 | #19（P1） | **资料缺失**：依赖 #17 扰动场景 | 无变化（10-05） |
 | #18（P2） | **资料缺失**：真实 bag | 无变化（10-05） |
-| #24（P1） | **运行时缺失**：验收第 2 条需 ROS1 运行环境（本机无 Noetic、无 docker）；第 1 条已拆给 #79 | 10-19 精确化；本轮再拆出可执行切片 |
+| #24（P1） | **运行时缺失**：剩余验收需 ROS1 运行环境（本机无 Noetic、无 docker）；源码对照切片 #79 已交付关闭 | `updatedAt` 10-19；第 1 条已由 #79 关闭，本体仍卡运行时 |
 | #37（P3，needs-triage+blocked） | **资料缺失**：需 #15 标定完成后翻转 `use_arbiter` 默认 | 无变化（10-09） |
 
-> D-013 复查进度：已按口径复验 #23（转决策缺失）、#24（运行时缺失）、#15（资料缺失）。**剩余 #16/#17/#18/#19/#37 每轮查 1–2 个即可**。另：#25/#26/#27（needs-info）待 #17①② / #18 证据，D-007-B 生效中；#63–#76 为 `ready-for-human`，不计饥饿规则、不进 Executor 队列。
+> D-013 复查：本轮逐单核对 28 个 open Issue 的 `updatedAt`，除 #69 因 Planner 治理评论更新外，**无任何外部输入到位**，7 个 blocked 全部维持。另：#25/#26/#27（needs-info）待 #17①② / #18 证据，D-007-B 生效中；#63–#76 为 `ready-for-human`，不计饥饿规则、不进 Executor 队列。
 
 ## 八、下一阶段
 
-- **S2a 主链**：**#81 → #80 → #82**（元数据 → 离线判据 → ROS 闭环）。#80 合入后重生成 baseline，核对「过线 + 停车」语义；#82 合入后 ROS 闭环具备可证伪的完赛门禁。
-- **并行加固**：#79（定位纯 std 核）/ #78（Hough 残余 UB）可在主链间隙执行。
-- **P3 积压**：主链消化后排入 **#83**（`hough_threshold` 死参数）、**#84**（NaN/越界参数守卫）、**#85**（迁移文档回填）；三者均有可复核证据，不阻断 S2a。
-- **S2a 闭环后**：按 D-014 重新评估八字绕环的最小实现与定位需求；在 #18 真实 bag 到位前不引入 ESKF/SLAM（D-015），不进 `ready`。
+- **✅ S2a 已闭环（2026-10-21）**：#81→#80→#82 主链 + #79/#78 加固全部验收关闭，四层判据（元数据 / 离线 / ROS 闭环 / 可证伪）达成。
+- **今日（P3 积压）**：#83/#84（straight_line_planner 死参数与 NaN 守卫，**同文件族须串行、勿覆盖 #78 守卫**）、#85（迁移文档回填）；做完 ready-for-agent 见底。
+- **下一步方向 = pending D-019**（默认 B）：完成 P3 后进入 D-009 维持模式——每轮只做 CI/Nightly 看护 + blocked 零成本复查（D-013 口径），不为找活而扫描。
+- **八字/高速（S2b/S3）暂不进 ready**：D-014 已定 S2a 闭环后评估八字，但其定位精度要求高，D-015 暂缓 ESKF/SLAM、#18 真实 bag 未到位前无法验收（D-004）；强推属过度工程，需先解约束或经用户重新定义范围（见 D-019 选项 A）。
 - **外部输入到位即返工**：任一 `blocked` Issue 出现协议/标定/bag 实据（`updatedAt`/新评论），即触发该线重新规划，不受 D-009 维持模式限制。
-- D-009 维持模式继续生效：不为找活而扫描；每轮只做 CI/Nightly 看护 + 阻塞零成本复查（D-013 口径）。本轮扩充立项是用户显式要求，不构成常态扫描。
 
 ## 九、已明确放弃 / 不做
 
@@ -129,9 +122,9 @@
 
 ## 十、Decision Gate 状态与给 Executor 的指令
 
-- **当前无 pending 决策**。D-014/D-015/D-016 为用户亲选、D-017 为本轮 Planner 自定；D-009/D-012 生效中。
-- **给 Executor 的顺序**：**#81 → #80 → #82 → (#79 / #78)**；#83–#85 为主链后的 P3 积压。五项今日队列任务均不需外部输入、不触 1.10 红线；基线已与 origin 同步，无 rebase 需求。
-- 📣 **D-012 提醒项**：10-19 的 Executor 轮已完成 #77/#62，旧的 7 天空转**已终结**；但本轮新建的 ready 队列（8 项，今日队列取 5 项）尚未被任何执行轮认领。S2a 从现在起依赖执行推进，**建议用户尽快发起 Execution 会话**（按 #81 → #80 → #82 → #79/#78 顺序）。
-- 契约 1.10 红线本轮**均未触碰**：#77 为纯文档；#62 为 Core 下沉（无 schema/公共 API 变化）；#23 仅决策与标签；新立 #78–#85 未改任何契约话题/QoS/认证/CI 流程（#82 仅复用既有 `/system/task_event` 与 `/system/stop`，并通过 `makeQoS` 契约构造）。
+- **Decision Gate**：本轮裁 **D-018**（`acceleration_v1` 口径变更→D-003 传导，Planner 自决）；新建 **pending D-019**（S2a 后方向，默认 B）。D-014/D-015/D-016 用户亲选、D-017 Planner 自定、D-009/D-012 生效中。
+- **给 Executor 的顺序**：**(#83 → #84，严格串行同文件族) + #85**（可并行/任意时机）；三单均不需外部输入、不触 1.10 红线。基线 `main`=`origin/main`（0/0），无 rebase 需求。**清理遗留**：远程分支 `origin/agent/issue-81-track-metadata`（#81 已合入却未删，违契约 1.9）请本轮顺带删除。
+- 📣 **D-012 提醒项**：ready 队列（#83/#84/#85）为非空且自 10-20 立项后尚未被任何执行轮认领（昨日队列执行的是 S2a 五单）。**建议用户尽快发起 Execution 会话**（顺序见上）；若答复 pending D-019，可据此定下一 Milestone。
+- 契约 1.10 红线本轮**均未触碰**：验收关闭 #78–#82 未改契约话题/QoS/认证/CI 流程（#82 仅复用既有 `/system/task_event` 与 `/system/stop`，经 `makeQoS` 构造）；D-018/D-019 属协议解释与方向询问，非红线变更。
 - 外部 `M AGENTS.md` 脏改动非本体系产生：不碰、不代提交、不提问（只读记录）。
-- **日报义务**：Executor 每轮收尾写 `.agent/DIARY/YYYY-MM-DD.md`（一天一条、追加不覆写、更正用新行追加）。这是次日验收的唯一输入；10-19 已有日报（`2026-10-19.md`），本轮验收已引用。
+- **日报义务**：Executor 每轮收尾写 `.agent/DIARY/YYYY-MM-DD.md`（一天一条、追加不覆写、更正用新行追加）；这是次日验收唯一输入。10-20 日报已由上一执行轮产出并被本轮验收引用。
