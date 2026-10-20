@@ -4,6 +4,7 @@
 #include <functional>
 #include <geometry_msgs/msg/transform_stamped.hpp>
 
+#include "geodetic_core.hpp"     // #79：坐标变换数学已下沉纯 std 核，此处仅薄转发
 #include "interface_contract.h"  // #14：话题名缺省引用契约常量（common_msgs 手写头不带前缀）
 
 VehicleStateEstimator::VehicleStateEstimator(rclcpp::Node::SharedPtr node)
@@ -64,29 +65,9 @@ void VehicleStateEstimator::DiagnoseHealth(diagnostic_updater::DiagnosticStatusW
 
 void VehicleStateEstimator::GeodeticToEnu(double lat, double lon, double h, double lat0, double lon0, double h0,
                                           double enu_xyz[3]) {
-    constexpr double a = 6378137.0;
-    constexpr double b = 6356752.3142;
-    constexpr double f = (a - b) / a;
-    constexpr double e_sq = f * (2 - f);
-
-    auto ecef = [&](double la, double lo, double alt, double& X, double& Y, double& Z) {
-        double s = sin(la);
-        double N = a / sqrt(1 - e_sq * s * s);
-        X = (alt + N) * cos(la) * cos(lo);
-        Y = (alt + N) * cos(la) * sin(lo);
-        Z = (alt + (1 - e_sq) * N) * sin(la);
-    };
-
-    double x, y, z, x0, y0, z0;
-    ecef(lat, lon, h, x, y, z);
-    ecef(lat0, lon0, h0, x0, y0, z0);
-
-    double xd = x - x0, yd = y - y0, zd = z - z0;
-    double t = -cos(lon0) * xd - sin(lon0) * yd;
-
-    enu_xyz[0] = -sin(lon0) * xd + cos(lon0) * yd;
-    enu_xyz[1] = t * sin(lat0) + cos(lat0) * zd;
-    enu_xyz[2] = cos(lat0) * cos(lon0) * xd + cos(lat0) * sin(lon0) * yd + sin(lat0) * zd;
+    // #79：数学已下沉到纯 std 核（geodetic_core.hpp），此处仅薄转发；
+    // 输出与下沉前逐位一致（位模式差分夹具见该 Issue 的执行报告）。
+    vehicle_state_core::GeodeticToEnuCore(lat, lon, h, lat0, lon0, h0, enu_xyz);
 }
 
 void VehicleStateEstimator::PublishState() {

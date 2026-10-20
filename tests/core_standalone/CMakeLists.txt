@@ -44,6 +44,7 @@ set(CORE_INCLUDE_DIRS
     "${REPO_ROOT}/src/simulation/vehicle_simulator/include"
     "${REPO_ROOT}/src/planning/urinay/include"
     "${REPO_ROOT}/src/planning/skidpad_planner/include"
+    "${REPO_ROOT}/src/localization/vehicle_state/include"
     "${EIGEN3_INCLUDE_DIR}"
 )
 
@@ -207,6 +208,11 @@ add_core_test(test_circle_centerline_core
 add_core_test(test_line_fit_core
     SOURCES
         "${REPO_ROOT}/src/planning/straight_line_planner/test/test_line_fit_core.cpp")
+
+# #79：vehicle_state 大地坐标→ENU 纯 std 核（header-only）——WGS84 / ECEF / ENU 变换
+add_core_test(test_geodetic_core
+    SOURCES
+        "${REPO_ROOT}/src/localization/vehicle_state/test/test_geodetic_core.cpp")
 
 # 排除清单（#40 逐个数过，不靠“碰巧没加”）——这些测试文件本身零 rclcpp，
 # 但传递依赖 ROS 生成消息头或 PCL，无法在“不 source ROS”的入口里编译：
