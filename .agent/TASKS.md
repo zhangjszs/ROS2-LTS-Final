@@ -81,12 +81,12 @@
 
 ## 环境与流程注意（本轮实测）
 
-- 基线：`main` = `ea5e19b`（#79 merge）= `origin/main`（**0/0 同步**，无分叉）。工作区仅外部 `M AGENTS.md`（非本体系产生，不碰、不代提交；提交 `.agent/` 只 `git add` 指定文件，严禁 `-a`/`-A`）。**该外部改动全程未碰**：本轮开始与结束均只观察到该文件为脏，未 add、未 commit。
+- 基线：`main` = `8bc9e19`（.agent 收尾）= `origin/main`（**0/0 同步**，无分叉）；最近一次代码提交为 #79 的 `0654d0e` / merge `ea5e19b`。工作区仅外部 `M AGENTS.md`（非本体系产生，不碰、不代提交；提交 `.agent/` 只 `git add` 指定文件，严禁 `-a`/`-A`）。**该外部改动全程未碰**：本轮开始与结束均只观察到该文件为脏，未 add、未 commit。
 - **远程遗留分支**：远端仍有 `agent/issue-81-track-metadata`（#81 的分支，已合入 main `0f48b3a` 却未删）；契约 1.9 要求合回主干后删除临时分支，Executor 在 #81 收尾时遗漏。本轮未擅自删（属前序遗留，删除远程分支影响面小但需 Planner 知悉）。
 - 支持环境（D-017）：CI = ROS 2 **Jazzy**，本机 = **lyrical**；验证入口唯一为 `bash scripts/drive_gates.sh`（`QUICK=1` 快速轨）。**ROS1 运行时不在支持范围内**（仅源码对照基线 `FSAC/2025`）。
 - **`gh` 正常**：`issue list/view/create/comment/close`、`run list/view` 全部可用；账号 `zhangjszs`。`gh` **无** `milestone` 子命令（勿再试）。
 - **`gh issue list --json` 不接受 `commentCount` 字段**（输出为空）；用 `--json number,updatedAt,labels,title` + `gh issue view --json comments`。
 - **`gh run view --json jobs` 偶发空输出**：需重试。
-- CI：`0f48b3a` 的 push CI `39413891086` success；`126cc83` 的 CI `39416500750` **success**（13m31s）；`f5008d5` 的 CI `39418221488` **success**；#78 merge `a71b548` 的 CI `39422351603` 与 #79 merge `ea5e19b` 的 CI `39423649207` 本轮实测仍 `in_progress`（**结论待 Planner 复核**，run id 已写入 #78/#79 执行报告与本文件）。
+- CI：`0f48b3a` 的 push CI `39413891086` success；`126cc83` 的 CI `39416500750` **success**（13m31s）；`f5008d5` 的 CI `39418221488` **success**；#78 merge `a71b548` 的 CI `39422351603` **success**；#79 merge `ea5e19b` 的 CI `39423649207` **success**；.agent 收尾 `8bc9e19` 的 CI `39424306720` **success**（均已于 2026-10-20T20:56 由 Executor 实测复核，本轮无因本次变更导致的 CI 失败）。
 - Nightly **八连绿**（10-12/13×2/14/15/16/17/18/19），最新 `39331301871` @`b27fc64` success（10-19 调度点已过，本轮入账）。
 - **本机 DDS 发现失效（本轮实测，影响所有多节点 runtime 门禁）**：`ros2 node list` 恒为空；8 组环境组合矩阵（SHM / LOCALHOST_ONLY / RANGE / DOMAIN_ID）全败或仅偶发成功；数据面 40 s 收到 0 条 `/localization/vehicle_state`。**纯 std / 离线门禁（core_standalone、benchmark、lint、colcon test）不受影响**，可照常作为验收证据。
