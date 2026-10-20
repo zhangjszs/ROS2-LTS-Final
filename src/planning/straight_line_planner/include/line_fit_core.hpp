@@ -145,9 +145,13 @@ inline LineParams HoughFitCore(std::span<const P> cones, const LineDetectorConfi
     if (cones.size() < 2)
         return LineParams();
 
-    // 参数守卫 1（#62）：hough_min_inlier_ratio 必须为有限非负数，非有限或负值返回空 LineParams，防止 L87
-    // static_cast<int>(NaN/inf) 发生 UB
-    if (!std::isfinite(cfg.hough_min_inlier_ratio) || cfg.hough_min_inlier_ratio < 0.0) {
+    // 参数守卫 1（#62/#78）：hough_min_inlier_ratio 必须是 [0, 1] 内的有限数，否则返回空 LineParams。
+    // #62 已覆盖 NaN / +inf / -inf / 负值；#78 补上**超大有限值**（如 1e300）——
+    // 那类值会让下方的 static_cast<int>(ceil(ratio * cones.size())) 触发 float→int 溢出 UB
+    // （UBSan: 1e+301 is outside the range of representable values of type 'int'）。
+    // ratio > 1 判为非法与旧行为等价：此时自适应阈值大于总票数，本就返回空 LineParams。
+    if (!std::isfinite(cfg.hough_min_inlier_ratio) || cfg.hough_min_inlier_ratio < 0.0 ||
+        cfg.hough_min_inlier_ratio > 1.0) {
         return LineParams();
     }
 

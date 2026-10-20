@@ -150,6 +150,52 @@ TEST(LineFitCoreTest, HoughMinInlierRatioNanAndInfGuards) {
     EXPECT_FALSE(neg_ratio_res.valid);
 }
 
+TEST(LineFitCoreTest, HoughMinInlierRatioHugeFiniteValueGuard) {
+    auto pts = MakeLinePoints(0.05, 1.0, 1.0, 10.0, 1.0);
+    slp_core::LineDetectorConfig cfg;
+    cfg.enable_hough = true;  // 显式使能 Hough，防止前置未通过导致假绿
+
+    // (1) 1e300：#78 的原始复现值。修复前在 line_fit_core.hpp 的
+    //     static_cast<int>(ceil(ratio * cones.size())) 处触发 float→int 溢出 UB
+    //     （UBSan: 1e+301 is outside the range of representable values of type 'int'）
+    cfg.hough_min_inlier_ratio = 1e300;
+    EXPECT_FALSE(slp_core::HoughFitCore(std::span<const slp_core::Point2D>{pts}, cfg).valid);
+
+    // (2) INT_MAX 附近：乘积仍是有限 double，但超出 int 可表示范围
+    cfg.hough_min_inlier_ratio = 1e9;
+    EXPECT_FALSE(slp_core::HoughFitCore(std::span<const slp_core::Point2D>{pts}, cfg).valid);
+
+    // (3) double 最大值：ratio * 锥桶数 溢出成 inf，同样不得触发 UB
+    cfg.hough_min_inlier_ratio = std::numeric_limits<double>::max();
+    EXPECT_FALSE(slp_core::HoughFitCore(std::span<const slp_core::Point2D>{pts}, cfg).valid);
+
+    // (4) 刚越过上界 1.0：比例语义上界，判非法（与旧行为等价：阈值本就大于总票数）
+    cfg.hough_min_inlier_ratio = 1.0 + 1e-9;
+    EXPECT_FALSE(slp_core::HoughFitCore(std::span<const slp_core::Point2D>{pts}, cfg).valid);
+
+    // (5) 边界仍合法：ratio = 0.0 与 1.0 的输出必须与修复前逐字一致。
+    //     逐字一致性由 build/repro78.cpp 的黄金快照 diff 单独证明（修复前后位模式相同）；
+    //     此处断言的是「边界值仍被接受、且两端取到同一峰值」这一语义不变量。
+    //     注：rho 显式取 0.05（细分辨率）——默认 0.30 下 Hough 离散化误差达 0.067，
+    //     属算法本身的分辨率特性，与本守卫无关，不能用它做期望值基准。
+    cfg.hough_rho_resolution = 0.05;
+    cfg.hough_min_inlier_ratio = 0.0;
+    const auto zero_ratio = slp_core::HoughFitCore(std::span<const slp_core::Point2D>{pts}, cfg);
+    EXPECT_TRUE(zero_ratio.valid);
+    EXPECT_NEAR(zero_ratio.slope, 0.05, 0.05);
+    EXPECT_NEAR(zero_ratio.intercept, 1.0, 0.2);
+
+    cfg.hough_min_inlier_ratio = 1.0;
+    const auto one_ratio = slp_core::HoughFitCore(std::span<const slp_core::Point2D>{pts}, cfg);
+    EXPECT_TRUE(one_ratio.valid);
+    EXPECT_NEAR(one_ratio.slope, 0.05, 0.05);
+    EXPECT_NEAR(one_ratio.intercept, 1.0, 0.2);
+
+    // ratio = 0 与 ratio = 1 的自适应阈值同为总票数，取到同一峰值 → 输出逐位相同
+    EXPECT_DOUBLE_EQ(zero_ratio.slope, one_ratio.slope);
+    EXPECT_DOUBLE_EQ(zero_ratio.intercept, one_ratio.intercept);
+}
+
 TEST(LineFitCoreTest, HoughRhoResolutionDegradationDefined) {
     auto pts = MakeLinePoints(0.05, 1.0, 1.0, 10.0, 1.0);
     slp_core::LineDetectorConfig cfg;
