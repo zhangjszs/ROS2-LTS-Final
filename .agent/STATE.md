@@ -1,21 +1,21 @@
 # STATE
 
-- 更新时间：2026-10-20T20:56:43+08:00
-- 当前任务：**无 in-progress 任务**。#78 / #79 已完成并转 `in-review`；#82 转 `blocked`（环境阻塞，未提交代码）
-- 分支：`main` = `origin/main`（0/0 同步，无分叉）；临时分支 `agent/issue-78-hough-ub-guard`、`agent/issue-79-geodetic-core` 均已删除
+- 更新时间：2026-10-21T00:05:30+08:00（本轮自 2026-10-20 队列续开，跨午夜收尾）
+- 当前任务：**无 in-progress 任务**。今日队列五单 #81 / #80 / #78 / #79 / **#82** 全部完成并转 `in-review`
+- 分支：`main` = `origin/main`（0/0 同步，无分叉）；本轮所有临时分支已删除（含误推远程后已回收的 `agent/issue-82-ros-finish-loop`）
 - 未完成工作：无
 - 最近提交：
-  - `8bc9e19` chore(agent): exec-20261020 #78/#79 转 in-review、#82 转 blocked（.agent 状态，已推送）
-  - `ea5e19b` Merge branch 'agent/issue-79-geodetic-core' into main（#79，已推送）
-  - `0654d0e` refactor(vehicle_state): GeodeticToEnu 数学下沉纯 std 核并建立无 ROS 夹具（#79）
-  - `a71b548` Merge branch 'agent/issue-78-hough-ub-guard' into main（#78，已推送）
-  - `f56ff36` fix(straight_line_planner): 为 hough_min_inlier_ratio 增加 [0,1] 上界守卫，消除 float→int UB（#78）
-  - `f5008d5` chore(agent): exec-20261020 #80 转 in-review（.agent 状态）
-- CI 状态（已复核）：`39422351603`（#78 @ `a71b548`）**success** · `39423649207`（#79 @ `ea5e19b`）**success** · `39424306720`（.agent @ `8bc9e19`）**success**；更早的 `39416500750` / `39418221488` 亦 success
-- 今日日报：**已写**（`.agent/DIARY/2026-10-20.md`，本轮在原 49 行基础上**追加** #78/#79/#82 三段 + CI 复核补记，已写行未编辑）
+  - `40673b0` test(scripts): 给 accel 完赛门禁加 MAX_V 对照臂，证明绿不依赖人为限速（#82，已推送）
+  - `e5f9998` Merge branch 'agent/issue-82-ros-finish-loop' into main（#82，已推送；CI `39441369149` **success**）
+  - `343ecc3` feat(track_benchmark): ROS 闭环直线加速完赛——终点事件源 + 仲裁器锁存停门禁（#82）
+  - `90dd749` / `8bc9e19` chore(agent): exec-20261020 收尾与 CI 复核补记
+  - `ea5e19b` / `0654d0e`（#79）、`a71b548` / `f56ff36`（#78）
+- CI 状态：`39422351603`(#78) **success** · `39423649207`(#79) **success** · `39424306720`/`39426424030`(.agent) **success** · `39441369149`(#82 merge `e5f9998`) **success** · `39453577195`(#82 `40673b0`) 收尾时 `in_progress`，**待 Planner 复核**
+- 今日日报：**已写**（`.agent/DIARY/2026-10-20.md`，**追加**会话 3 段（#82 + 环境根因更正）；此前已追加会话 2 段（#78/#79/#82 阻塞）与 CI 复核补记；**已写入的行一律未编辑**，更正一律用新行追加）
 - 已知环境限制：
-  1. **本机 ROS 2 多节点 DDS 发现不可用**（VPN 网段 UDP 组播被挡；`FASTDDS_BUILTIN_TRANSPORTS=SHM` 反而使发现彻底失效；`ros2 node list` 恒空；数据面 40 s 收到 0 条 `/localization/vehicle_state`）→ 所有多节点 runtime 门禁与 #82 的 ROS 闭环验收在本机**无法产出可信证据**；纯 std / 离线门禁（core_standalone、benchmark、lint、colcon test）不受影响
-  2. `shellcheck` 本机未安装（advisory 层，CI 的 apt 步骤已安装）
-  3. 沙箱内 `bwrap --dev /dev` 无 `/dev/shm`，SHM 传输不可用（需沙箱外复测）
-  4. 远程遗留分支 `origin/agent/issue-81-track-metadata`（#81 已合入 main 却未删，前序轮遗漏；本轮未擅自删）
-  5. 工作区长期存在外部脏改动 `M AGENTS.md`（非本体系产生）——全程未读其内容、未 add、未 commit
+  1. **（本轮更正）本机并无"DDS 多节点发现不可用"这一限制**。先前现象的真因是 ros2cli daemon 未显式启动：`drive_gates.sh` 原先只 `daemon stop` 并指望自动重建，而在"每次执行都新建进程/会话"的环境里 daemon 随父进程退出 → `ros2 node list` 恒**超时**（rc=124，不是空表）→ 节点被误判"未注册"。`FASTDDS_BUILTIN_TRANSPORTS=SHM` 处方一直有效。已修为 `stop` + 显式 `start` + `sleep 3`，**本机完整版 `drive_gates.sh` 12 门全 PASS、hard_fail=0、440s**。
+  2. **跨进程 DDS 诊断的方法学约束**：publisher 与 subscriber 必须在**同一次执行**内起；分到两次工具调用 = 两个独立 bwrap 沙箱（各自独立 `/dev/shm`，且 `--die-with-parent` 会回收后台进程），怎么调环境变量都不可能成功。
+  3. 本机 `/tmp` 只读（AGENTS.md 已载）：`ROS_HOME`/`TMPDIR` 必须指向 `build/` 下可写目录，否则 daemon 与 launch_ros 参数文件都会失败。
+  4. 其余 5 个既有 runtime 脚本头部仍只 `daemon stop`——单独直跑时仍会假失败（经 `drive_gates.sh` 调用不受影响）。本轮按最小改动未逐个修改。
+  5. `shellcheck` 本机未安装（advisory 层，CI 已装）；远程仍有前序轮遗留分支 `origin/agent/issue-81-track-metadata`（未擅删，见 TASKS.md）。
+  6. 工作区长期存在外部脏改动 `M AGENTS.md`（非本体系产生）——全程未读其内容、未 add、未 commit。
