@@ -230,6 +230,17 @@ for name in ("acceleration", "skidpad", "trackdrive"):
     for k in ("track_version", "run_status", "valid_laps", "out_of_bounds_events", "collision_events"):
         if b.get(k) != o.get(k):
             name_fails.append(f"{k} 从 {b.get(k)!r} 变到 {o.get(k)!r}")
+    # #80：直线赛的完赛判据字段同样是硬口径（完赛/停稳语义不得静默漂移）。
+    # 闭合赛道无终点语义 → 这些字段恒为缺省值、无信息量，故只对 acceleration 比对；
+    # 这样 skidpad/trackdrive 的既有基线文件保持字节不变（#80 明确不包含改它们）。
+    if name == "acceleration":
+        for k in ("finish_crossed", "stopped"):
+            if b.get(k) != o.get(k):
+                name_fails.append(f"{k} 从 {b.get(k)!r} 变到 {o.get(k)!r}")
+        for k in ("finish_time_s", "stop_position_m", "stop_distance_m"):
+            bv, ov = float(b.get(k) or 0), float(o.get(k) or 0)
+            if abs(ov - bv) > 1e-6:
+                name_fails.append(f"{k} {bv} -> {ov} 变化（完赛判据为硬口径，不允许漂移）")
     # 软口径：rmse / 圈速 在比例容差内
     for k, tol in (("rmse_lateral_m", rmse_tol), ("best_valid_lap_time_s", lap_tol)):
         bv, ov = float(b.get(k) or 0), float(o.get(k) or 0)
@@ -400,8 +411,119 @@ else
     echo "OK   调参集变体真实生效：走廊收紧 0.2 后越界样本 ${base_oob} → ${tight_oob}（仅入 ${TUNE_DIR}，不参与基线对账）"
 fi
 
+echo "=== 9) 直线赛完赛判据（#80：越过终点线 + 终点后缓冲区停稳）==="
+# 三层机读证据：
+#   9.1 KPI JSON 字段：完赛判据字段本身必须命中（不得只比较 max_speed/RMSE）
+#   9.2 指令时间线：终点线之前**无制动**、越线后才进入制动/停车逻辑（读 runner 的 stderr 机读行）
+#   9.3 可证伪：--no-post-finish-braking 必须让完赛判据失败（否则判据形同虚设）
+# 完赛边界（终点线 / 缓冲区末端）从第 5 节导出的 tracks.json 读取，不在脚本里硬编码。
+MANIFEST="${OUT_DIR}/tracks_export/tracks.json"
+if [ ! -f "${MANIFEST}" ]; then
+    echo "FAIL 缺 ${MANIFEST}（第 5 节未导出赛道清单，无法确定完赛边界）"
+    fail=1
+else
+    python3 - "${OUT_DIR}/acceleration.json" "${OUT_DIR}/acceleration.log" "${MANIFEST}" <<'PY'
+import json, sys
+
+acc_json, acc_log, manifest = sys.argv[1:4]
+fails = []
+try:
+    d = json.load(open(acc_json))
+except Exception as exc:
+    print(f"FAIL acceleration: 读不出 KPI JSON {acc_json}（{exc}）")
+    sys.exit(1)
+
+# —— 完赛边界来自赛道清单（#81 元数据；不硬编码 75/100）——
+try:
+    tracks = json.load(open(manifest)).get("tracks", [])
+    acc = next((t for t in tracks if t.get("id") == "acceleration-75m"), None)
+    if acc is None:
+        raise KeyError("acceleration-75m 不在 tracks.json 中")
+    finish_x = float(acc["finish_x"])
+    runout_end = float(acc["runout_end_m"])
+except Exception as exc:
+    print(f"FAIL acceleration: 无法从 tracks.json 读取完赛边界（{exc}）")
+    sys.exit(1)
+
+# —— 9.1 KPI JSON 字段 ——
+if d.get("finish_crossed") is not True:
+    fails.append(f"finish_crossed 期望 true，实际 {d.get('finish_crossed')!r}")
+finish_time = float(d.get("finish_time_s") or 0)
+if finish_time <= 0.0:
+    fails.append(f"finish_time_s 期望 >0，实际 {d.get('finish_time_s')!r}")
+if d.get("stopped") is not True:
+    fails.append(f"stopped 期望 true，实际 {d.get('stopped')!r}")
+stop_pos = float(d.get("stop_position_m") or 0)
+if not finish_x < stop_pos <= runout_end:
+    fails.append(f"stop_position_m 期望落在 ({finish_x}, {runout_end}]，实际 {stop_pos!r}")
+stop_dist = float(d.get("stop_distance_m") or 0)
+if not 0.0 < stop_dist <= runout_end - finish_x:
+    fails.append(f"stop_distance_m 期望落在 (0, {runout_end - finish_x}]，实际 {stop_dist!r}")
+if d.get("finished") is not True:
+    fails.append(f"finished 期望 true，实际 {d.get('finished')!r}")
+
+# —— 9.2 指令时间线（终点线之前无制动、越线后才制动）——
+tl = {}
+try:
+    for line in open(acc_log):
+        if "[benchmark_runner] finish:" in line:
+            for kv in line.split("finish:", 1)[1].split():
+                if "=" in kv:
+                    k, _, v = kv.partition("=")
+                    tl[k] = v
+except Exception as exc:
+    fails.append(f"读不到完赛判据时间线 {acc_log}（{exc}）")
+
+if not tl:
+    fails.append("完赛判据时间线缺失（runner 未输出 [benchmark_runner] finish: 行）")
+else:
+    if tl.get("enabled") != "1":
+        fails.append(f"完赛判据未启用（enabled={tl.get('enabled')!r}）")
+    if tl.get("crossed") != "1":
+        fails.append(f"时间线未记录越线（crossed={tl.get('crossed')!r}）")
+    if tl.get("pre_finish_brake") != "0":
+        fails.append(f"终点线之前出现制动指令（pre_finish_brake={tl.get('pre_finish_brake')!r}，必须为 0）")
+    if tl.get("runout_exceeded") != "0":
+        fails.append(f"冲出停车缓冲区（runout_exceeded={tl.get('runout_exceeded')!r}）")
+    try:
+        cross_t = float(tl.get("cross_t", "-1"))
+        brake_t = float(tl.get("brake_t", "-1"))
+        if brake_t < cross_t:
+            fails.append(f"制动时刻 {brake_t} 早于越线时刻 {cross_t}（越线后才允许制动）")
+        tl_stop_x = float(tl.get("stop_x", "-1"))
+        if not finish_x < tl_stop_x <= runout_end:
+            fails.append(f"时间线停车位置 {tl_stop_x} 不在 ({finish_x}, {runout_end}] 内")
+    except ValueError as exc:
+        fails.append(f"时间线字段解析失败（{exc}）")
+
+if fails:
+    print("FAIL acceleration 完赛判据未通过：")
+    for f in fails:
+        print("       -", f)
+    sys.exit(1)
+print(f"OK   acceleration 完赛判据：finish_x={finish_x} runout_end={runout_end} "
+      f"finish_crossed=true finish_time_s={finish_time} stopped=true "
+      f"stop_position_m={stop_pos} stop_distance_m={stop_dist}（终点线之前无制动）")
+PY
+    [ $? -eq 0 ] || fail=1
+fi
+
+# —— 9.3 可证伪：禁用越线后制动 → 完赛判据必须失败 ——
+ros2 run track_benchmark benchmark_runner --out "${OUT_DIR}/accel_nobrake.json" \
+    --track acceleration --no-post-finish-braking >/dev/null 2>"${OUT_DIR}/accel_nobrake.log"
+nb_rc=$?
+nb_stopped="$(grep -oE '"stopped": (true|false)' "${OUT_DIR}/accel_nobrake.json" 2>/dev/null | head -1 | grep -oE '(true|false)')"
+nb_crossed="$(grep -oE '"finish_crossed": (true|false)' "${OUT_DIR}/accel_nobrake.json" 2>/dev/null | head -1 | grep -oE '(true|false)')"
+if [ "${nb_rc}" -ne 0 ] && [ "${nb_stopped}" = "false" ] && [ "${nb_crossed}" = "true" ]; then
+    echo "OK   可证伪：--no-post-finish-braking 下 rc=${nb_rc} finish_crossed=true stopped=false（越线后未停稳 → 判据如期失败）"
+else
+    echo "FAIL 可证伪失效：--no-post-finish-braking 下 rc=${nb_rc} finish_crossed=${nb_crossed:-<无>} stopped=${nb_stopped:-<无>}"
+    echo "       （应为 rc≠0 且 finish_crossed=true / stopped=false）"
+    fail=1
+fi
+
 if [ "${fail}" -ne 0 ]; then
   echo "Benchmark regression: FAILED"
   exit 1
 fi
-echo "Benchmark regression: 正向完成性 + 可复现性 + 负样本判据 + 单一赛道来源 + 基线对账 + 速度口径 + 第三臂基线 + 调参分离 全部通过 ✔"
+echo "Benchmark regression: 正向完成性 + 可复现性 + 负样本判据 + 单一赛道来源 + 基线对账 + 速度口径 + 第三臂基线 + 调参分离 + 完赛判据 全部通过 ✔"

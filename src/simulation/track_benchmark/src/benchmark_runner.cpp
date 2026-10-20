@@ -15,6 +15,8 @@
 // #19 B1：MPC 数学核（mpc_controller_lib，无 rclcpp 依赖）离线接入
 #include "mpc_controller/mpc_model.hpp"
 #include "track_benchmark/controller_diag.hpp"
+// #80：直线赛完赛判据（纯 std 核心；终点线 + 终点后停车缓冲区）
+#include "track_benchmark/finish_judge.hpp"
 #include "track_benchmark/kpi_evaluator.hpp"
 #include "track_benchmark/speed_envelope.hpp"  // #29：速度包络单一实现（PP 分支与 MPC 参考同函数）
 #include "track_benchmark/track_generator.hpp"
@@ -81,6 +83,9 @@ struct RunnerConfig {
     // 所以调参声明的网格必须把 eps/max_iter/band 三维一起覆盖（-1 = 沿用代码默认值）。
     double mpc_acceptable_primal = -1.0;
     double mpc_acceptable_dual = -1.0;
+    // #80：越线后制动开关（默认启用）。--no-post-finish-braking 禁用它 → 车辆越过终点线
+    // 后不再减速，必然冲过停车缓冲区末端 → 停稳判据必然失败（可证伪钩子）。
+    bool post_finish_braking = true;
 };
 
 // 开环固定舵角 (rad)：取单一侧的小角度，使车辆持续向走廊外推进。
@@ -196,6 +201,15 @@ struct RunResult {
     bool ok = false;
     // #44：只观察不干预；不进 KPI JSON，由 --diag-out 写独立产物
     benchmark::ControllerDiagnostics diag;
+    // #80：完赛判据的时间线证据（机读，走 stderr）。pre_finish_brake_samples 是
+    // “终点线之前是否下发过负加速度指令”的拍数——它必须为 0（#80 验收第 2 条）；
+    // brake_start_time_s 是首次制动指令的时刻，必须不早于越线时刻。
+    bool finish_enabled{false};
+    double finish_v_cap{0.0};
+    double brake_start_time_s{-1.0};
+    int pre_finish_brake_samples{0};
+    double stop_speed_mps{0.0};
+    bool runout_exceeded{false};
 };
 
 RunResult run(const RunnerConfig& cfg) {
@@ -231,6 +245,19 @@ RunResult run(const RunnerConfig& cfg) {
 
     VehicleParams vp{};
     BicycleModel model(vp);
+
+    // #80：直线赛完赛判据参数。终点线与停车缓冲区位置来自赛道元数据（#81，不硬编码
+    // 75/100），制动能力来自车辆参数（vp.max_decel），停稳阈值与安全系数用判据核默认值。
+    benchmark::FinishRunoutSpec finish_spec;
+    if (track->hasFinish()) {
+        finish_spec.enabled = true;
+        finish_spec.finish_x = *track->finish_x;
+        finish_spec.runout_end_m = *track->runout_end_m;
+        finish_spec.brake_decel = vp.max_decel;
+    }
+    benchmark::FinishJudge finish_judge(finish_spec);
+    // 到达速度上限：由“越线后必须在缓冲区内停稳”反推（见 finish_judge.hpp）。0 = 不限速。
+    const double finish_v_cap = benchmark::approachSpeedCap(finish_spec);
     // 反向场景：初始航向翻转 180°，目标点沿 -s 方向选取 → 车辆物理地倒跑过起点线。
     const double init_theta = cl.front().theta + (reverse ? std::numbers::pi : 0.0);
     model.Reset(cl.front().x, cl.front().y, init_theta, 0.0);
@@ -247,6 +274,14 @@ RunResult run(const RunnerConfig& cfg) {
     double t = 0.0;
     bool reached_end = false;
     bool frozen = false;
+    // #80：直线赛完赛过程状态（时间线证据，喂给 stderr 与门禁断言）。
+    bool stopped = false;          // 已在停车缓冲区内停稳
+    bool runout_exceeded = false;  // 越线后未停稳就冲过缓冲区末端 → 本次运行失败
+    bool brake_started = false;    // 是否已下发过越线后制动指令
+    double brake_start_time_s = -1.0;
+    double stop_position_m = 0.0;
+    double stop_speed_mps = 0.0;
+    int pre_finish_brake_samples = 0;  // 终点线之前的负加速度指令拍数（必须为 0）
     size_t guard = 0;
     const size_t max_steps = static_cast<size_t>(cfg.timeout_s / cfg.dt) + 10;
 
@@ -323,6 +358,9 @@ RunResult run(const RunnerConfig& cfg) {
             return res;
         }
 
+        // #80：越线检测（用本拍最新观测）。判据层只观测不干预，制动指令由下方既有控制链路发出。
+        finish_judge.Update(s.x, s.v, t);
+
         size_t idx = 0;
         eval.ComputeCrossTrackError(s.x, s.y, s.theta, &idx);
 
@@ -391,6 +429,26 @@ RunResult run(const RunnerConfig& cfg) {
             steer = std::clamp(steer_bias, -vp.max_steer_angle, vp.max_steer_angle);
         }
 
+        // #80：赛制速度上限（仅对有终点语义的赛道生效）。超过上限后**只停止加速**
+        // （正加速度截到 0），全程不产生制动指令——终点线之前不得出现负加速度
+        // （#80 验收第 2 条）；停车由越线后的制动段负责。
+        if (finish_v_cap > 0.0 && s.v >= finish_v_cap && accel > 0.0)
+            accel = 0.0;
+
+        // #80：越线后才进入制动/停车逻辑，经既有 ControlCommand 链路下发
+        // （不得为判据写“瞬移/直接置零”式后门）。
+        if (finish_judge.crossed() && cfg.post_finish_braking) {
+            accel = -vp.max_decel;
+            if (!brake_started) {
+                brake_started = true;
+                brake_start_time_s = t;
+            }
+        }
+
+        // #80：“终点线之前无制动”的机读计数（终点线之前下发负加速度的拍数，必须为 0）。
+        if (finish_spec.enabled && !finish_judge.crossed() && accel < 0.0)
+            ++pre_finish_brake_samples;
+
         // #44：诊断统一记账（只观察，不影响上面已算出的 steer/accel）。
         // 口径：hold = 这一拍下发的指令不是该臂控制律新鲜算出来的（MPC 未收敛，
         // 或被注入类开环接管）；两臂各自在自己的“控制拍”上计数，跨臂比较的是比率。
@@ -418,7 +476,21 @@ RunResult run(const RunnerConfig& cfg) {
         const VehicleState& ns = model.state();
         eval.Update(ns.x, ns.y, ns.theta, ns.v, ns.steering_angle, t);
 
-        if (!closed && idx + 1 >= cl.size()) {
+        if (finish_spec.enabled) {
+            // #80：直线赛终止判定 —— 在缓冲区内停稳（成功）/ 冲过缓冲区末端（失败）。
+            if (finish_judge.IsStopped(ns.x, ns.v)) {
+                stopped = true;
+                stop_position_m = ns.x;
+                stop_speed_mps = ns.v;
+                break;
+            }
+            if (finish_judge.ExceededRunout(ns.x)) {
+                runout_exceeded = true;
+                stop_position_m = ns.x;
+                stop_speed_mps = ns.v;
+                break;
+            }
+        } else if (!closed && idx + 1 >= cl.size()) {
             reached_end = true;
             break;
         }
@@ -433,8 +505,20 @@ RunResult run(const RunnerConfig& cfg) {
     summary.elapsed_s = t;
     const bool laps_ok = !closed || cfg.require_laps == 0 || summary.valid_laps >= cfg.require_laps;
     const bool rmse_ok = !(summary.total_samples > 0 && summary.rmse_lateral_m > cfg.rmse_max);
+    // #80：直线赛完赛判据落成 KPI 字段（终点线 + 终点后停车缓冲区）。
+    summary.finish_crossed = finish_judge.crossed();
+    summary.finish_time_s = finish_judge.cross_time_s();
+    summary.stopped = stopped;
+    summary.stop_position_m = stopped ? stop_position_m : 0.0;
+    summary.stop_distance_m = stopped ? (stop_position_m - finish_spec.finish_x) : 0.0;
     // 反向/越界/碰桶/驻停等故障场景必须回落到未达标（laps_ok 由有效圈保证，rmse_ok 由走廊误差保证）。
-    if (closed) {
+    if (finish_spec.enabled) {
+        // 直线赛完赛 = 越线 + 在终点后停车缓冲区内停稳 + 走廊误差合格 + 未越界/未碰桶。
+        // 后两项把“评测器识别故障”接进完赛语义：撞桶/驶出走廊的运行不算有效完赛——
+        // 否则越线比原先更早（采样窗口更短）反而会让故障样本的 rmse 变小而侥幸过关。
+        summary.finished = stopped && rmse_ok && summary.out_of_bounds_events == 0 && summary.collision_events == 0;
+        summary.run_status = summary.finished ? "finished" : (t >= cfg.timeout_s ? "timeout" : "incomplete");
+    } else if (closed) {
         summary.finished = laps_ok && rmse_ok;
         summary.run_status = summary.finished ? "finished" : (t >= cfg.timeout_s ? "timeout" : "incomplete");
     } else {
@@ -447,6 +531,13 @@ RunResult run(const RunnerConfig& cfg) {
     res.elapsed = t;
     res.run_status = summary.run_status;
     res.ok = summary.finished;
+    // #80：完赛判据时间线证据（供门禁断言，不进 KPI JSON）。
+    res.finish_enabled = finish_spec.enabled;
+    res.finish_v_cap = finish_v_cap;
+    res.brake_start_time_s = brake_start_time_s;
+    res.pre_finish_brake_samples = pre_finish_brake_samples;
+    res.stop_speed_mps = stop_speed_mps;
+    res.runout_exceeded = runout_exceeded;
     return res;
 }
 
@@ -458,6 +549,7 @@ void print_usage() {
               << "       [--controller pure_pursuit|mpc] [--mpc-update-period S]\n"
               << "       [--diag-out FILE.json]   # #44 控制器诊断独立产物，不写则一律行为不变\n"
               << "       [--corridor-scale S]     # #45 调参集变体（仅缩放越界走廊；比较集必须用 1.0）\n"
+              << "       [--no-post-finish-braking]  # #80 禁用越线后制动（可证伪开关：完赛判据必然失败）\n"
               << "       [--mpc-eps-abs V] [--mpc-eps-rel V] [--mpc-rho V] [--mpc-max-iter N]\n"
               << "       [--mpc-acceptable-primal V] [--mpc-acceptable-dual V]\n"  // #48/§7.6 兜底带同轮扫
               << "                                  # #45 QP 调参旋钮（缺省=沿用代码默认值，零漂移）\n"
@@ -540,6 +632,8 @@ int main(int argc, char** argv) {
             cfg.mpc_acceptable_dual = std::stod(next("-1"));
         else if (a == "--const-speed")
             cfg.const_speed_mps = std::stod(next("5"));
+        else if (a == "--no-post-finish-braking")
+            cfg.post_finish_braking = false;  // #80 可证伪钩子：越线后不再制动 → 停稳判据必然失败
         else if (a == "--out")
             cfg.out = next("");
         else if (a == "--export-tracks") {
@@ -587,5 +681,13 @@ int main(int argc, char** argv) {
     std::cerr << "[benchmark_runner] track=" << cfg.track << " controller=" << cfg.controller
               << " inject=" << cfg.inject << " speed_source=" << cfg.speed_source << " status=" << res.run_status
               << " laps=" << res.summary.valid_laps << " rmse=" << res.summary.rmse_lateral_m << "\n";
+    // #80：完赛判据时间线（机读）：门禁据此断言“终点线之前无制动、越线后才进入制动/停车逻辑”。
+    // 字段顺序固定，便于脚本稳定解析；不进 KPI JSON（避免基线口径无谓变更）。
+    std::cerr << "[benchmark_runner] finish: enabled=" << (res.finish_enabled ? 1 : 0)
+              << " crossed=" << (res.summary.finish_crossed ? 1 : 0) << " cross_t=" << res.summary.finish_time_s
+              << " brake_t=" << res.brake_start_time_s << " pre_finish_brake=" << res.pre_finish_brake_samples
+              << " stopped=" << (res.summary.stopped ? 1 : 0) << " stop_x=" << res.summary.stop_position_m
+              << " stop_v=" << res.stop_speed_mps << " v_cap=" << res.finish_v_cap
+              << " runout_exceeded=" << (res.runout_exceeded ? 1 : 0) << "\n";
     return res.ok ? 0 : 1;
 }
