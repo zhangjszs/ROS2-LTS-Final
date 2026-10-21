@@ -51,6 +51,11 @@ struct ConeSideSplit {
  */
 template <BaseLinkConeLike C>
 [[nodiscard]] ConeSideSplit SplitConesBySide(std::span<const C> cones, double center_margin) {
+    // #84：center_margin 非法（非有限/负值）时回退默认 0.3（与 LineDetectorConfig 默认一致）。
+    // NaN 曾使两侧比较恒 false → 全部锥桶被静默丢弃，表现为无解释的“无锥桶/无路径”。
+    if (!std::isfinite(center_margin) || center_margin < 0.0) {
+        center_margin = 0.3;
+    }
     ConeSideSplit split;
     split.left.reserve(cones.size());
     split.right.reserve(cones.size());

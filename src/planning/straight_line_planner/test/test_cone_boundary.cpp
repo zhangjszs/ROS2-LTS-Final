@@ -111,6 +111,21 @@ TEST(ConeBoundarySplit, SplitIndicesPreserveInputOrder) {
     EXPECT_EQ(split.right, (std::vector<std::size_t>{0, 2}));
 }
 
+TEST(ConeBoundarySplit, IllegalMarginFallsBackToDefault) {
+    // #84：NaN margin 曾使两侧比较恒 false → 全部锥桶被静默丢弃；
+    // 现回退默认 0.3，合法几何的分离结果必须与显式传 0.3 逐位一致。
+    const std::vector<TestCone> cones = {MakeCone(-1.8), MakeCone(1.2)};
+    const auto expected = Split(cones, 0.3);
+    for (double bad_margin :
+         {kNaN, std::numeric_limits<double>::infinity(), -std::numeric_limits<double>::infinity(), -0.5}) {
+        const auto split = Split(cones, bad_margin);
+        EXPECT_EQ(split.left, expected.left) << bad_margin;
+        EXPECT_EQ(split.right, expected.right) << bad_margin;
+        EXPECT_FALSE(split.left.empty()) << bad_margin;  // 不得静默清空锥桶
+        EXPECT_FALSE(split.right.empty()) << bad_margin;
+    }
+}
+
 // ---------------------------------------------------------------------------
 // 边界可接受性判定（宽度阈值）
 // ---------------------------------------------------------------------------
