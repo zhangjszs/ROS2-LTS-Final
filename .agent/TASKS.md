@@ -1,9 +1,9 @@
 # TASKS.md — Issue 本地镜像（权威：GitHub Issue；本文件由 Planner 每轮整体重写）
 
-> 维护者：Planning Agent｜最后更新：2026-10-21T07:30+08:00（`plan-20261021b` **同日复入轮**：S2a 验收结论维持；今日队列 = P3 积压 **#83/#84/#85 + 新增 #86**；共 **29 open**）
+> 维护者：Planning Agent｜最后更新：2026-10-21T08:00+08:00（`plan-20261021c` **同日第三轮·纯看护**：无执行轮、无新事实，S2a 验收结论与今日队列维持；入账 21b 两笔 `.agent` 提交 CI success；共 **29 open**）
 > 规则：本文件只读镜像，Executor 改状态时先改 Issue 再同步对应行；冲突以 Issue 为准。
 > 日报：`.agent/DIARY/2026-10-20.md`（三会话 + 补记）已由上一执行轮产出，上轮验收已逐条引用并独立复核。**10-21 尚无日报**（无执行轮）。
-> 🆕 **本轮变化**：`main` 前进到 `9c46174`（仅用户 `docs(agents)` 提交，无代码）；Nightly 10-20 与 HEAD CI 入账；新增 **#86**（AGENTS.md/CLAUDE.md 的 daemon「自动重建」表述与 #82 实测冲突，docs-only）；#83/#84 验收命令收紧为 `core_standalone_check.sh` / `QUICK=1 drive_gates.sh`；裁 **D-020**（文档纠错不并入 #69）。
+> 🆕 **本轮变化（plan-20261021c）**：`main` 前进到 `8df444c`（仅 plan-20261021b 的两笔 `chore(agent)` 提交，无代码）；其 CI `39515233351`(`e2b1e68`)/`39515260640`(`8df444c`) 均 **success** 已入账。**无执行轮**（10-21 无日报）、无新评论、无新事实：#83/#84/#85/#86 仍 `ready-for-agent`、0 评论；7 个 blocked 的 `updatedAt` 无变化；遗留分支 `origin/agent/issue-81-track-metadata` 仍在（清理指令维持）。队列维持 4 项不变。
 > ✅ **验收性质说明**：五单报告均**属实**，无「报告失实」项；且 #82 会话 3 主动更正了会话 2 一份**失实的 `blocked` 报告**（误判「本机 DDS 不可用」→ 真因 ros2cli daemon 未显式启动），本轮以门禁留痕独立验证更正为真（closed-loop/fault/closed-loop-fault 三门均 PASS）。
 
 ## 今日队列（2026-10-21，给 Executor 的建议顺序）
@@ -77,7 +77,7 @@
 
 ## 环境与流程注意（本轮实测/复核）
 
-- 基线：`main` = `origin/main` = `9c46174`（**0/0 同步**，无分叉）。上轮验收基线 `761817e`；其后仅用户 `docs(agents)` 一次提交（`9c46174`，01:10，AGENTS.md 重写），**无代码提交**。本轮为纯复核/治理轮，零代码提交；提交 `.agent/` 只 `git add` 指定文件，严禁 `-a`/`-A`。
+- 基线：`main` = `origin/main` = `8df444c`（**0/0 同步**，无分叉）。上上轮验收基线 `761817e`；其后仅 `9c46174`（用户 docs，AGENTS.md 重写）+ 两笔 `chore(agent)`（`e2b1e68`/`8df444c`），**无代码提交**。本轮亦为纯看护轮，零代码提交；提交 `.agent/` 只 `git add` 指定文件，严禁 `-a`/`-A`。
 - **AGENTS.md 不再是外部脏改动**：已被用户提交（`9c46174`），工作区干净，`git status --short` 为空。但该文件仍存在一条与 #82 实测冲突的表述（“stop 后自动重建”）→ 已立 **#86**。
 - **独立复核证据（本轮 Planner 第一方，非仅采信报告）**：
   - `bash scripts/core_standalone_check.sh` → EXIT=0，**32/32 通过、ASan+UBSan 干净**，含 `test_track_generator`(#81)/`test_finish_judge`(#80)/`test_line_fit_core`(#78)/`test_geodetic_core`(#79)。
@@ -87,4 +87,4 @@
 - **远程遗留分支**：`origin/agent/issue-81-track-metadata`（#81 已合入 `0f48b3a` 却未删，违契约 1.9）**仍在**。上轮未擅自删除（属前序 Executor 遗留分支）；已亲验该分支 tip `1aae347` 为 main 祖先，**删除安全**；**请下一执行轮清理**，PLAN「给 Executor 的指令」已提示。
 - **支持环境（D-017）**：CI = ROS 2 **Jazzy**，本机 = **lyrical**；验证入口唯一 `bash scripts/drive_gates.sh`（`QUICK=1` 快速轨）。**ROS1 运行时不在支持范围**（对照基线 `FSAC/2025`）。
 - `gh` 正常（账号 `zhangjszs`）；`gh` **无** `milestone` 子命令；`gh issue list --json` 不接受 `commentCount`。
-- CI/Nightly（本轮核实 2026-10-21T07:24+08:00）：HEAD `9c46174` CI `39463759166` **success**；Nightly 10-20 `39498071564` @ `main` **success**（上轮“下一轮入账”已结清，连续 9 次 success）。
+- CI/Nightly（本轮核实 2026-10-21T08:00+08:00）：HEAD `8df444c` CI `39515260640` **success**；`e2b1e68` CI `39515233351` **success**；`9c46174` CI `39463759166` **success**；Nightly 10-20 `39498071564` @ `main` **success**，连续 9 次 success（10-13 起）。
