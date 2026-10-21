@@ -315,7 +315,98 @@ TEST(LineFitCoreTest, TemporalFilterTransitions) {
     EXPECT_EQ(prev_age, 0);
 }
 
-// ── 6. 鸭子类型（Position2DLike）多类型适配 ─────────────────────────────────
+// ── 7. 参数清洗（#84）：非法时序滤波参数回退默认，不产出 NaN 线 ──────────────
+
+TEST(LineFitCoreTest, SanitizeConfigFallsBackToDefaults) {
+    slp_core::LineDetectorConfig cfg;
+    cfg.temporal_filter_alpha = std::numeric_limits<double>::quiet_NaN();
+    cfg.temporal_filter_jump_threshold = -1.0;
+    cfg.temporal_filter_intercept_jump = std::numeric_limits<double>::infinity();
+    cfg.center_margin = -0.5;
+
+    const auto sanitized = slp_core::SanitizeLineDetectorConfig(cfg);
+    ASSERT_EQ(sanitized.fixes.size(), 4u);
+    EXPECT_STREQ(sanitized.fixes[0].name, "temporal_filter_alpha");
+    EXPECT_DOUBLE_EQ(sanitized.cfg.temporal_filter_alpha, 0.3);
+    EXPECT_STREQ(sanitized.fixes[1].name, "temporal_filter_jump_threshold");
+    EXPECT_DOUBLE_EQ(sanitized.cfg.temporal_filter_jump_threshold, 0.4);
+    EXPECT_STREQ(sanitized.fixes[2].name, "temporal_filter_intercept_jump");
+    EXPECT_DOUBLE_EQ(sanitized.cfg.temporal_filter_intercept_jump, 4.0);
+    EXPECT_STREQ(sanitized.fixes[3].name, "center_margin");
+    EXPECT_DOUBLE_EQ(sanitized.cfg.center_margin, 0.3);
+    // 非法值被记录在案，供适配层 WARN
+    EXPECT_TRUE(std::isnan(sanitized.fixes[0].bad_value));
+    EXPECT_DOUBLE_EQ(sanitized.fixes[1].bad_value, -1.0);
+}
+
+TEST(LineFitCoreTest, SanitizeConfigKeepsLegalConfigUntouched) {
+    slp_core::LineDetectorConfig cfg;
+    cfg.temporal_filter_alpha = 1.0;           // [0,1] 边界合法
+    cfg.temporal_filter_jump_threshold = 0.0;  // >= 0 边界合法
+    cfg.temporal_filter_intercept_jump = 2.5;
+    cfg.center_margin = 0.3;
+
+    const auto sanitized = slp_core::SanitizeLineDetectorConfig(cfg);
+    EXPECT_TRUE(sanitized.fixes.empty());
+    EXPECT_DOUBLE_EQ(sanitized.cfg.temporal_filter_alpha, 1.0);
+    EXPECT_DOUBLE_EQ(sanitized.cfg.temporal_filter_jump_threshold, 0.0);
+    EXPECT_DOUBLE_EQ(sanitized.cfg.temporal_filter_intercept_jump, 2.5);
+    EXPECT_DOUBLE_EQ(sanitized.cfg.center_margin, 0.3);
+}
+
+TEST(LineFitCoreTest, TemporalFilterIllegalAlphaFallsBackToDefault) {
+    // NaN/±inf/越界 alpha 均回退 0.3，输出必须有限且与合法 alpha=0.3 逐位一致
+    const slp_core::LineParams prev_val(0.1, 1.0);
+    const slp_core::LineParams cur(0.2, 1.2);
+    for (double bad_alpha : {std::numeric_limits<double>::quiet_NaN(), std::numeric_limits<double>::infinity(),
+                             -std::numeric_limits<double>::infinity(), 1.5, -0.1}) {
+        slp_core::LineDetectorConfig cfg;
+        cfg.temporal_filter_alpha = bad_alpha;
+        slp_core::LineParams prev = prev_val;
+        bool has_prev = true;
+        int age = 0;
+        const auto out = slp_core::ApplyTemporalFilterCore(cur, prev, has_prev, age, cfg);
+        EXPECT_TRUE(out.valid) << bad_alpha;
+        EXPECT_TRUE(std::isfinite(out.slope)) << bad_alpha;
+        EXPECT_TRUE(std::isfinite(out.intercept)) << bad_alpha;
+        EXPECT_NEAR(out.slope, 0.13, 1e-12) << bad_alpha;      // 0.3*0.2 + 0.7*0.1
+        EXPECT_NEAR(out.intercept, 1.06, 1e-12) << bad_alpha;  // 0.3*1.2 + 0.7*1.0
+    }
+}
+
+TEST(LineFitCoreTest, TemporalFilterNanJumpThresholdKeepsSuppressionActive) {
+    // NaN 阈值曾使跳变比较恒 false → 抑制被静默关闭（0.1→0.9 不被拒，age=0）；
+    // 现回退默认 0.4，突变必须被拒并续用上一帧（age 递增）
+    for (double bad : {std::numeric_limits<double>::quiet_NaN(), -std::numeric_limits<double>::infinity(), -1.0}) {
+        slp_core::LineDetectorConfig cfg;
+        cfg.temporal_filter_alpha = 0.3;
+        cfg.temporal_filter_jump_threshold = bad;
+        cfg.temporal_filter_intercept_jump = 4.0;
+        slp_core::LineParams prev(0.1, 1.0);
+        bool has_prev = false;
+        int age = 0;
+        (void)slp_core::ApplyTemporalFilterCore(slp_core::LineParams(0.1, 1.0), prev, has_prev, age, cfg);
+        ASSERT_TRUE(has_prev);
+        const auto rejected =
+            slp_core::ApplyTemporalFilterCore(slp_core::LineParams(0.9, 1.0), prev, has_prev, age, cfg);
+        EXPECT_EQ(age, 1) << bad;  // 跳变被拒，续用上一帧
+        EXPECT_DOUBLE_EQ(rejected.slope, 0.1) << bad;
+    }
+
+    // 截距跳变阈值非法同样不关闭抑制（|1.0→6.0| = 5.0 > 4.0 默认阈值 → 拒绝）
+    slp_core::LineDetectorConfig cfg;
+    cfg.temporal_filter_alpha = 0.3;
+    cfg.temporal_filter_intercept_jump = std::numeric_limits<double>::quiet_NaN();
+    slp_core::LineParams prev(0.1, 1.0);
+    bool has_prev = false;
+    int age = 0;
+    (void)slp_core::ApplyTemporalFilterCore(slp_core::LineParams(0.1, 1.0), prev, has_prev, age, cfg);
+    const auto rejected = slp_core::ApplyTemporalFilterCore(slp_core::LineParams(0.1, 6.0), prev, has_prev, age, cfg);
+    EXPECT_EQ(age, 1);
+    EXPECT_DOUBLE_EQ(rejected.intercept, 1.0);
+}
+
+// ── 8. 鸭子类型（Position2DLike）多类型适配 ─────────────────────────────────
 
 TEST(LineFitCoreTest, DuckTypingCustomConeCompatibility) {
     slp_core::LineDetectorConfig cfg;

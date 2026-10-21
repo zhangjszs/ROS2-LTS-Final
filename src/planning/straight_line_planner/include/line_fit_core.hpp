@@ -64,6 +64,54 @@ struct LineDetectorConfig {
     int prev_max_age_frames = 10;
 };
 
+// #84：单个非法参数的清洗记录（供适配层逐项 WARN：参数名 + 非法值 + 回退值）。
+struct ConfigParamFix {
+    const char* name;
+    double bad_value;
+    double used_value;
+};
+
+// #84：核心边界参数清洗。非法（非有限或越界）的时序滤波/分离参数回退到
+// LineDetectorConfig{} 默认值，保证：
+//   - 时序滤波不会以 valid=true 产出含 NaN 的线（alpha=NaN 曾直接传播）；
+//   - 跳变抑制不会被 NaN 阈值静默关闭（NaN 比较恒 false 曾等于禁用抑制）；
+//   - center_margin 非法时不会静默丢弃全部锥桶。
+// 合法配置逐字段原样返回（fixes 为空），对既有黄金样本零影响。
+// 适配层在构造时调用一次并 WARN；核心函数（ApplyTemporalFilterCore /
+// SplitConesBySide）内部另有同规则兜底，直调核心时同样安全。
+struct SanitizedConfig {
+    LineDetectorConfig cfg;
+    std::vector<ConfigParamFix> fixes;
+};
+
+[[nodiscard]] inline SanitizedConfig SanitizeLineDetectorConfig(const LineDetectorConfig& cfg) {
+    const LineDetectorConfig defaults{};
+    SanitizedConfig out;
+    out.cfg = cfg;
+
+    auto fix_if_invalid = [&out](const char* name, double& value, double fallback, bool valid) {
+        if (!valid) {
+            out.fixes.push_back(ConfigParamFix{name, value, fallback});
+            value = fallback;
+        }
+    };
+
+    fix_if_invalid("temporal_filter_alpha", out.cfg.temporal_filter_alpha, defaults.temporal_filter_alpha,
+                   std::isfinite(out.cfg.temporal_filter_alpha) && out.cfg.temporal_filter_alpha >= 0.0 &&
+                       out.cfg.temporal_filter_alpha <= 1.0);
+    fix_if_invalid(
+        "temporal_filter_jump_threshold", out.cfg.temporal_filter_jump_threshold,
+        defaults.temporal_filter_jump_threshold,
+        std::isfinite(out.cfg.temporal_filter_jump_threshold) && out.cfg.temporal_filter_jump_threshold >= 0.0);
+    fix_if_invalid(
+        "temporal_filter_intercept_jump", out.cfg.temporal_filter_intercept_jump,
+        defaults.temporal_filter_intercept_jump,
+        std::isfinite(out.cfg.temporal_filter_intercept_jump) && out.cfg.temporal_filter_intercept_jump >= 0.0);
+    fix_if_invalid("center_margin", out.cfg.center_margin, defaults.center_margin,
+                   std::isfinite(out.cfg.center_margin) && out.cfg.center_margin >= 0.0);
+    return out;
+}
+
 // 坐标鸭子类型（duck-typing）：同时支持 Point2D（.x/.y）与 ROS HuatCone（.position_base_link.x/.y）
 template <typename T>
 concept Position2DLike = (requires(const T& p) {
@@ -334,9 +382,24 @@ inline LineParams ApplyTemporalFilterCore(const LineParams& current, LineParams&
         return current;
     }
 
+    // #84：参数兑底——非法 alpha/跳变阈值回退默认（与 SanitizeLineDetectorConfig 同规则），
+    // 保证输出有限、跳变抑制不被 NaN 静默关闭；直调本函数绕过构造期清洗时仍安全。
+    double a = cfg.temporal_filter_alpha;
+    if (!std::isfinite(a) || a < 0.0 || a > 1.0) {
+        a = LineDetectorConfig{}.temporal_filter_alpha;
+    }
+    const double jump_threshold =
+        (std::isfinite(cfg.temporal_filter_jump_threshold) && cfg.temporal_filter_jump_threshold >= 0.0)
+            ? cfg.temporal_filter_jump_threshold
+            : LineDetectorConfig{}.temporal_filter_jump_threshold;
+    const double intercept_jump =
+        (std::isfinite(cfg.temporal_filter_intercept_jump) && cfg.temporal_filter_intercept_jump >= 0.0)
+            ? cfg.temporal_filter_intercept_jump
+            : LineDetectorConfig{}.temporal_filter_intercept_jump;
+
     double dslope = std::abs(current.slope - prev.slope);
     double dintercept = std::abs(current.intercept - prev.intercept);
-    if (dslope > cfg.temporal_filter_jump_threshold || dintercept > cfg.temporal_filter_intercept_jump) {
+    if (dslope > jump_threshold || dintercept > intercept_jump) {
         if (prev_age < cfg.prev_max_age_frames) {
             ++prev_age;
             return prev;
@@ -347,7 +410,6 @@ inline LineParams ApplyTemporalFilterCore(const LineParams& current, LineParams&
         return current;
     }
 
-    double a = cfg.temporal_filter_alpha;
     LineParams filtered;
     filtered.slope = a * current.slope + (1.0 - a) * prev.slope;
     filtered.intercept = a * current.intercept + (1.0 - a) * prev.intercept;

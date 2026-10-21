@@ -45,7 +45,6 @@ StraightLinePlannerNode::StraightLinePlannerNode(rclcpp::Node::SharedPtr node)
     LineDetectorConfig cfg;
     node_->declare_parameter<double>("kCenterMargin", cfg.center_margin);
     node_->get_parameter("kCenterMargin", cfg.center_margin);
-    center_margin_ = cfg.center_margin;
     node_->declare_parameter<double>("ransac_inlier_threshold", cfg.ransac_inlier_threshold);
     node_->get_parameter("ransac_inlier_threshold", cfg.ransac_inlier_threshold);
     node_->declare_parameter<int>("ransac_max_iterations", cfg.ransac_max_iter);
@@ -76,6 +75,16 @@ StraightLinePlannerNode::StraightLinePlannerNode(rclcpp::Node::SharedPtr node)
     node_->get_parameter("temporal_filter_intercept_jump", cfg.temporal_filter_intercept_jump);
     node_->declare_parameter<int>("prev_max_age_frames", cfg.prev_max_age_frames);
     node_->get_parameter("prev_max_age_frames", cfg.prev_max_age_frames);
+
+    // #84：核心边界参数清洗——非法值回退默认，并逐项 WARN（参数名 + 非法值 + 回退值）。
+    // 拒绝帧会把配置错误伪装成“无路径”，故采回退默认 + WARN 保留帧连续。
+    const slp_core::SanitizedConfig sanitized = slp_core::SanitizeLineDetectorConfig(cfg);
+    for (const auto& fix : sanitized.fixes) {
+        RCLCPP_WARN(node_->get_logger(), "[straight_line_planner] 参数 %s 非法（%g），回退默认值 %g", fix.name,
+                    fix.bad_value, fix.used_value);
+    }
+    cfg = sanitized.cfg;
+    center_margin_ = cfg.center_margin;
 
     line_detector_ = std::make_unique<LineDetector>(cfg);
 
