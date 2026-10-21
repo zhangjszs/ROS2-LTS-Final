@@ -20,7 +20,6 @@
 
     # 霍夫变换（默认禁用；设为 true 可启用作为主要拟合器）
     enable_hough: false
-    hough_threshold: 10
     hough_rho_resolution: 0.30        # rho 分辨率（米）；越大对噪声越宽容
     hough_min_inlier_ratio: 0.5       # 自适应投票阈值 = max(3, ceil(比例 * 锥桶数))
 
