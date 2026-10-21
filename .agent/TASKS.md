@@ -1,12 +1,14 @@
 # TASKS.md — Issue 本地镜像（权威：GitHub Issue；本文件由 Planner 每轮整体重写）
 
-> 维护者：Planning Agent｜最后更新：2026-10-21T08:00+08:00（`plan-20261021c` **同日第三轮·纯看护**：无执行轮、无新事实，S2a 验收结论与今日队列维持；入账 21b 两笔 `.agent` 提交 CI success；共 **29 open**）
+> 维护者：Planning Agent｜最后更新：2026-10-21T10:35+08:00（exec-20261021 会话1 **队列清空**：#83/#84/#85/#86 全部完成转 `in-review`，报告见各 Issue；遗留分支已清理；仅同步状态行）
 > 规则：本文件只读镜像，Executor 改状态时先改 Issue 再同步对应行；冲突以 Issue 为准。
 > 日报：`.agent/DIARY/2026-10-20.md`（三会话 + 补记）已由上一执行轮产出，上轮验收已逐条引用并独立复核。**10-21 尚无日报**（无执行轮）。
 > 🆕 **本轮变化（plan-20261021c）**：`main` 前进到 `8df444c`（仅 plan-20261021b 的两笔 `chore(agent)` 提交，无代码）；其 CI `39515233351`(`e2b1e68`)/`39515260640`(`8df444c`) 均 **success** 已入账。**无执行轮**（10-21 无日报）、无新评论、无新事实：#83/#84/#85/#86 仍 `ready-for-agent`、0 评论；7 个 blocked 的 `updatedAt` 无变化；遗留分支 `origin/agent/issue-81-track-metadata` 仍在（清理指令维持）。队列维持 4 项不变。
 > ✅ **验收性质说明**：五单报告均**属实**，无「报告失实」项；且 #82 会话 3 主动更正了会话 2 一份**失实的 `blocked` 报告**（误判「本机 DDS 不可用」→ 真因 ros2cli daemon 未显式启动），本轮以门禁留痕独立验证更正为真（closed-loop/fault/closed-loop-fault 三门均 PASS）。
 
 ## 今日队列（2026-10-21，给 Executor 的建议顺序）
+
+> **✅ 已全部执行完毕（exec-20261021 会话 1，10:30）**：四单全部转 `in-review`，执行报告见各 Issue comment（八字段齐全）。#83/#84 已按约束串行合入（`cb09a6b` → `c7d7e8c`），未覆盖 #78 守卫。ready-for-agent **见底**，后续按 **D-019（B）** 转 D-009 维持模式。以下原队列描述留作验收对照。
 
 > 主线 S2a 已闭环，今日为 P3 积压清理。**⚠ #83 与 #84 同处 `src/planning/straight_line_planner/include/line_fit_core.hpp` 与 `test/test_line_fit_core.cpp` 文件族**：该文件已含 #78 落地的 `hough_min_inlier_ratio > 1.0` 守卫，改动时**不得覆盖**；两单**必须串行**（先其一合入、`git pull --rebase` 后再做其二），不可并行开分支。#85 与 #86 均为纯 docs 且**文件不重叠**（#85 = `docs/README.md` + `docs/MIGRATION_BASELINE.md`；#86 = `AGENTS.md` + `CLAUDE.md`），风险最低，可任意时机。
 
@@ -17,22 +19,24 @@
 
 > 队列 = 4 项（2–5 区间内）。做完即 ready-for-agent **见底**——后续方向已由 **D-019（用户亲选 B）** 定：完成 P3 后进入 D-009 维持模式。
 
-## ready（可执行，4）
+## in-review（待验收，4）
 
-| Issue | 标题 | 优先级 | 依赖 / 要点 |
+| Issue | 标题 | 优先级 | 执行结论 / 报告位置 |
 | --- | --- | --- | --- |
-| #83 | `hough_threshold` 死参数（节点/YAML 暴露但算法未使用） | P3 | 无；实测 0 与 1000 输出逐位相同；方案 A 删除 / B 接线；**勿覆盖 #78 守卫** |
-| #84 | temporal_filter_* 与 kCenterMargin 的 NaN/越界静默失效 | P3 | 无；实测 alpha=NaN 输出 NaN 且 valid=true；**与 #83 同文件族，须串行** |
-| #85 | MIGRATION_BASELINE 回填 D-014/15/16 并挂入文档入口 | P3 | 无；仅 docs/；不改变结论边界 |
-| #86 | AGENTS.md/CLAUDE.md 的 daemon 口径纠错（本轮新增） | P3 | 无；仅 2 文件 ≤8 行；不碰脚本；报告贴最终文本供用户复核 |
+| #83 | `hough_threshold` 死参数删除（方案 A） | P3 | 完成；`db68a2a`/merge `cb09a6b`；报告 comment `6315494227`；CI `39596962618` success |
+| #84 | temporal_filter/center_margin NaN 兑底（方案 ①） | P3 | 完成；`4ff55d4`/merge `c7d7e8c`；报告 comment `6315806654`；591 tests 0 fail |
+| #85 | MIGRATION_BASELINE 决策引用 + docs/README.md 索引 | P3 | 完成；`4ea8467`/merge `4d303d1`；报告 comment `6315894962` |
+| #86 | AGENTS.md/CLAUDE.md daemon 口径纠错 | P3 | 完成；`8eab81e`/merge `6b6697f`；报告 comment `6315924060`（逐行文本供用户复核） |
 
-## in-review（待验收，0）
+## ready（可执行，0）
 
-无。昨日五单 #81/#80/#78/#79/#82 已于上轮验收关闭（见「已关闭」）。
+无——队列见底。
 
 ## in-progress（0）
 
 无。
+
+> 昨日（10-20）五单 #81/#80/#78/#79/#82 已于上轮验收关闭，见「已关闭」。
 
 ## 仓库外阻塞（7，均为外部输入缺失，非代码可推进）
 
