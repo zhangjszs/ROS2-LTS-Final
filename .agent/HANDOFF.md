@@ -24,7 +24,7 @@ exec-20261021 **会话 1**（Planner 今日队列 4 单串行清空 + 遗留分�
 ## 未完成 / 进行中（下一棒最优先看这里）
 
 - **无未完成工作**；今日队列已清空，ready-for-agent 见底（D-019 = B：转 D-009 维持模式）。
-- **CI 入账缺口**：`c7d7e8c`（#84）/`4d303d1`（#85）/`6b6697f`（#86）三个 merge 的 CI run 收尾时尚 `in_progress`（`39599109053`/`39599755595`/`39599977048`）。三单中仅 #84 触及代码；若出现失败须归因复现（但 #84 的完整本机门禁已 12 门全绿，假红概率低）。**下一轮（Planner 或下一执行会话）请先 `gh run list` 入账这三个 run。**
+- **✅ CI 已全部入账（10:50 复核）**：`c7d7e8c`（#84）`39599109053` / `4d303d1`（#85）`39599755595` / `6b6697f`（#86）`39599977048` 均 **success**；连同 `cb09a6b`（#83）`39596962618` 与 `.agent` 收尾 `c8bd4e3` `39600468883`，本轮 5 个 run 全绿，无因本次变更导致的失败需修复。
 
 ## 验证情况
 
@@ -48,9 +48,8 @@ exec-20261021 **会话 1**（Planner 今日队列 4 单串行清空 + 遗留分�
 
 ## 给下一棒的第一步建议
 
-1. `gh run list --limit 6` 入账 #84/#85/#86 三个 merge 的 CI 结论；若有红先看是否与本轮变更相关。
-2. 今日队列已空；无现场可恢复。按 D-019，后续为 D-009 维持模式（CI/Nightly 看护 + blocked 零成本复查），除非 Planner 补队列。
-3. 若直跑任何 runtime 门禁：`export FASTDDS_BUILTIN_TRANSPORTS=SHM` + `export PATH="$HOME/.local/bin:$PATH"`；跑测试的构建加 `-DBUILD_TESTING=ON`。
+1. 今日队列已空；无现场可恢复。按 D-019，后续为 D-009 维持模式（CI/Nightly 看护 + blocked 零成本复查），除非 Planner 补队列。
+2. 若直跑任何 runtime 门禁：`export FASTDDS_BUILTIN_TRANSPORTS=SHM` + `export PATH="$HOME/.local/bin:$PATH"`；跑测试的构建加 `-DBUILD_TESTING=ON`。
 
 ## 今日日报
 

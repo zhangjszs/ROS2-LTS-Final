@@ -1,6 +1,6 @@
 # TASKS.md — Issue 本地镜像（权威：GitHub Issue；本文件由 Planner 每轮整体重写）
 
-> 维护者：Planning Agent｜最后更新：2026-10-21T10:35+08:00（exec-20261021 会话1 **队列清空**：#83/#84/#85/#86 全部完成转 `in-review`，报告见各 Issue；遗留分支已清理；仅同步状态行）
+> 维护者：Planning Agent｜最后更新：2026-10-21T10:50+08:00（exec-20261021 会话1 补记：**四单 CI 全部入账 success**，收尾 commit `c8bd4e3` CI `39600468883` 亦 success；队列见底，仅同步状态行）
 > 规则：本文件只读镜像，Executor 改状态时先改 Issue 再同步对应行；冲突以 Issue 为准。
 > 日报：`.agent/DIARY/2026-10-20.md`（三会话 + 补记）已由上一执行轮产出，上轮验收已逐条引用并独立复核。**10-21 尚无日报**（无执行轮）。
 > 🆕 **本轮变化（plan-20261021c）**：`main` 前进到 `8df444c`（仅 plan-20261021b 的两笔 `chore(agent)` 提交，无代码）；其 CI `39515233351`(`e2b1e68`)/`39515260640`(`8df444c`) 均 **success** 已入账。**无执行轮**（10-21 无日报）、无新评论、无新事实：#83/#84/#85/#86 仍 `ready-for-agent`、0 评论；7 个 blocked 的 `updatedAt` 无变化；遗留分支 `origin/agent/issue-81-track-metadata` 仍在（清理指令维持）。队列维持 4 项不变。
@@ -24,9 +24,9 @@
 | Issue | 标题 | 优先级 | 执行结论 / 报告位置 |
 | --- | --- | --- | --- |
 | #83 | `hough_threshold` 死参数删除（方案 A） | P3 | 完成；`db68a2a`/merge `cb09a6b`；报告 comment `6315494227`；CI `39596962618` success |
-| #84 | temporal_filter/center_margin NaN 兑底（方案 ①） | P3 | 完成；`4ff55d4`/merge `c7d7e8c`；报告 comment `6315806654`；591 tests 0 fail |
-| #85 | MIGRATION_BASELINE 决策引用 + docs/README.md 索引 | P3 | 完成；`4ea8467`/merge `4d303d1`；报告 comment `6315894962` |
-| #86 | AGENTS.md/CLAUDE.md daemon 口径纠错 | P3 | 完成；`8eab81e`/merge `6b6697f`；报告 comment `6315924060`（逐行文本供用户复核） |
+| #84 | temporal_filter/center_margin NaN 兑底（方案 ①） | P3 | 完成；`4ff55d4`/merge `c7d7e8c`；报告 comment `6315806654`；591 tests 0 fail；CI `39599109053` **success** |
+| #85 | MIGRATION_BASELINE 决策引用 + docs/README.md 索引 | P3 | 完成；`4ea8467`/merge `4d303d1`；报告 comment `6315894962`；CI `39599755595` **success** |
+| #86 | AGENTS.md/CLAUDE.md daemon 口径纠错 | P3 | 完成；`8eab81e`/merge `6b6697f`；报告 comment `6315924060`（逐行文本供用户复核）；CI `39599977048` **success** |
 
 ## ready（可执行，0）
 
