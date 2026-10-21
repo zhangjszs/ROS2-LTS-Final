@@ -19,13 +19,13 @@ Full project context (architecture, data flow, package roles) lives in **[CLAUDE
 ## Runtime env (local ≠ CI)
 
 - Local ROS distro is **lyrical** (`/opt/ros/lyrical`); CI runs **Jazzy**. Source both workspaces for runtime gates: `source /opt/ros/<distro>/setup.bash && source install/setup.bash`.
-- Multi-node gates need `export FASTDDS_BUILTIN_TRANSPORTS=SHM` locally (VPN-blocked UDP multicast breaks DDS discovery; not needed on CI).
+- Multi-node gates need `export FASTDDS_BUILTIN_TRANSPORTS=SHM` locally (local UDP-multicast discovery is unreliable behind VPN; not needed on CI).
 - `drive_gates.sh` already points `ROS_HOME`/`TMPDIR` into `build/` — don't override; a read-only `/tmp` prevents the ros2 daemon from starting.
 
 ## ros2 queries: always via daemon
 
 - Assertion queries (`ros2 node|topic|service list|info`) must use the ros2cli daemon. Never `--no-daemon` — it returns empty tables before DDS discovery converges (machine-checked by `lint_shell.sh`, past main-branch reds).
-- Gate scripts start with `timeout 20 ros2 daemon stop` to clear stale daemons; after that calls rebuild it automatically.
+- Gate scripts start with `timeout 20 ros2 daemon stop` → **explicit `ros2 daemon start`** → `sleep 3`. Do NOT assume later calls rebuild the daemon automatically: in fresh per-session environments it dies with its parent and assertion queries hang with `rc=124` (#82; `drive_gates.sh` already does this).
 
 ## Tests: Core/ROS boundary (ADR: `docs/CORE_ROS_BOUNDARY_ADR.md`)
 
