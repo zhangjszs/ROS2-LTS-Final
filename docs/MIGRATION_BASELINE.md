@@ -11,6 +11,7 @@
   - **未证明全部历史迁移来源**：ROS 2 部分算法为重构或重新实现，非直接 git 迁移代码。
   - **未完成整栈/实车验收**：ROS 1 存在相关代码不代表已完成整车闭环验收；ROS 2 源码存在不代表已完成实车/硬件验收。
   - 本文档不包含产品决策（如端到端首选赛制）、不包含架构决策（如定位后端强迁与否）、不包含仓库外硬件驱动事实确认（如 VCU 外部驱动）。
+  - **决策引用约定（#85，2026-10-21）**：受影响条目会引用决策台账 `.agent/DECISIONS.md` 中的决策编号（D-014 / D-015 / D-016）标注处置来源；决策内容以该台账为唯一权威，本文仅作指针，不复制、不改写其结论边界。状态枚举五值仍按§一执行，引用不改变状态值本身的判定事实。
 
 ---
 
@@ -43,16 +44,16 @@
 | 能力项 | ROS 1 入口 (`路径:行`) | ROS 2 入口 (`路径:行`) | 消息与参数差异 | 坐标/时间语义 | 外部依赖 | 验证证据 | 状态 | 对应 Issue |
 |---|---|---|---|---|---|---|---|---|
 | 惯导数据坐标转换 | `src/vehicle_interface_ros/scripts/ins_bridge.py:1` | `src/localization/vehicle_state/src/vehicle_state_estimator.cpp:51` | ROS 1 通过 Python 脚本桥接 INS；ROS 2 实现 C++20 `GeodeticToEnu` 高性能大地坐标向局部 ENU 坐标转换并发布 `HuatCarstate` | WGS84 经纬高 → 局部站心切平面 ENU 笛卡尔坐标；时间戳透传自 INS 硬件戳 | 硬件惯导驱动/消息 | `src/localization/vehicle_state/test` 或节点离线转换测试 | `替换` | #23 |
-| 锥桶地图构建与匹配 | `src/localization_core/src/location_mapper.cpp:42` | 未找到 | ROS 1 具备 `LocationMapper` 进行锥桶全局地图与局部感知的相关性匹配与回环；ROS 2 源码中无此实现 | 局部锥桶系到全局 map 系对齐 | 激光/视觉锥桶检测话题 | ROS 2 仓库代码检索（无对应文件） | `未找到` | #23 |
-| ESKF 状态估计滤波 | `src/localization_core/src/imu_state_estimator.cpp:10` | 未找到 | ROS 1 包含基于误差状态卡尔曼滤波（ESKF）的 IMU 与里程计融合估计器；ROS 2 仅有原始 INS 坐标转换，未包含 ESKF 融合层 | 状态向量包含位置、速度、姿态、IMU 零偏 | IMU 原始高频数据与轮速反馈 | ROS 2 仓库代码检索（仅有简单 vehicle_state_estimator） | `证据不足`（缺真实 bag 与传感器数据输入） | #18, #23 |
-| 因子图优化后端 | `src/localization_core/src/factor_graph_optimizer.cpp:48` | 未找到 | ROS 1 引入 GTSAM 因子图优化后端，综合位姿图、回环约束与圆约束；ROS 2 未引入 GTSAM 依赖与因子图代码 | 全局非线性最小二乘位姿优化 | GTSAM 库 | ROS 2 仓库代码检索；CMakeLists 无 GTSAM 依赖 | `暂缓`（依路线图不强迁高复杂度因子图） | #23 |
+| 锥桶地图构建与匹配 | `src/localization_core/src/location_mapper.cpp:42` | 未找到 | ROS 1 具备 `LocationMapper` 进行锥桶全局地图与局部感知的相关性匹配与回环；ROS 2 源码中无此实现 | 局部锥桶系到全局 map 系对齐 | 激光/视觉锥桶检测话题 | ROS 2 仓库代码检索（无对应文件） | `未找到`；**处置引用 D-015**（2026-10-20 用户亲选：暂缓全部复杂定位后端、纯 INS 基线——属“已决策不做”，非“实现缺失待补”） | #23 |
+| ESKF 状态估计滤波 | `src/localization_core/src/imu_state_estimator.cpp:10` | 未找到 | ROS 1 包含基于误差状态卡尔曼滤波（ESKF）的 IMU 与里程计融合估计器；ROS 2 仅有原始 INS 坐标转换，未包含 ESKF 融合层 | 状态向量包含位置、速度、姿态、IMU 零偏 | IMU 原始高频数据与轮速反馈 | ROS 2 仓库代码检索（仅有简单 vehicle_state_estimator） | `证据不足`（缺真实 bag 与传感器数据输入）；**处置引用 D-015**（暂缓 ESKF，未来切换后端的前置输入是 #18 真实 bag） | #18, #23 |
+| 因子图优化后端 | `src/localization_core/src/factor_graph_optimizer.cpp:48` | 未找到 | ROS 1 引入 GTSAM 因子图优化后端，综合位姿图、回环约束与圆约束；ROS 2 未引入 GTSAM 依赖与因子图代码 | 全局非线性最小二乘位姿优化 | GTSAM 库 | ROS 2 仓库代码检索；CMakeLists 无 GTSAM 依赖 | `暂缓`（依路线图不强迁高复杂度因子图）；**处置引用 D-015**（同上，用户亲选） | #23 |
 
 ### 3. 底盘与执行器接口（Chassis & Actuator Interface）
 
 | 能力项 | ROS 1 入口 (`路径:行`) | ROS 2 入口 (`路径:行`) | 消息与参数差异 | 坐标/时间语义 | 外部依赖 | 验证证据 | 状态 | 对应 Issue |
 |---|---|---|---|---|---|---|---|---|
-| 底盘网络通信层 (UDP) | `src/vehicle_interface_core/src/udp_socket.cpp:1` | 未找到 | ROS 1 通过底层 POSIX UDP Socket 直接收发 VCU 二进制数据包；ROS 2 仓库内无网络通讯包，控制输出终止于 ROS 话题层 | 控制周期通常为 20ms~50ms，含时间戳与序列号 | 车载局域网 / VCU 控制器硬件 | ROS 2 仓库代码检索（无 `vehicle_interface_*` 包） | `证据不足`（缺外部驱动仓库事实与 VCU 协议资料） | #15, #23 |
-| 底盘协议节点包装 | `src/vehicle_interface_ros/src/Node.cpp:1` | 未找到 | ROS 1 订阅 `HUAT_VehicleCmd` 并编码打包发送至 UDP，同时解析 UDP 状态包发布 `HUAT_VehicleStatus`；ROS 2 无此硬件桥接节点 | 硬件反馈与软件指令桥接 | VCU 协议规范与硬件连线 | ROS 2 检索确认无对应节点 | `证据不足`（缺 VCU 协议资料与实车台架） | #15, #23 |
+| 底盘网络通信层 (UDP) | `src/vehicle_interface_core/src/udp_socket.cpp:1` | 未找到 | ROS 1 通过底层 POSIX UDP Socket 直接收发 VCU 二进制数据包；ROS 2 仓库内无网络通讯包，控制输出终止于 ROS 话题层 | 控制周期通常为 20ms~50ms，含时间戳与序列号 | 车载局域网 / VCU 控制器硬件 | ROS 2 仓库代码检索（无 `vehicle_interface_*` 包） | `证据不足`（缺外部驱动仓库事实与 VCU 协议资料）；**处置引用 D-016**（2026-10-20 用户亲选：外部驱动不存在、需自建；缺失输入 = VCU 协议文档 + 台架标定实值，见 #15） | #15, #23 |
+| 底盘协议节点包装 | `src/vehicle_interface_ros/src/Node.cpp:1` | 未找到 | ROS 1 订阅 `HUAT_VehicleCmd` 并编码打包发送至 UDP，同时解析 UDP 状态包发布 `HUAT_VehicleStatus`；ROS 2 无此硬件桥接节点 | 硬件反馈与软件指令桥接 | VCU 协议规范与硬件连线 | ROS 2 检索确认无对应节点 | `证据不足`（缺 VCU 协议资料与实车台架）；**处置引用 D-016**（自建为交付归属，但不以“自建”绕过 D-004 实车证据要求） | #15, #23 |
 | 控制指令帧编码与守卫 | `src/autodrive_msgs/msg/HUAT_VehicleCmd.msg:1` | `src/control/pure_pursuit/src/control/vehicle_command_encoder.cpp:1` | ROS 1 与 ROS 2 均维护包含 `head1`, `head2`, `speed`, `steering`, `brake`, `checksum` 的紧凑指令帧；ROS 2 剥离为独立的 `VehicleCommandEncoder` 纯函数并实现转向标定守卫 | 纯字节级二进制帧协议；转角弧度与原始量化值映射 | 无 | `src/control/pure_pursuit/test/test_pure_pursuit.cpp` 及指令编解码断言 | `保留` | #15, #24 |
 ### 4. 控制与安全保护（Control Protection & Safety Arbitration）
 
@@ -78,13 +79,14 @@
 根据上述对照，以下领域存在确定性缺口，按输入缺失类型与对应 Issue 分类汇总：
 
 1. **底盘接入缺口（VCU 外部驱动与协议）**：
-   - **缺失输入**：外部驱动仓库事实、VCU 通讯协议规范、实车台架标定数据。
+   - **缺失输入**：外部驱动仓库事实、VCU 通讯协议规范、实车台架标定数据。**事实澄清（D-016，2026-10-20 用户亲选）：外部驱动不存在，底盘接入属本项目自身交付物；缺失输入收敛为“VCU 协议文档 + 台架标定实值”两项。**
    - **影响**：ROS 2 无法在无物理驱动或实车适配层的情况下直接输出到线控底盘网络。
-   - **归属跟踪**：关联父单 **#23**（待产品/外部事实决策）与执行单 **#15**（共用执行器适配层与车辆标定配置）。
+   - **归属跟踪**：关联父单 **#23**（已由 D-014/D-015/D-016 三项决策收口）与执行单 **#15**（共用执行器适配层与车辆标定配置，仍 `blocked` 于上述两项外部输入）。
 2. **定位后端演进缺口（SLAM 建图与 ESKF 滤波）**：
-   - **缺失输入**：端到端赛制决策（直线加速/八字绕环无需复杂 SLAM，高速循迹需锥桶跟踪/建图）、真实车载传感器 bag 数据。
+   - **缺失输入**：端到端赛制决策（**已决：D-014，2026-10-20 用户亲选 = 直线加速**，纯 INS 即满足其判据）、真实车载传感器 bag 数据。
+   - **处置决策（D-015，用户亲选）**：暂缓 LocationMapper / ESKF / GTSAM 全部复杂定位后端，维持纯 INS 站心（ENU）基线；切换后端的前置输入是 #18 真实 bag。
    - **影响**：当前 `vehicle_state_estimator` 仅能依赖高精度 INS 站心坐标转换，在 GPS/INS 信号丢失或无惯导工况下缺乏自主定位冗余。
-   - **归属跟踪**：关联父单 **#23**（定位后端架构决策）与 **#18**（rosbag 数据集与感知质量评估）。
+   - **归属跟踪**：关联父单 **#23**（定位后端架构决策已由 D-015 收口）与 **#18**（rosbag 数据集与感知质量评估）。
 3. **仿真轮胎动力学校准缺口**：
    - **缺失输入**：实车极限速度与轮胎侧偏刚度实测标定数据。
    - **影响**：高附着极限工况下的动力学仿真精度受限。
@@ -101,4 +103,4 @@
 2. **子任务建议 B（合成定位夹具先行）**：
    - 在缺乏 Noetic 运行时与真实 bag 的约束下，参照 #24 模式为 `vehicle_state` 编写基于已知轨迹和合成惯导信号的无 ROS 核心单元测试（纯 std 坐标转换断言与边界守卫）。
 3. **子任务建议 C（赛制适配分层）**：
-   - 待 #23 用户决策确定首个端到端赛制后，若首选为直线加速或八字绕环，可直接以现行 `vehicle_state`（纯 INS）作为定位基线推进闭环，将全功能建图定位后端解耦并排期。
+   - **（2026-10-21 更新）赛制决策已由 D-014 落定 = 直线加速**，且 S2a 直线加速事件闭环已达成（#81/#80/#82）；现行 `vehicle_state`（纯 INS）即该赛制的定位基线（D-015）。若未来扩展到八字绕环/高速循迹（S2b/S3），需先解 D-015 约束或经用户新事实重新定义范围。
