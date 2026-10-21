@@ -1,32 +1,25 @@
 # TASKS.md — Issue 本地镜像（权威：GitHub Issue；本文件由 Planner 每轮整体重写）
 
-> 维护者：Planning Agent｜最后更新：2026-10-21T10:50+08:00（exec-20261021 会话1 补记：**四单 CI 全部入账 success**，收尾 commit `c8bd4e3` CI `39600468883` 亦 success；队列见底，仅同步状态行）
-> 规则：本文件只读镜像，Executor 改状态时先改 Issue 再同步对应行；冲突以 Issue 为准。
-> 日报：`.agent/DIARY/2026-10-20.md`（三会话 + 补记）已由上一执行轮产出，上轮验收已逐条引用并独立复核。**10-21 尚无日报**（无执行轮）。
-> 🆕 **本轮变化（plan-20261021c）**：`main` 前进到 `8df444c`（仅 plan-20261021b 的两笔 `chore(agent)` 提交，无代码）；其 CI `39515233351`(`e2b1e68`)/`39515260640`(`8df444c`) 均 **success** 已入账。**无执行轮**（10-21 无日报）、无新评论、无新事实：#83/#84/#85/#86 仍 `ready-for-agent`、0 评论；7 个 blocked 的 `updatedAt` 无变化；遗留分支 `origin/agent/issue-81-track-metadata` 仍在（清理指令维持）。队列维持 4 项不变。
-> ✅ **验收性质说明**：五单报告均**属实**，无「报告失实」项；且 #82 会话 3 主动更正了会话 2 一份**失实的 `blocked` 报告**（误判「本机 DDS 不可用」→ 真因 ros2cli daemon 未显式启动），本轮以门禁留痕独立验证更正为真（closed-loop/fault/closed-loop-fault 三门均 PASS）。
+> 维护者：Planning Agent｜最后更新：2026-10-21T22:30:00+08:00（`plan-20261021d`：**#83/#84/#85/#86 四单全量验收入账并关闭**；ready-for-agent 队列见底 = 0，按 D-019 用户亲选 B 正式转入 D-009 维持模式）
+> 规则：本文件为只读镜像，Executor 改状态时先改 Issue 再同步对应行；冲突以 Issue 为准。
+> 权威来源状态：`gh issue list --state open` 实测 **25 open**（ready 0 · in-review 0 · in-progress 0 · 仓库外阻塞 7 · needs-info 3 · ready-for-human 14 · 路线图伞形 1）。
+> 🆕 **本轮变化（plan-20261021d）**：
+> 1. 今日队列原 4 单（#83、#84、#85、#86）经 Executor 会话 1 执行完毕并提交执行报告，本轮 Planner 独立复核代码 diff、运行命令证据与 CI 记录，全部判定**通过并关闭**（Issue 评论与关闭已在远端生效）。
+> 2. CI 全绿：#83 `39596962618`、#84 `39599109053`、#85 `39599755595`、#86 `39599977048`、会话收尾 `39600468883` 均 success。
+> 3. 遗留分支清理：`origin/agent/issue-81-track-metadata` 已由 Executor 按指令删除。
+> 4. 队列状态：ready-for-agent 见底（0 项）。依 **D-019（用户 2026-10-21 亲选 B）**，项目在完成 P3 积压后正式转入 **D-009 维持模式**（CI/Nightly 看护 + blocked 零成本复查，不为找活而扫描）。
 
 ## 今日队列（2026-10-21，给 Executor 的建议顺序）
 
-> **✅ 已全部执行完毕（exec-20261021 会话 1，10:30）**：四单全部转 `in-review`，执行报告见各 Issue comment（八字段齐全）。#83/#84 已按约束串行合入（`cb09a6b` → `c7d7e8c`），未覆盖 #78 守卫。ready-for-agent **见底**，后续按 **D-019（B）** 转 D-009 维持模式。以下原队列描述留作验收对照。
+> **当前队列为空（0 项）**：
+> 今日队列四单（#83、#84、#85、#86）已在 exec-20261021 会话 1 串行执行完毕，并于本轮全部通过验收关闭。
+> 当前可执行池无 ready-for-agent 任务。
+> 依据 **D-019 用户亲选方案 B**，项目完成 P3 积压后正式转入 **D-009 维持模式**。
+> Executor 今日无需领取新任务；下一执行阶段待外部输入到位（解除 blocked）或用户明确下发新 Milestone 方向。
 
-> 主线 S2a 已闭环，今日为 P3 积压清理。**⚠ #83 与 #84 同处 `src/planning/straight_line_planner/include/line_fit_core.hpp` 与 `test/test_line_fit_core.cpp` 文件族**：该文件已含 #78 落地的 `hough_min_inlier_ratio > 1.0` 守卫，改动时**不得覆盖**；两单**必须串行**（先其一合入、`git pull --rebase` 后再做其二），不可并行开分支。#85 与 #86 均为纯 docs 且**文件不重叠**（#85 = `docs/README.md` + `docs/MIGRATION_BASELINE.md`；#86 = `AGENTS.md` + `CLAUDE.md`），风险最低，可任意时机。
+## in-review（待验收，0）
 
-1. **#83** `hough_threshold` 死参数（P3）：节点/YAML/`LineDetectorConfig` 三处声明但 `HoughFitCore` 从未读取（Planner 实测 0 vs 1000 输出逐位相同）。**推荐方案 A**（从三处删除，使暴露面与实现一致）；若选 B（接线 `adaptive_thresh=std::max(hough_threshold, dynamic_min)` 且默认设 3）须在报告说明。**硬约束：默认配置下 `HoughFitCore` 输出逐字不变**（用 #62 黄金样本对比）。
-2. **#84** `temporal_filter_*` / `kCenterMargin` 的 NaN/越界静默失效（P3）：实测 alpha=NaN→NaN 且 `valid=true`、jump=NaN→跳变抑制静默关闭、center_margin=NaN→全部锥桶丢弃。在核心边界加参数清洗/校验（**推荐 ①回退默认+WARN**；②拒绝帧须说明理由），**不得以 `valid=true` 返回含 NaN 的线**、不得静默清空锥桶；补 NaN/±inf/负值/alpha>1 各 ≥1 例。
-3. **#85** `docs/MIGRATION_BASELINE.md` 回填 D-014/15/16 决策引用 + 新增 `docs/README.md` 文档索引挂入 5 篇文档入口（P3）：仅 `docs/`；保持五值状态枚举、不改结论边界、不替代实车证据（D-004）。
-4. **#86** `AGENTS.md`/`CLAUDE.md` 的 daemon 处置口径纠错（P3，本轮新增）：`AGENTS.md` 现写 “after that calls rebuild it automatically”，与 #82 实测（须显式 `ros2 daemon start` + `sleep 3`）冲突；仅 2 文件、≤8 行，**不碰脚本**（脚本回填仍归 #69）。报告须逐行贴出最终文本供用户复核。
-
-> 队列 = 4 项（2–5 区间内）。做完即 ready-for-agent **见底**——后续方向已由 **D-019（用户亲选 B）** 定：完成 P3 后进入 D-009 维持模式。
-
-## in-review（待验收，4）
-
-| Issue | 标题 | 优先级 | 执行结论 / 报告位置 |
-| --- | --- | --- | --- |
-| #83 | `hough_threshold` 死参数删除（方案 A） | P3 | 完成；`db68a2a`/merge `cb09a6b`；报告 comment `6315494227`；CI `39596962618` success |
-| #84 | temporal_filter/center_margin NaN 兑底（方案 ①） | P3 | 完成；`4ff55d4`/merge `c7d7e8c`；报告 comment `6315806654`；591 tests 0 fail；CI `39599109053` **success** |
-| #85 | MIGRATION_BASELINE 决策引用 + docs/README.md 索引 | P3 | 完成；`4ea8467`/merge `4d303d1`；报告 comment `6315894962`；CI `39599755595` **success** |
-| #86 | AGENTS.md/CLAUDE.md daemon 口径纠错 | P3 | 完成；`8eab81e`/merge `6b6697f`；报告 comment `6315924060`（逐行文本供用户复核）；CI `39599977048` **success** |
+无。今日四单已全部验收通过并关闭。
 
 ## ready（可执行，0）
 
@@ -36,59 +29,58 @@
 
 无。
 
-> 昨日（10-20）五单 #81/#80/#78/#79/#82 已于上轮验收关闭，见「已关闭」。
-
 ## 仓库外阻塞（7，均为外部输入缺失，非代码可推进）
 
 | Issue | 标题 | 阻塞原因（D-013 分类） | 本轮复核 |
-| --- | --- | --- | --- |
-| #15 | 共用执行器适配层与车辆标定配置（P1） | **资料缺失**：VCU 协议文档、台架标定实值（D-016 已确认非外部代码缺失） | `updatedAt` 10-19；性质已澄清，仍不可执行 |
+|---|---|---|---|
+| #15 | 共用执行器适配层与车辆标定配置（P1） | **资料缺失**：VCU 协议文档、台架标定实值（D-016 已确认外部驱动不存在需自建） | `updatedAt` 10-19；性质已澄清，仍无外部资料输入 |
 | #16 | 统一任务与安全状态、最终指令仲裁（P1） | **资料缺失**：硬件急停链路、实车停车预算 | `updatedAt` 10-05，无新评论 |
-| #17 | 可复现仿真场景、可信 KPI 与自动回归（P1） | **资料缺失**：模型速度范围实测、感知扰动量化 | 同上 |
-| #19 | Pure Pursuit 低速基线与 MPC 公平对比（P1） | **资料缺失**：依赖 #17 扰动场景 | 同上 |
-| #18 | rosbag 数据集与感知质量评估（P2） | **资料缺失**：真实 bag（亦是 D-015 定位后端与 S2b 八字的前置） | 同上 |
-| #24 | 跨 ROS 版本语义差分回放与故障回归（P1） | **运行时缺失**：验收第 2 条需 ROS1 运行环境（本机无 Noetic、无 docker）；第 1 条已由 #79 完成 | 第 1 条切片已交付关闭；本体仍卡运行时 |
+| #17 | 可复现仿真场景、可信 KPI 与自动回归（P1） | **资料缺失**：模型速度范围实测、感知扰动量化 | `updatedAt` 10-05，无新评论 |
+| #19 | Pure Pursuit 低速基线与 MPC 公平对比（P1） | **资料缺失**：依赖 #17 扰动场景 | `updatedAt` 10-05，无新评论 |
+| #18 | rosbag 数据集与感知质量评估（P2） | **资料缺失**：真实 bag（亦是 D-015 定位后端与 S2b 八字的前置） | `updatedAt` 10-05，无新评论 |
+| #24 | 跨 ROS 版本语义差分回放与故障回归（P1） | **运行时缺失**：验收第 2 条需 ROS1 运行环境（本机无 Noetic、无 docker）；第 1 条切片已由 #79 完成关闭 | `updatedAt` 10-19；本体仍卡运行时 |
 | #37 | 翻转 use_arbiter 默认（P3，needs-triage + blocked） | **资料缺失**：需 #15 标定完成 | `updatedAt` 10-09，无新评论 |
 
-> D-013 复查：本轮无外部输入到位（各单 `updatedAt` 未变），维持 blocked。剩余每轮零成本复查即可，不主动扫描（D-009）。
+> D-013 复查：本轮逐单复核 7 个 blocked Issue 的外部状态，无任何外部输入到位，7 单全部维持 blocked。依 D-009 维持模式，后续每轮仅做零成本复查，不主动扫描外部。
 
 ## needs-info / 待条件（3）
 
 | Issue | 标题 | 等待 |
-| --- | --- | --- |
+|---|---|---|
 | #25 | 技术博客系列（P2） | #17①② / #18 证据 |
 | #26 | 完整项目展示（P2，父跟踪） | 同上 |
 | #27 | 跨仓库路线总入口（P2） | 同上 |
 
-## ready-for-human（14，用户跟进）
+## ready-for-human（14，用户/人工跟进，不计入 agent 队列与饥饿规则）
 
-#63 CI 路径过滤与并发取消（P2）· #64 `check_cpp20.sh` 参数统一（P2）· #65 closed-loop-fault 六臂并行（P2）· #66 CI job 三段拆分（P2）· #67 `affected_gates.sh`（P3）· #68 ccache 键头文件通配（P3）· **#69 DDS 环境性失败区分（P2，本轮已并入「daemon 预热回填其余 5 脚本」范围，comment `6296201990`）**· #70 门禁时长预算监控（P3）· #71 core_standalone 覆盖率基线（P3）· #72 Prepare ROS 2 步骤超时（P3）· #73 评分核测试双轨去重（P3）· #74 本地快速反馈文档（P3）· #75 测试编写规范入库（P3）· #76 伞形：12 个仅 colcon 轨测试下沉（P3）
+#63 CI 路径过滤与并发取消（P2）· #64 `check_cpp20.sh` 参数统一（P2）· #65 closed-loop-fault 六臂并行（P2）· #66 CI job 三段拆分（P2）· #67 `affected_gates.sh`（P3）· #68 ccache 键头文件通配（P3）· #69 DDS 环境性失败区分（P2，含 daemon 预热回填其余 5 脚本范围）· #70 门禁时长预算监控（P3）· #71 core_standalone 覆盖率基线（P3）· #72 Prepare ROS 2 步骤超时（P3）· #73 评分核测试双轨去重（P3）· #74 本地快速反馈文档（P3）· #75 测试编写规范入库（P3）· #76 伞形：12 个仅 colcon 轨测试下沉（P3）
 
 ## 路线图伞形（1，长期跟踪，无优先级标签系有意豁免）
 
 | Issue | 标题 |
-| --- | --- |
+|---|---|
 | #20 | ROS 2 车队开发路线：运行基线 → 可信仿真 → 低速闭环 → 性能优化 |
 
 ## 已关闭（近期备查）
 
-- **#82**（2026-10-21 验收关闭；`343ecc3`+`40673b0`/merge `e5f9998`；comment `6296139845`）：ROS 闭环完赛门禁 accel-finish，正样本 rc=0 + `ENABLE_FINISH_EVENT=0` 负样本 rc=1 + `MAX_V=20` 对照臂，完整 drive_gates 12 门全 PASS。含对旧 `blocked` 误判的更正。CI `39441369149`/`39453577195` success。
-- **#80**（2026-10-21 验收关闭；`3870249`/merge `126cc83`；comment `6296132845`）：直线加速完赛判据（finish_judge.hpp 纯 std 核 + 门禁第 9 节 + 可证伪）；acceleration 基线重录 stopped false→true（口径变更 → D-018）。CI `39416500750` success。
-- **#81**（2026-10-21 验收关闭；`1aae347`/merge `0f48b3a`；comment `6296130011`）：赛道元数据 finish_x/runout 进 TrackDefinition+tracks.json；CSV/baseline 逐字节不变。
-- **#79**（2026-10-21 验收关闭；`0654d0e`/merge `ea5e19b`；comment `6296137702`）：GeodeticToEnu 下沉 geodetic_core.hpp（零 ROS 依赖，位模式差分 TOTAL_MISMATCH=0）。CI `39423649207` success。
-- **#78**（2026-10-21 验收关闭；`f56ff36`/merge `a71b548`；comment `6296135114`）：hough_min_inlier_ratio 增 [0,1] 上界守卫消除 float→int UB（先红后绿）。CI `39422351603` success。
+- **#86**（2026-10-21 验收关闭；`8eab81e`/merge `6b6697f`；comment `6318358288`）：AGENTS.md/CLAUDE.md daemon 口径纠错（stop → 显式 start → sleep 3；组播因果句撤回具体断言），正文改动仅 3 行，未碰脚本，逐行文本已供用户复核。CI `39599977048` success。
+- **#85**（2026-10-21 验收关闭；`4ea8467`/merge `4d303d1`；comment `6318356016`）：docs/MIGRATION_BASELINE.md 回填 D-014/D-015/D-016 决策引用（五值枚举不变）；新增 docs/README.md 索引挂入 5 篇核心文档，12 链接解析验证全过。CI `39599755595` success。
+- **#84**（2026-10-21 验收关闭；`4ff55d4`/merge `c7d7e8c`；comment `6318335866`）：straight_line_planner 时序滤波与分离参数非法值清洗（回退默认 + WARN）；新增 5 个非法参数用例，591 tests 0 fail，消除 NaN 输出与静默丢弃锥桶风险；未覆盖 #78 守卫。CI `39599109053` success。
+- **#83**（2026-10-21 验收关闭；`db68a2a`/merge `cb09a6b`；comment `6318333740`）：straight_line_planner 移除未读取死参数 hough_threshold（方案 A，纯 4 行删除）；默认配置黄金样本逐字不变；未触碰 #78 守卫。CI `39596962618` success。
+- **#82**（2026-10-21 验收关闭；`343ecc3`+`40673b0`/merge `e5f9998`；comment `6296139845`）：ROS 闭环完赛门禁 accel-finish（正样本 rc=0、负样本 rc=1、对照臂通过），12 门全 PASS。CI `39441369149`/`39453577195` success。
+- **#80**（2026-10-21 验收关闭；`3870249`/merge `126cc83`；comment `6296132845`）：直线加速完赛判据核（finish_judge.hpp + 门禁第 9 节断言）；acceleration 基线重录 stopped=true（口径变更 → D-018）。CI `39416500750` success。
+- **#81**（2026-10-21 验收关闭；`1aae347`/merge `0f48b3a`；comment `6296130011`）：赛道元数据 finish_x/runout 进 TrackDefinition+tracks.json。
+- **#79**（2026-10-21 验收关闭；`0654d0e`/merge `ea5e19b`；comment `6296137702`）：GeodeticToEnu 下沉 geodetic_core.hpp 纯 std 核（位模式差分 TOTAL_MISMATCH=0）。CI `39423649207` success。
+- **#78**（2026-10-21 验收关闭；`f56ff36`/merge `a71b548`；comment `6296135114`）：hough_min_inlier_ratio 增 [0,1] 上界守卫消除 float→int UB。CI `39422351603` success。
 - 更早：#77 / #62 / #23（2026-10-20）；#59 / #60 / #61（2026-10-12）；#55 / #56 / #57 / #58。
 
 ## 环境与流程注意（本轮实测/复核）
 
-- 基线：`main` = `origin/main` = `8df444c`（**0/0 同步**，无分叉）。上上轮验收基线 `761817e`；其后仅 `9c46174`（用户 docs，AGENTS.md 重写）+ 两笔 `chore(agent)`（`e2b1e68`/`8df444c`），**无代码提交**。本轮亦为纯看护轮，零代码提交；提交 `.agent/` 只 `git add` 指定文件，严禁 `-a`/`-A`。
-- **AGENTS.md 不再是外部脏改动**：已被用户提交（`9c46174`），工作区干净，`git status --short` 为空。但该文件仍存在一条与 #82 实测冲突的表述（“stop 后自动重建”）→ 已立 **#86**。
-- **独立复核证据（本轮 Planner 第一方，非仅采信报告）**：
-  - `bash scripts/core_standalone_check.sh` → EXIT=0，**32/32 通过、ASan+UBSan 干净**，含 `test_track_generator`(#81)/`test_finish_judge`(#80)/`test_line_fit_core`(#78)/`test_geodetic_core`(#79)。
-  - `build/drive_gates/last.json` 直读 → 完整 drive_gates **12 门全 PASS、hard_fail=0、440s**（含 accel-finish 64s、closed-loop 11s、closed-loop-fault 225s、fault-injection 45s）。
-  - `git show 3870249` 亲验 acceleration 基线口径变更；`git log` 亲验 skidpad/trackdrive 基线最近改动为旧提交 `afbfa65`(#17)，本轮三单未触碰。
-- **本机 runtime 门禁可用（关键事实，已推翻上一轮误判）**：真因是 ros2cli daemon 需显式启动（`stop`+`start`+`sleep 3`），非「DDS 发现不可用」。跨进程 DDS 诊断的 pub/sub 必须在**同一次执行**内（分两次沙箱调用永远不通）。
-- **远程遗留分支**：`origin/agent/issue-81-track-metadata`（#81 已合入 `0f48b3a` 却未删，违契约 1.9）**仍在**。上轮未擅自删除（属前序 Executor 遗留分支）；已亲验该分支 tip `1aae347` 为 main 祖先，**删除安全**；**请下一执行轮清理**，PLAN「给 Executor 的指令」已提示。
-- **支持环境（D-017）**：CI = ROS 2 **Jazzy**，本机 = **lyrical**；验证入口唯一 `bash scripts/drive_gates.sh`（`QUICK=1` 快速轨）。**ROS1 运行时不在支持范围**（对照基线 `FSAC/2025`）。
-- `gh` 正常（账号 `zhangjszs`）；`gh` **无** `milestone` 子命令；`gh issue list --json` 不接受 `commentCount`。
-- CI/Nightly（本轮核实 2026-10-21T08:00+08:00）：HEAD `8df444c` CI `39515260640` **success**；`e2b1e68` CI `39515233351` **success**；`9c46174` CI `39463759166` **success**；Nightly 10-20 `39498071564` @ `main` **success**，连续 9 次 success（10-13 起）。
+- 基线：`main` = `origin/main` = `f3faa10`（**0/0 同步**，无分叉）。
+- **远端遗留分支清理完毕**：`origin/agent/issue-81-track-metadata` 已由 Executor 亲验并成功删除，契约 1.9 纪律恢复。
+- **独立复核证据（本轮 Planner 第一方实测）**：
+  - `bash scripts/core_standalone_check.sh` → EXIT=0，**32/32 通过、ASan+UBSan 干净**（含新增非法参数清洗测试用例）。
+  - `QUICK=1 bash scripts/drive_gates.sh` → 全部硬门禁通过（21s）。
+  - `test -f` 抽验 docs 链接 ×13 → 全部存在无断链。
+  - `gh run list` 核验远端 CI 5 run 全部 success。
+- **支持环境（D-017）**：CI = ROS 2 **Jazzy**，本机 = **lyrical**；验证入口唯一为 `bash scripts/drive_gates.sh`。多节点 runtime 门禁必须 `export FASTDDS_BUILTIN_TRANSPORTS=SHM`。
