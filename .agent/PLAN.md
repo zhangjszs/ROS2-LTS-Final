@@ -1,121 +1,98 @@
 # PLAN.md — 路线、当前阶段与可执行队列
 
-> 维护者：Planning Agent（时间流接力）｜最后更新：2026-10-21T22:30+08:00（`plan-20261021d` **同日第四轮·全量验收入账**：验收关闭 #83/#84/#85/#86 四单，S2a 及 P3 积压全面出清，按 D-019 用户亲选 B 正式转入 D-009 维持模式）
-> 事实基线：`main` = `origin/main` = `f3faa10`（0/0 同步）。本轮入账 exec-20261021 会话 1 的 4 单提交（`cb09a6b`、`c7d7e8c`、`4d303d1`、`6b6697f`）及两笔 `.agent` 提交（`c8bd4e3`、`f3faa10`），5 run CI 全部 **success**。环境事实见 `.agent/ENV.md`（D-017 口径）。
+> 维护者：Planning Agent（时间流接力）｜最后更新：2026-10-21T23:45+08:00（`plan-20261021e` **同日第五轮**：依用户亲选指令正式启动 **Milestone S2b「八字绕环仿真闭环与规划加固」**；裁 **D-022**，立项 #87/#88/#89 构成今日 ready 队列）
+> 事实基线：`main` = `origin/main` = `f9db916`（0/0 同步）。本轮无未合入代码提交，入账 S2b 首批 3 项立项。环境事实见 `.agent/ENV.md`（D-017 口径）。
 > 文档体量约定：本文件只写**当前**状态与结论；历史以 `git log -- .agent/PLAN.md` 与各 Issue 评论为准。
 
-## 〇、本轮结论：Milestone S2a 及 P3 积压全面验收出清，正式转入 D-009 维持模式
+## 〇、本轮结论：正式启动 Milestone S2b「八字绕环仿真闭环与规划加固」
 
-本轮（`plan-20261021d`）对 exec-20261021 会话 1 提交的今日队列四单进行独立复核取证（diff 审查 + `core_standalone_check.sh` 32/32 全过 + ASan/UBSan 干净 + `QUICK=1 drive_gates.sh` 21s 全绿 + docs 12 链接有效性 + CI 5 run 全 success），**4 单全部通过验收并关闭**：
+在 S2a「直线加速事件闭环」与首批 P3 积压全面达成并验收出清后，依据用户交互掌舵指令（裁 **D-022**），项目由维持模式切换为新功能推进态，正式开启 **Milestone S2b「八字绕环仿真闭环与规划加固」**。
 
-| 任务 | 核心成果 | 关键提交 | 验收结论 |
-|---|---|---|---|
-| **#83**（P3）`hough_threshold` 死参数 | 移除未读取死参数（方案 A，纯 4 行删除）；默认配置黄金样本逐字不变 | `db68a2a` / merge `cb09a6b` | ✓ pass 关闭（comment `6318333740`） |
-| **#84**（P3）时序滤波/分离参数 NaN 守卫 | 参数边界清洗（回退默认 + WARN）；新增 5 个非法参数测试用例，591 tests 0 fail | `4ff55d4` / merge `c7d7e8c` | ✓ pass 关闭（comment `6318335866`） |
-| **#85**（P3）迁移基线决策回填与文档索引 | 回填 D-014/D-015/D-016 决策引用；新建 `docs/README.md` 索引挂入 5 篇核心文档，链接解析全通 | `4ea8467` / merge `4d303d1` | ✓ pass 关闭（comment `6318356016`） |
-| **#86**（P3）daemon 处置口径纠错 | AGENTS.md/CLAUDE.md 改为 stop → 显式 start → sleep 3；撤回组播因果断言，仅 2 文件 3 行 | `8eab81e` / merge `6b6697f` | ✓ pass 关闭（comment `6318358288`） |
-
-至此：
-1. **主线 Milestone S2a「直线加速事件闭环」与 P3 积压清理全部达成**；
-2. 远端遗留分支 `origin/agent/issue-81-track-metadata` 已删除，分支生灭闭环；
-3. `ready-for-agent` 队列见底（0 项）。依据 **D-019 用户亲选 B**，项目全面进入 **D-009 维持模式**。
+首批通过 4.2 ready 门禁的 3 项任务已在远端 GitHub Issues 正式立项入轨：
+1. **#88（P1）**：`TrackGenerator` 补齐八字绕环规范中心线（进场 + 右双圈 + S 弯过渡切线 + 左双圈 + 出场停稳）；
+2. **#87（P2）**：`skidpad_planner` 节点对齐契约 QoS（kQosPath / kQosState）与默认话题 `/planning/pathlimits`，消除重复圆拟合计算；
+3. **#89（P2）**：`skidpad_planner` 核心边界参数清洗与退化守卫（非法值回退默认并构造期 WARN，防除零与清空锥桶）。
 
 ## 一、当前方向
 
-当前处于 **S2a 达成后的稳态维持期（D-009 维持模式）**：
-1. **CI 与 Nightly 健康看护**：主干各分支提交 0/0 同步，CI 连续全绿，Nightly 连续 9 天 success，防止环境与依赖漂移；
-2. **已知阻塞零成本复查**：按 D-013 分类对 7 个外部阻塞 Issue 保持跟踪，外部资料/运行时到位即触发返工；
-3. **不为找活而扫描**：不凭空发明新任务，不违背 D-004/D-015 推进缺乏真实依据的重构，等待实车/台架/bag 证据或用户定义新 Milestone。
+当前主线推进 **Milestone S2b 八字绕环仿真闭环与规划加固**：
+1. **赛道几何真值完善**：将 `TrackGenerator::GenerateSkidpad()` 由当前的单圈右半圆扩充为 FSAC 规范的双圆全景轨迹，消除基线评测撞锥缺陷；
+2. **规划契约与健壮性**：将 `skidpad_planner` 全面纳入 D-002 接口契约单一权威（`makeQoS`、标准话题），清洗未定义输入参数；
+3. **低速闭环与门禁建立**：基于现有纯 INS 站心定位基线（D-015）与 Pure Pursuit 基线控制器，打通仿真中的八字多节点闭环与可证伪门禁。
 
 ## 二、今日目标（2026-10-21）
 
-- [x] 验收执行轮提交的 #83、#84、#85、#86 四单产出并下达最终结论（已全部通过关闭）
-- [x] 核对代码 diff、单测覆盖与 CI 运行记录，确认无回归
-- [x] 刷新 `TASKS.md` 镜像与 `PLAN.md` 状态，对齐 GitHub Issues 事实（25 open）
-- [x] 确认遗留分支已清理，无 dangling 分支
-- [x] 依 D-019 落地进入 D-009 维持模式，明确后续动作边界
+- [x] 验收执行轮提交的 #83、#84、#85、#86 四单并全部关闭
+- [x] 用户交互确认下一阶段方向，裁定并落盘 **D-022**
+- [x] 完成八字绕环（Skidpad）全链路现状调研与技术断言实测（中心线单圆缺陷、QoS 裸队列、Taubin 重复计算）
+- [x] 在远端 GitHub Issues 创建 #87、#88、#89 三项 ready 任务
+- [x] 整体重写 `TASKS.md` 镜像与 `PLAN.md` 路线图，对齐 28 open 事实
+- [ ] 提交推送 `.agent/` 变更，向 Executor 下达 S2b 执行指令
 
-## 三、当前 Milestone：Milestone S2a「直线加速事件闭环」与 P3 积压（进度：9 / 9 已完成，收敛达成）
+## 三、当前 Milestone：Milestone S2b「八字绕环仿真闭环与规划加固」（进度：0 / 3 ready 任务开工）
 
 ### 目标与验收
-- **目标**：在可复现仿真中完成直线加速闭环——车辆从起点加速、跨越 x=75 m 终点线、在 x≤100 m 缓冲区内停稳；离线 benchmark 与 ROS 多节点闭环两层输出均可判定「是否过线、何时过线、停在哪、是否停稳」；收尾感知/定位纯 std core 下沉及 P3 质量/文档积压。
-- **完成判据（全部达成 ✅）**：
-  1. ✅ #81 元数据 + #80 离线判据：`acceleration` 基线重录 `stopped=true`、`finish_crossed=true`、`stop_position_m=97.12≤100`；门禁第 9 节字段+时间线断言。
-  2. ✅ #82 ROS 闭环：`finish_event_node` 事件恰好 1 次 @x=75.0 + 锁存停 + `stop_position_m=84.7≤100` + `v_final=0`；纳入 drive_gates 为 `accel-finish` 硬门。
-  3. ✅ 可证伪：离线 `--no-post-finish-braking` rc=1；闭环 `ENABLE_FINISH_EVENT=0` rc=1；`MAX_V=20` 对照臂。
-  4. ✅ 定位与感知加固：#79（GeodeticToEnu 纯 std 核，位模式零差异）/ #78（hough ratio 上界守卫）关闭。
-  5. ✅ P3 积压收尾：#83（死参数清理）/ #84（非法参数清洗守卫）/ #85（迁移基线文档索引）/ #86（daemon 运行文档纠错）全部关闭。
-- **完成信号（Success signal）**：S2a 四层判据闭环入库 + P3 四单验收通过 + drive_gates 12 门全 PASS + CI 全绿。**事实已全部呈现，Milestone 确认达成并收敛。**
-- **明确非目标（Non-goals）**：不宣称实车能力（D-004）；不引入 ESKF/SLAM/GTSAM（D-015）；不改控制律/调参（D-003 冻结）；不做八字/高速（D-014）；不改契约话题与 QoS（D-002）。
+- **目标**：在可复现仿真（纯 INS 基线）中完成八字绕环闭环——赛道生成器产出符合 FSAC 规则的完整八字轨迹（右双圈 + 切线换圆 + 左双圈 + 出场）；`skidpad_planner` 接入契约 QoS 与参数清洗守卫；离线 benchmark 与多节点 ROS 仿真均能稳定完赛。
+- **完成判据**：
+  1. **#88 几何真值**：`TrackGenerator::GenerateSkidpad()` 生成完整八字参考中心线（含曲率极值与各段连续性单测断言）；导出 `skidpad_track.csv`；
+  2. **#87 契约对齐**：`skidpad_planner` 经 `makeQoS` 接入 `kQosPath` / `kQosState`，默认输出话题对齐 `/planning/pathlimits`；
+  3. **#89 边界鲁棒**：参数非法值（NaN/负值/除零）构造期清洗回退默认并 WARN，核心计算防除零兜底，5+ 非法组合用例通过；
+  4. **闭环门禁（后续任务）**：建立类似 `accel-finish` 的八字绕环闭环门禁或基线更新，证明端到端数据流动与可控性。
+- **完成信号（Success signal）**：S2b 核心任务验收合入 + `core_standalone_check.sh` 干净 + 完整 drive_gates 全 PASS + 远端 CI 全绿。
+- **明确非目标（Non-goals）**：
+  - 恪守 D-015：不引入 ESKF / LocationMapper / GTSAM 因子图，坚持纯 INS 站心基线；
+  - 恪守 D-003：不修改 MPC 控制律与判据，不私动比较基线；
+  - 恪守 D-004：不宣称实车能力，不替代实车/台架关闭条件；
+  - 恪守 D-002：不更改公共契约话题类型与字段定义。
 
-## 四、验收结论（本轮：4 单全部通过并关闭）
+## 四、执行队列（给 Executor 的建议顺序，3 项 ready）
 
-今日 in-review 四单逐条独立复核（`git show` + `core_standalone_check.sh` 32/32 + `QUICK=1 drive_gates.sh` + `test -f` 路径抽验 + `gh run list` CI 取证），**全部 pass 并关闭**：
+> **队列状态**：3 项（处于 2–5 规范区间内，全部通过 4.2 ready 门禁）。
+> **文件冲突规避与依赖分析**：
+> - **#88（P1）**：独占 `src/simulation/track_benchmark/`，无文件冲突，建议最先开工并合入；
+> - **#87（P2）与 #89（P2）**：同处 `src/planning/skidpad_planner/`。#87 触及适配层与 launch，#89 触及 core 算法与单测。**两单建议严格串行**（先 #87 合入 main、pull rebase 后再开工 #89，或在同一分支连续提交）。
+> - 推荐执行顺序：**#88 → #87 → #89**。
 
-- **#83 → pass 关闭**（comment `6318333740`）：`grep -rn hough_threshold src/` 结果 rc=1 零残留；`git show --stat db68a2a` 仅 3 文件 4 行纯删除，未触碰 #78 守卫；`core_standalone_check.sh` 32/32 全过，黄金样本逐字不变；CI `39596962618` success。
-- **#84 → pass 关闭**（comment `6318335866`）：新增 `SanitizeLineDetectorConfig` 纯函数，时序滤波与中心分离非法参数清洗回退默认并构造期 WARN，`ApplyTemporalFilterCore` 与 `SplitConesBySide` 内部同规则兜底；测试用例从 586 净增至 591（新增 5 个非法参数用例），ASan+UBSan 干净；CI `39599109053` success。
-- **#85 → pass 关闭**（comment `6318356016`）：`git show --stat 4ea8467` 仅 docs/ 下 2 文件；MIGRATION_BASELINE.md 规范回填 12 处 D-014/15/16 引用，维持五值枚举；新建 `docs/README.md` 挂入 5 篇核心文档，12 处链接抽验 test -f 全部有效；CI `39599755595` success。
-- **#86 → pass 关闭**（comment `6318358288`）：`git show --stat 8eab81e` 仅 `AGENTS.md` 与 `CLAUDE.md`，正文修改 3 行（≤8 上限），未新增章节，未碰脚本（脚本仍归 #69）；纠正 daemon 处置为 stop → 显式 start → sleep 3，组播因果句撤回具体机理；文本已逐行贴在报告供用户复核；CI `39599977048` success。
+1. **#88** `[S2b] TrackGenerator 补齐八字绕环完整中心线（右双圈+过渡切入+左双圈+出场）`（P1）
+   - 落点：`src/simulation/track_benchmark/src/track_generator.cpp`、`test/test_track_generator.cpp`、`src/simulation/vehicle_simulator/tracks/skidpad_track.csv`
+2. **#87** `[S2b] skidpad_planner 节点对齐契约 QoS 与接口话题规范（kQosPath / kQosState / 默认话题对齐）`（P2）
+   - 落点：`src/planning/skidpad_planner/src/skidpad_planner_node.cpp`、`config/skidpad_planner.yaml`、`huat_launch`
+3. **#89** `[S2b] skidpad_planner 核心边界参数清洗与退化守卫（非法值回退默认与 WARN）`（P2）
+   - 落点：`src/planning/skidpad_planner/include/centerline_core.hpp`、`src/planning/skidpad_planner/src/icp_apf_planner.cpp`、`test/`
 
-## 五、执行队列（给 Executor 的建议顺序）
+## 五、已完成（阶段性摘要）
 
-> **当前队列：0 项（队列见底，依 D-019 用户亲选 B 转入 D-009 维持模式）**
-> 
-> 诚实说明原因：
-> 1. S2a 核心链（#78–#82）与 P3 积压（#83–#86）已全部验收关闭；
-> 2. 剩余 open issues 均不满足 4.2 ready 门禁：
->    - 7 个仓库外阻塞单（#15, #16, #17, #18, #19, #24, #37）均卡外部输入（资料缺失/运行时缺失/真机标定），按 D-004/D-015/D-016 绝不能无证据放入 ready；
->    - 3 个展示/博客单（#25, #26, #27）待真实数据，按 D-007-B 维持 needs-info；
->    - 14 个工程优化单（#63–#76）为 ready-for-human（由用户跟进）；
->    - 1 个路线图长期伞形单（#20）。
-> 3. 用户已于 2026-10-21 当日亲选 **D-019 方案 B**：完成 P3 积压后进入 D-009 维持模式，不为找活而扫描。
-> 4. Executor 今日无新任务需领取，下一阶段待外部输入到位或用户指定新 Milestone。
+- **S0 可重复启动**：已完成（#13/#14 已关闭）。
+- **S2a 直线加速事件闭环**：✅ 全部达成（#78、#79、#80、#81、#82 五单关闭，四层判据收敛）。
+- **首批 P3 积压清理**：✅ 全部达成（#83、#84、#85、#86 四单验收关闭，CI 全绿）。
+- **ADR 下沉线**：全部完成（#59/#60/#61/#62 均关闭）。
 
 ## 六、CI / Nightly 状态（本轮复核）
 
 - **主干 origin/main 全绿**：
-  - 本轮 4 单及收尾提交的 CI 全部 success：
-    - `cb09a6b`（#83）CI `39596962618` success（15m19s）
-    - `c7d7e8c`（#84）CI `39599109053` success（14m14s）
-    - `4d303d1`（#85）CI `39599755595` success（12m51s）
-    - `6b6697f`（#86）CI `39599977048` success（15m4s）
-    - `c8bd4e3`（收尾）CI `39600468883` success（15m20s）
+  - 最近提交全部 CI success（#83 `39596962618` · #84 `39599109053` · #85 `39599755595` · #86 `39599977048` · agent 提交 `39600468883` / `39614818759`）。
 - **Nightly 连续 9 天 success**（10-13 起，最新 10-20 `39498071564` 16m21s）。
-  - **10-21 调度尚未到点，无可入账对象**（2026-10-21T15:19Z 实测）：cron = `0 18 * * *`，而 GitHub 调度有稳定延迟——历史五次实际拉起为 cron 后 2–4 小时（19:58 / 19:59 / 20:25 / 21:09 / 21:56Z）；查询时 `gh run list --workflow Nightly` 无任何 queued/in_progress 项。处置：不用旧 run 假冒今日，也不手动 `gh workflow run` 伪造看护（会污染“scheduled nightly”计数口径）；**下一轮直接取新 run 入账**，预计落地窗口 10-21T20:00–22:00Z（北京时间 10-22 凌晨 04:00–06:00）。
-- 本地与远端 0/0 同步，无代码未合入，无分支未清理。
+- 本地与远端 0/0 同步，无未推送提交，无 dangling 临时分支。
 
-## 七、已知阻塞与依赖（均有证据，D-013 口径逐项复验）
+## 七、已知阻塞与依赖（D-013 口径逐项复验）
 
-| Issue | 阻塞原因（D-013 分类） | 本轮状态（2026-10-21） |
-|---|---|---|
-| #15（P1） | **资料缺失**：VCU 协议文档、台架标定实值（D-016 已确认外部驱动不存在需自建） | `updatedAt` 10-19；无新外部输入，仍不可执行 |
-| #16（P1） | **资料缺失**：硬件急停链路、实车停车预算 | 无变化（10-05） |
-| #17（P1） | **资料缺失**：模型速度范围实测、感知扰动量化 | 无变化（10-05） |
-| #19（P1） | **资料缺失**：依赖 #17 扰动场景 | 无变化（10-05） |
-| #18（P2） | **资料缺失**：真实 bag | 无变化（10-05） |
-| #24（P1） | **运行时缺失**：剩余验收需 ROS1 运行环境（本机无 Noetic、无 docker）；源码对照已由 #79 交付 | `updatedAt` 10-19；本体仍卡运行时 |
-| #37（P3） | **资料缺失**：需 #15 标定完成后翻转 `use_arbiter` 默认 | 无变化（10-09） |
-
-> D-013 复查：本轮逐单核对各 blocked Issue，无任何外部输入到位，7 单全部维持 blocked。
+7 项外部阻塞（#15/#16/#17/#18/#19/#24/#37）维持 blocked，无外部数据/运行时到位；3 项 needs-info（#25/#26/#27）待真实数据。
+S2b 的当前 3 项任务不依赖上述任何外部输入，纯仿真可推进。
 
 ## 八、下一阶段
 
-- **当前状态**：S2a 里程碑达成，P3 积压出清，依据 D-019（用户亲选 B）转入 D-009 维持模式。
-- **返工触发条件**：任一 `blocked` Issue 出现外部输入（VCU 协议/台架标定/真实 bag/运行时环境），即刻激活对应模块的执行规划。
-- **八字绕环 / 高速循迹（S2b / S3）**：需先具备较高精度定位与相应测试环境（D-014、D-015），待外部输入到位或经用户另行定义纯仿真子集后再行立项。
+- **S2b 闭环建立**：完成 #88/#87/#89 基础层后，立项八字仿真闭环冒烟门禁（如 `skidpad_finish_smoke.sh`）与离线基线回归。
+- **S3 高速循迹**：待 S2b 稳定后评估高速工况。
 
 ## 九、已明确放弃 / 不做
 
-- 调参腿已收口：无新维度动机且未按新 round 预注册前不再扫描；不冻结参数（D-003）。
-- 不从运动学模型推出轮胎极限结论（#17 边界）。
-- 不用仿真证据关闭实车依赖 issue（D-004）。
-- ADR 下沉候选已全部完成；Way/delaunay/kdtree 暂缓（超 P3 承载）。
-- KD-tree 平局语义已由 D-008 确定，不复议。
+- 调参腿已收口，不冻结参数（D-003）。
 - 不引入复杂定位后端（D-015）：ESKF / LocationMapper / GTSAM 因子图在真实 bag（#18）到位前不进 ready。
 - 底盘自建不等于提前关闭 #15（D-016）。
+- 不把 `FSAC/2024` 当对照基线（D-013）。
 
 ## 十、Decision Gate 状态与给 Executor 的指令
 
-- **Decision Gate**：当前**无 pending 项**。D-019 用户亲选 B 已转正落地；D-020 已执行收尾。
+- **Decision Gate**：裁定 **D-022**（启动 S2b）；当前**无 pending 决策**。
 - **给 Executor 的指令**：
-  > 今日队列已全部验收通过并关闭，ready 队列清空；项目依 D-019 转入维持模式，本日无新任务需执行。
+  > 请按 **#88 → #87 → #89** 顺序领取开工；#87 与 #89 同处 `skidpad_planner`，请严格串行执行并留意契约 QoS 规范。
