@@ -67,9 +67,10 @@ bash scripts/demo.sh                    # #57: one-click normal-vs-fault demo (c
 断言型 ros2 查询不得用 `--no-daemon`（#49，`lint_shell.sh` 的第 2 段必查项）：`ros2 node list
 --no-daemon` / `ros2 topic info --no-daemon` 在新进程里从零做 DDS 发现并立即查图，常在收到
 周期性 SPDP 公告之前就返回空表 → 门禁假失败（已因此在 Jazzy 判红过主干）。运行时门禁的
-节点/端点判据一律走 ros2cli daemon，脚本头部先 `timeout 20 ros2 daemon stop` 消掉残留 daemon，
-并把 `TMPDIR`/`ROS_HOME` 指到工作区（只读 /tmp 会让 daemon 起不来）。注释与 echo 里的
-`--no-daemon` 字样不算违规。
+节点/端点判据一律走 ros2cli daemon，脚本头部先 `timeout 20 ros2 daemon stop` 消掉残留
+daemon、**显式 `ros2 daemon start` + `sleep 3`**（勿假设后续调用自动重建，#82；
+`drive_gates.sh` 已内置），并把 `TMPDIR`/`ROS_HOME` 指到工作区（只读 /tmp 会让 daemon
+起不来）。注释与 echo 里的 `--no-daemon` 字样不算违规。
 
 新增共用层单测的约定（#40）：`src/**/test/test_*.cpp` 每一个都必须在
 `tests/core_standalone/CMakeLists.txt` 里“交代”——能脱 ROS 编译就 `add_core_test(...)`，
