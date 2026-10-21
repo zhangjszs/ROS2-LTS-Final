@@ -61,8 +61,6 @@ StraightLinePlannerNode::StraightLinePlannerNode(rclcpp::Node::SharedPtr node)
 
     node_->declare_parameter<bool>("enable_hough", cfg.enable_hough);
     node_->get_parameter("enable_hough", cfg.enable_hough);
-    node_->declare_parameter<int>("hough_threshold", cfg.hough_threshold);
-    node_->get_parameter("hough_threshold", cfg.hough_threshold);
     node_->declare_parameter<double>("hough_rho_resolution", cfg.hough_rho_resolution);
     node_->get_parameter("hough_rho_resolution", cfg.hough_rho_resolution);
     node_->declare_parameter<double>("hough_min_inlier_ratio", cfg.hough_min_inlier_ratio);

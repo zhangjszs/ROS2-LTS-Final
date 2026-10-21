@@ -53,7 +53,6 @@ struct LineDetectorConfig {
 
     // Hough
     bool enable_hough = false;
-    int hough_threshold = 10;
     double hough_rho_resolution = 0.30;
     double hough_min_inlier_ratio = 0.5;
 
