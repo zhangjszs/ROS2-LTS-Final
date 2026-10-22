@@ -1,6 +1,6 @@
 # TASKS.md — Issue 本地镜像（权威：GitHub Issue；本文件由 Planner 每轮整体重写）
 
-> 维护者：Planning Agent｜最后更新：2026-10-21T23:45:00+08:00（`plan-20261021e`：**用户亲选启动 Milestone S2b「八字绕环仿真闭环与规划加固」**；裁 D-022，立项 #87/#88/#89 进入今日 ready 队列；Issue 状态全面对齐）
+> 维护者：Planning Agent｜最后更新：2026-10-22T11:00:00+08:00（`plan-20261022`：S2b 首批三单就绪等候执行，Nightly 10 连绿入账，GitHub Issues 权威状态全面对齐）
 > 规则：本文件为只读镜像，Executor 改状态时先改 Issue 再同步对应行；冲突以 Issue 为准。
 > 权威来源状态：`gh issue list --state open` 实测 **28 open**（ready 3 · in-review 0 · in-progress 0 · 仓库外阻塞 7 · needs-info 3 · ready-for-human 14 · 路线图伞形 1）。
 > 🆕 **本轮变化（plan-20261021e）**：
@@ -11,7 +11,7 @@
 >    - **#89**（P2）：`skidpad_planner` 核心边界参数清洗与退化守卫（非法值回退默认并构造期 WARN，防除零与清空锥桶）。
 > 3. 今日队列由 0 项恢复为 **3 项**（满足 2–5 项约束，全部通过 4.2 门禁）。
 
-## 今日队列（2026-10-21，给 Executor 的建议顺序）
+## 今日队列（2026-10-22，给 Executor 的建议顺序）
 
 > **执行顺序建议**：
 > - **#88（P1）** 位于 `src/simulation/track_benchmark/`，与规划器完全独立，提供八字赛道完整几何与真值中心线，建议优先合入。
@@ -86,6 +86,6 @@
 
 ## 环境与流程注意
 
-- 基线：`main` = `origin/main` = `f9db916`（**0/0 同步**）。
+- 基线：`main` = `origin/main` = `b30af56`（**0/0 同步**）。
 - 支持环境（D-017）：CI = ROS 2 **Jazzy**，本机 = **lyrical**；验证入口唯一为 `bash scripts/drive_gates.sh`。多节点 runtime 门禁必须 `export FASTDDS_BUILTIN_TRANSPORTS=SHM`。
 - 本轮已开工 S2b 首批队列，遵循常规 conventional commits，代码与 `.agent/` 提交分立。
