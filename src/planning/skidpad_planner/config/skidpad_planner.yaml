@@ -2,7 +2,7 @@
   ros__parameters:
     # Skidpad 规划器参数
     input_cone_map_topic: "/sensors/cones/fused"
-    output_pathlimits_topic: "/planning/skidpad/pathlimits"
+    output_pathlimits_topic: "/planning/pathlimits"
     vehicle_state_topic: "/localization/vehicle_state"
 
     # 赛道类型: 1=八字绕环, 2=直线/加速, 3=赛道行驶
