@@ -33,6 +33,67 @@ struct CenterlineParams {
     double path_lookahead{20.0};
 };
 
+struct IcpApfConfig {
+    double center_margin = 0.3;
+    int icp_max_iter = 20;
+    double icp_convergence = 0.001;
+    double k_a = 0.5;
+    double k_r = 2.0;
+    double d_0 = 2.0;
+    double path_spacing = 0.5;
+    double path_lookahead = 20.0;
+    int apf_max_iter = 10;
+    double apf_step_limit = 0.2;
+    double icp_max_match_dist = 3.0;
+};
+
+struct ConfigParamFix {
+    const char* name;
+    double bad_value;
+    double used_value;
+};
+
+struct SanitizedSkidpadConfig {
+    IcpApfConfig cfg;
+    std::vector<ConfigParamFix> fixes;
+};
+
+// #89：skidpad 核心边界参数清洗纯函数。非法输入回退默认值并记录 fix。
+[[nodiscard]] inline SanitizedSkidpadConfig SanitizeSkidpadConfig(const IcpApfConfig& cfg) {
+    const IcpApfConfig defaults{};
+    SanitizedSkidpadConfig out;
+    out.cfg = cfg;
+
+    auto fix_if_invalid_double = [&out](const char* name, double& value, double fallback, bool valid) {
+        if (!valid) {
+            out.fixes.push_back(ConfigParamFix{name, value, fallback});
+            value = fallback;
+        }
+    };
+
+    auto fix_if_invalid_int = [&out](const char* name, int& value, int fallback, bool valid) {
+        if (!valid) {
+            out.fixes.push_back(ConfigParamFix{name, static_cast<double>(value), static_cast<double>(fallback)});
+            value = fallback;
+        }
+    };
+
+    fix_if_invalid_double("center_margin", out.cfg.center_margin, defaults.center_margin,
+                          std::isfinite(out.cfg.center_margin) && out.cfg.center_margin >= 0.0);
+    fix_if_invalid_double("k_a", out.cfg.k_a, defaults.k_a, std::isfinite(out.cfg.k_a) && out.cfg.k_a >= 0.0);
+    fix_if_invalid_double("k_r", out.cfg.k_r, defaults.k_r, std::isfinite(out.cfg.k_r) && out.cfg.k_r >= 0.0);
+    fix_if_invalid_double("d_0", out.cfg.d_0, defaults.d_0, std::isfinite(out.cfg.d_0) && out.cfg.d_0 > 0.0);
+    fix_if_invalid_double("path_station_spacing", out.cfg.path_spacing, defaults.path_spacing,
+                          std::isfinite(out.cfg.path_spacing) && out.cfg.path_spacing > 0.0);
+    fix_if_invalid_double("path_lookahead_distance", out.cfg.path_lookahead, defaults.path_lookahead,
+                          std::isfinite(out.cfg.path_lookahead) && out.cfg.path_lookahead > 0.0);
+    fix_if_invalid_double("apf_step_limit", out.cfg.apf_step_limit, defaults.apf_step_limit,
+                          std::isfinite(out.cfg.apf_step_limit) && out.cfg.apf_step_limit > 0.0);
+    fix_if_invalid_int("icp_max_iterations", out.cfg.icp_max_iter, defaults.icp_max_iter, out.cfg.icp_max_iter > 0);
+
+    return out;
+}
+
 inline void AppendMidpointsCore(std::span<const Point2D> primary, std::span<const Point2D> secondary, double max_dist,
                                 std::vector<Point2D>& out) {
     if (primary.empty() || secondary.empty()) {
