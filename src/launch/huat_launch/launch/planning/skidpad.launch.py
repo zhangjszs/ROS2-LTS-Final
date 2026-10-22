@@ -4,7 +4,7 @@
 #  *
 #  * Converts skidpad.launch (ROS1) to ROS2 Python launch file.
 #  *
-#  * Output: /planning/skidpad/pathlimits
+#  * Output: /planning/pathlimits
 #  */
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -37,7 +37,7 @@ def generate_launch_description():
     )
     output_pathlimits_topic_arg = DeclareLaunchArgument(
         'output_pathlimits_topic',
-        default_value='/planning/skidpad/pathlimits',
+        default_value='/planning/pathlimits',
         description='Output path limits topic',
     )
 

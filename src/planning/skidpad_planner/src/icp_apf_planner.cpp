@@ -159,35 +159,6 @@ std::vector<Point2D> IcpApfPlanner::ComputeCircleCenterline(const std::vector<co
         right_pts.emplace_back(c.position_base_link.x, c.position_base_link.y);
     }
 
-    const Circle2D lc = FitCircleTaubinCore(left_pts);
-    const Circle2D rc = FitCircleTaubinCore(right_pts);
-
-    constexpr double kDefaultHalfTrackWidth = 1.5;
-    Circle2D center_circle;
-    if (lc.valid && rc.valid) {
-        center_circle.cx = (lc.cx + rc.cx) * 0.5;
-        center_circle.cy = (lc.cy + rc.cy) * 0.5;
-        center_circle.r = (lc.r + rc.r) * 0.5;
-        center_circle.valid = true;
-    } else if (lc.valid) {
-        center_circle.cx = lc.cx;
-        center_circle.cy = lc.cy;
-        center_circle.r = std::max(lc.r - kDefaultHalfTrackWidth, lc.r * 0.5);
-        center_circle.valid = true;
-    } else if (rc.valid) {
-        center_circle.cx = rc.cx;
-        center_circle.cy = rc.cy;
-        center_circle.r = std::max(rc.r - kDefaultHalfTrackWidth, rc.r * 0.5);
-        center_circle.valid = true;
-    }
-
-    if (center_circle.valid) {
-        RCLCPP_INFO(
-            rclcpp::get_logger("skidpad_planner"),
-            "[skidpad_planner] Taubin: left(valid=%d r=%.2f) right(valid=%d r=%.2f) center(cx=%.2f cy=%.2f r=%.2f)",
-            lc.valid, lc.r, rc.valid, rc.r, center_circle.cx, center_circle.cy, center_circle.r);
-    }
-
     const CenterlineParams params{
         .max_pair_dist = 6.0,
         .path_spacing = path_spacing_,

@@ -4,6 +4,7 @@
 #include <common_msgs/msg/huat_tracklimits.hpp>
 #include <ranges>
 
+#include "interface_contract_qos.hpp"
 namespace skidpad {
 
 SkidpadPlannerNode::SkidpadPlannerNode(rclcpp::Node::SharedPtr node)
@@ -18,7 +19,7 @@ SkidpadPlannerNode::SkidpadPlannerNode(rclcpp::Node::SharedPtr node)
     node_->get_parameter("road_type", road_type_);
     node_->declare_parameter<std::string>("input_cone_map_topic", "/sensors/cones/fused");
     node_->get_parameter("input_cone_map_topic", input_topic_);
-    node_->declare_parameter<std::string>("output_pathlimits_topic", "/planning/skidpad/pathlimits");
+    node_->declare_parameter<std::string>("output_pathlimits_topic", "/planning/pathlimits");
     node_->get_parameter("output_pathlimits_topic", output_topic_);
     node_->declare_parameter<std::string>("vehicle_state_topic", "/localization/vehicle_state");
     node_->get_parameter("vehicle_state_topic", vehicle_state_topic_);
@@ -72,9 +73,10 @@ SkidpadPlannerNode::SkidpadPlannerNode(rclcpp::Node::SharedPtr node)
     cone_map_sub_ = node_->create_subscription<common_msgs::msg::HuatMap>(
         input_topic_, 1, [this](const common_msgs::msg::HuatMap::ConstSharedPtr msg) { OnConeMapMessage(msg); });
     car_state_sub_ = node_->create_subscription<common_msgs::msg::HuatCarstate>(
-        vehicle_state_topic_, 1,
+        vehicle_state_topic_, common_msgs::contract::makeQoS(common_msgs::contract::kQosState),
         [this](const common_msgs::msg::HuatCarstate::ConstSharedPtr msg) { OnCarStateMessage(msg); });
-    path_limits_pub_ = node_->create_publisher<common_msgs::msg::HuatPathLimits>(output_topic_, 1);
+    path_limits_pub_ = node_->create_publisher<common_msgs::msg::HuatPathLimits>(
+        output_topic_, common_msgs::contract::makeQoS(common_msgs::contract::kQosPath));
 
     RCLCPP_INFO(node_->get_logger(), "[skidpad_planner] Node initialized. road_type=%d", road_type_);
 }
