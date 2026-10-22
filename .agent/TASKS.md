@@ -18,29 +18,27 @@
 > - **#87（P2）与 #89（P2）** 同处 `src/planning/skidpad_planner/`（#87 动 node/YAML/QoS，#89 动参数清洗/核心计算/单测）。为避免分支 rebase 冲突，**两单建议串行执行**：先 #87 合入 main，再拉分支开工 #89；或在同分支协同。
 > - 推荐总体顺序：**#88 → #87 → #89**。
 
-1. **#88** `[S2b] TrackGenerator 补齐八字绕环完整中心线（右双圈+过渡切入+左双圈+出场）`（P1，ready-for-agent）：
+1. **#88** `[S2b] TrackGenerator 补齐八字绕环完整中心线（右双圈+过渡切入+左双圈+出场）`（P1，in-review）：
    - `GenerateSkidpad()` 补齐 FSAC 规则要求的完整中心线（进场直线 -> 右双圈 -> S 弯过渡切线 -> 左双圈 -> 出场直线），解决当前仅单右圆、长度 72.33m、基线录制撞锥 3 次的问题；导出同步 `skidpad_track.csv`；单测断言曲率极值与连续性。
-2. **#87** `[S2b] skidpad_planner 节点对齐契约 QoS 与接口话题规范（kQosPath / kQosState / 默认话题对齐）`（P2，ready-for-agent）：
+2. **#87** `[S2b] skidpad_planner 节点对齐契约 QoS 与接口话题规范（kQosPath / kQosState / 默认话题对齐）`（P2，in-review）：
    - 节点发布/订阅接入 `common_msgs::contract::makeQoS`（消除 volatile 丢包陷阱）；默认输出话题改为标准契约话题 `/planning/pathlimits`；消除 `ComputeCircleCenterline` 中 Taubin 圆拟合的二次重复计算。
-3. **#89** `[S2b] skidpad_planner 核心边界参数清洗与退化守卫（非法值回退默认与 WARN）`（P2，ready-for-agent）：
+3. **#89** `[S2b] skidpad_planner 核心边界参数清洗与退化守卫（非法值回退默认与 WARN）`（P2，in-review）：
    - 纯函数 `SanitizeSkidpadConfig`：`center_margin`、`k_a`、`k_r`、`d_0`、`apf_step_limit` 非法值清洗，构造期 WARN，核心内部防除零兜底；补充 5+ 非法组合用例，消除清空锥桶与 NaN 路径隐患。
 
-## in-review（待验收，0）
-
-无。
-
-## ready（可执行，3）
+## in-review（待验收，3）
 
 | Issue | 标题 | 优先级 | 模块 | 预估影响 |
 |---|---|---|---|---|
 | #88 | [S2b] TrackGenerator 补齐八字绕环完整中心线（右双圈+过渡切入+左双圈+出场） | P1 | `track_benchmark` | 赛道几何真值完善，基线评测前置 |
 | #87 | [S2b] skidpad_planner 节点对齐契约 QoS 与接口话题规范（kQosPath / kQosState / 默认话题对齐） | P2 | `skidpad_planner` | 契约接口规范化，消除 QoS volatile 隐患 |
 | #89 | [S2b] skidpad_planner 核心边界参数清洗与退化守卫（非法值回退默认与 WARN） | P2 | `skidpad_planner` | 算法边界鲁棒性，防除零与 NaN 路径 |
+## ready（可执行，0）
+
+无。
 
 ## in-progress（0）
 
 无。
-
 ## 仓库外阻塞（7，均为外部输入缺失，非代码可推进）
 
 | Issue | 标题 | 阻塞原因（D-013 分类） | 本轮复核 |
