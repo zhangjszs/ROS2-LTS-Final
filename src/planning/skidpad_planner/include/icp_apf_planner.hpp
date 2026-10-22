@@ -18,20 +18,6 @@ struct IcpResult {
     IcpResult() : rotation(0.0), tx(0.0), ty(0.0), rmse(0.0), converged(false) {}
 };
 
-struct IcpApfConfig {
-    double center_margin = 0.3;
-    int icp_max_iter = 20;
-    double icp_convergence = 0.001;
-    double k_a = 0.5;
-    double k_r = 2.0;
-    double d_0 = 2.0;
-    double path_spacing = 0.5;
-    double path_lookahead = 20.0;
-    int apf_max_iter = 10;
-    double apf_step_limit = 0.2;
-    double icp_max_match_dist = 3.0;
-};
-
 class IcpApfPlanner {
    public:
     explicit IcpApfPlanner(const IcpApfConfig& cfg);

@@ -31,7 +31,6 @@ SkidpadPlannerNode::SkidpadPlannerNode(rclcpp::Node::SharedPtr node)
     double icp_convergence;
     node_->declare_parameter<double>("center_margin", 0.3);
     node_->get_parameter("center_margin", center_margin);
-    center_margin_ = center_margin;
     node_->declare_parameter<int>("icp_max_iterations", 20);
     node_->get_parameter("icp_max_iterations", icp_max_iter);
     node_->declare_parameter<double>("icp_convergence_threshold", 0.001);
@@ -46,7 +45,6 @@ SkidpadPlannerNode::SkidpadPlannerNode(rclcpp::Node::SharedPtr node)
     node_->get_parameter("path_station_spacing", path_spacing);
     node_->declare_parameter<double>("path_lookahead_distance", 20.0);
     node_->get_parameter("path_lookahead_distance", path_lookahead);
-    path_lookahead_ = path_lookahead;
 
     int apf_max_iter;
     double apf_step_limit;
@@ -68,6 +66,15 @@ SkidpadPlannerNode::SkidpadPlannerNode(rclcpp::Node::SharedPtr node)
     planner_cfg.path_lookahead = path_lookahead;
     planner_cfg.apf_max_iter = apf_max_iter;
     planner_cfg.apf_step_limit = apf_step_limit;
+    // #89：核心边界参数清洗，构造期 WARN 提示并回退默认值以保持帧连续性
+    const auto sanitized = SanitizeSkidpadConfig(planner_cfg);
+    for (const auto& fix : sanitized.fixes) {
+        RCLCPP_WARN(node_->get_logger(), "[skidpad_planner] 参数 %s 非法（%g），回退默认值 %g", fix.name, fix.bad_value,
+                    fix.used_value);
+    }
+    planner_cfg = sanitized.cfg;
+    center_margin_ = planner_cfg.center_margin;
+    path_lookahead_ = planner_cfg.path_lookahead;
     planner_ = std::make_unique<IcpApfPlanner>(planner_cfg);
 
     cone_map_sub_ = node_->create_subscription<common_msgs::msg::HuatMap>(

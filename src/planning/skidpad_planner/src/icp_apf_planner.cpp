@@ -84,29 +84,35 @@ static Eigen::Matrix2d SvdRotation2D(const Eigen::Matrix2d& H) {
 
 namespace skidpad {
 
-IcpApfPlanner::IcpApfPlanner(const IcpApfConfig& cfg)
-    : center_margin_(cfg.center_margin),
-      icp_max_iter_(cfg.icp_max_iter),
-      icp_convergence_(cfg.icp_convergence),
-      k_a_(cfg.k_a),
-      k_r_(cfg.k_r),
-      d_0_(cfg.d_0),
-      path_spacing_(cfg.path_spacing),
-      path_lookahead_(cfg.path_lookahead),
-      apf_max_iter_(cfg.apf_max_iter),
-      apf_step_limit_(cfg.apf_step_limit),
-      icp_max_match_dist_(cfg.icp_max_match_dist) {}
+IcpApfPlanner::IcpApfPlanner(const IcpApfConfig& cfg) {
+    const auto sanitized = SanitizeSkidpadConfig(cfg);
+    const auto& c = sanitized.cfg;
+    center_margin_ = c.center_margin;
+    icp_max_iter_ = c.icp_max_iter;
+    icp_convergence_ = c.icp_convergence;
+    k_a_ = c.k_a;
+    k_r_ = c.k_r;
+    d_0_ = c.d_0;
+    path_spacing_ = c.path_spacing;
+    path_lookahead_ = c.path_lookahead;
+    apf_max_iter_ = c.apf_max_iter;
+    apf_step_limit_ = c.apf_step_limit;
+    icp_max_match_dist_ = c.icp_max_match_dist;
+}
 
 void IcpApfPlanner::ClusterCones(const std::vector<common_msgs::msg::HuatCone>& cones,
                                  std::vector<common_msgs::msg::HuatCone>& left,
                                  std::vector<common_msgs::msg::HuatCone>& right) {
     left.clear();
     right.clear();
+    // #89: 参数兜底防除零与 NaN 比较恒 false 导致清空点云；
+    // 注：历史坐标约定中 left 为 y < -margin，right 为 y > margin（与 ROS +y 左 / -y 右相反，保留历史约定）
+    const double margin = (std::isfinite(center_margin_) && center_margin_ >= 0.0) ? center_margin_ : 0.3;
     std::ranges::copy_if(
-        cones, std::back_inserter(left), [this](float y) { return y < -center_margin_; },
+        cones, std::back_inserter(left), [margin](float y) { return y < -margin; },
         [](const common_msgs::msg::HuatCone& c) { return c.position_base_link.y; });
     std::ranges::copy_if(
-        cones, std::back_inserter(right), [this](float y) { return y > center_margin_; },
+        cones, std::back_inserter(right), [margin](float y) { return y > margin; },
         [](const common_msgs::msg::HuatCone& c) { return c.position_base_link.y; });
 }
 
@@ -241,6 +247,9 @@ Point2D IcpApfPlanner::ComputeApfForce(const Point2D& p, const std::vector<Point
     Point2D force;
 
     // 1. 朝向中心线的吸引力：使用 std::ranges::min_element 配合距离投影
+    const double ka = (std::isfinite(k_a_) && k_a_ >= 0.0) ? k_a_ : 0.5;
+    const double kr = (std::isfinite(k_r_) && k_r_ >= 0.0) ? k_r_ : 2.0;
+    const double d0 = (std::isfinite(d_0_) && d_0_ > 0.0) ? d_0_ : 2.0;
     if (!centerline.empty()) {
         auto nearest_it = std::ranges::min_element(centerline, {}, [&](const Point2D& c) {
             const double dx = p.x - c.x;
@@ -251,8 +260,8 @@ Point2D IcpApfPlanner::ComputeApfForce(const Point2D& p, const std::vector<Point
         const double dy = p.y - nearest_it->y;
         const double min_dist = std::sqrt(dx * dx + dy * dy);
         if (min_dist > 1e-6) {
-            force.x += -k_a_ * dx;
-            force.y += -k_a_ * dy;
+            force.x += -ka * dx;
+            force.y += -ka * dy;
         }
     }
 
@@ -263,8 +272,8 @@ Point2D IcpApfPlanner::ComputeApfForce(const Point2D& p, const std::vector<Point
             double dx = p.x - c.position_base_link.x;
             double dy = p.y - c.position_base_link.y;
             double dist = std::max(std::sqrt(dx * dx + dy * dy), kMinRepulsionDist);
-            if (dist < d_0_) {
-                double factor = k_r_ * (1.0 / dist - 1.0 / d_0_) / (dist * dist);
+            if (dist < d0) {
+                double factor = kr * (1.0 / dist - 1.0 / d0) / (dist * dist);
                 force.x += factor * dx;
                 force.y += factor * dy;
             }
@@ -282,13 +291,15 @@ std::vector<Point2D> IcpApfPlanner::ApplyApfCorrection(const std::vector<Point2D
                                                        const std::vector<common_msgs::msg::HuatCone>& right) {
     std::vector<Point2D> corrected = path;
     for (auto& p : corrected) {
-        for (int iter = 0; iter < apf_max_iter_; ++iter) {
+        const double step_limit = (std::isfinite(apf_step_limit_) && apf_step_limit_ > 0.0) ? apf_step_limit_ : 0.2;
+        const int max_iter = (apf_max_iter_ > 0) ? apf_max_iter_ : 10;
+        for (int iter = 0; iter < max_iter; ++iter) {
             Point2D f = ComputeApfForce(p, centerline, left, right);
             double step = std::sqrt(f.x * f.x + f.y * f.y);
             if (step < 1e-6)
                 break;
-            if (step > apf_step_limit_) {
-                double scale = apf_step_limit_ / step;
+            if (step > step_limit) {
+                double scale = step_limit / step;
                 f.x *= scale;
                 f.y *= scale;
             }
