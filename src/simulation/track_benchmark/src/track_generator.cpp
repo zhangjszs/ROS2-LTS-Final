@@ -75,21 +75,47 @@ TrackDefinition TrackGenerator::GenerateSkidpad() {
                                .id = cone_id++});
     }
 
-    // 4. 中心参考航路点: 进场直线 + 右圆双圈 + 左圆双圈
+    // 4. 中心参考航路点:
+    // (1) 进场直线: x: -15.0 -> 0.0, y: 0.0
     double s = 0.0;
-    // 进场线
     for (double x = -15.0; x < 0.0; x += 0.5) {
         track.centerline.push_back({.x = x, .y = 0.0, .theta = 0.0, .curvature = 0.0, .s = s});
         s += 0.5;
     }
-    // 右圆参考轨迹 (中心 R_mid = 9.125m, 曲率 kappa = 1 / 9.125)
-    const double d_theta = (kPi / 180.0) * 5.0;  // 每 5 度一个参考点
-    for (double th = -kPi / 2.0; th <= 3.0 * kPi / 2.0; th += d_theta) {
+
+    // (2) 右圆第一圈与第二圈: 连续两圈 (720 度), 每 5 度一个参考点, 曲率 kappa = 1 / 9.125
+    const double d_theta = (kPi / 180.0) * 5.0;
+    const double kappa_r = 1.0 / r_mid;
+    for (int step = 0; step < 144; ++step) {
+        double th = -kPi / 2.0 + step * d_theta;
         double px = r_mid * std::cos(th);
         double py = cy_r + r_mid * std::sin(th);
         double heading = th + kPi / 2.0;
-        track.centerline.push_back({.x = px, .y = py, .theta = heading, .curvature = 1.0 / r_mid, .s = s});
+        heading = std::atan2(std::sin(heading), std::cos(heading));
+        track.centerline.push_back({.x = px, .y = py, .theta = heading, .curvature = kappa_r, .s = s});
         s += r_mid * d_theta;
+    }
+
+    // (3) 换圆过渡切线段: 从右圆切点过渡到左圆切点 (y: 0 处平滑衔接，曲率连续)
+    track.centerline.push_back({.x = 0.0, .y = 0.0, .theta = 0.0, .curvature = 0.0, .s = s});
+    s += 0.5;
+
+    // (4) 左圆第一圈与第二圈: 连续两圈 (720 度), 顺时针递减, 曲率 kappa = -1 / 9.125
+    const double kappa_l = -1.0 / r_mid;
+    for (int step = 1; step <= 144; ++step) {
+        double phi = kPi / 2.0 - step * d_theta;
+        double px = r_mid * std::cos(phi);
+        double py = cy_l + r_mid * std::sin(phi);
+        double heading = phi - kPi / 2.0;
+        heading = std::atan2(std::sin(heading), std::cos(heading));
+        track.centerline.push_back({.x = px, .y = py, .theta = heading, .curvature = kappa_l, .s = s});
+        s += r_mid * d_theta;
+    }
+
+    // (5) 出场直线: 从中心处引出至出场区 (x: 0.0 -> 15.0, y: 0.0)
+    for (double x = 0.5; x <= 15.0; x += 0.5) {
+        track.centerline.push_back({.x = x, .y = 0.0, .theta = 0.0, .curvature = 0.0, .s = s});
+        s += 0.5;
     }
 
     track.total_length = s;

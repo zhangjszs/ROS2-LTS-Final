@@ -133,3 +133,59 @@ TEST(TrackFinishMetadataTest, ManifestWritesNullFinishMetadataForClosedTracks) {
         EXPECT_NE(line.find("\"runout_end_m\": null"), std::string::npos) << line;
     }
 }
+
+// —— #88：八字绕环完整中心线几何断言（包含左右双圆、正负曲率极值、各段连续性）——
+TEST(TrackSkidpadGeometryTest, SkidpadCenterlineCoversBothCirclesWithCurvature) {
+    const auto skidpad = TrackGenerator::GenerateSkidpad();
+    ASSERT_FALSE(skidpad.centerline.empty());
+
+    // 1. 验证存在覆盖左右两圆的极值点 (y > 5.0 与 y < -5.0)
+    bool has_right_extreme = false;
+    bool has_left_extreme = false;
+    double max_y = -1e9;
+    double min_y = 1e9;
+
+    // 2. 验证曲率包含正负两种极值 (右圆 +1/9.125, 左圆 -1/9.125)
+    bool has_pos_curvature = false;
+    bool has_neg_curvature = false;
+    const double expected_pos_kappa = 1.0 / 9.125;
+    const double expected_neg_kappa = -1.0 / 9.125;
+
+    // 3. 验证各段弧长累积连续不降
+    double prev_s = 0.0;
+    for (size_t i = 0; i < skidpad.centerline.size(); ++i) {
+        const auto& pt = skidpad.centerline[i];
+        max_y = std::max(max_y, pt.y);
+        min_y = std::min(min_y, pt.y);
+        if (pt.y > 5.0)
+            has_right_extreme = true;
+        if (pt.y < -5.0)
+            has_left_extreme = true;
+
+        if (std::abs(pt.curvature - expected_pos_kappa) < 1e-4)
+            has_pos_curvature = true;
+        if (std::abs(pt.curvature - expected_neg_kappa) < 1e-4)
+            has_neg_curvature = true;
+
+        if (i > 0) {
+            EXPECT_GE(pt.s, prev_s) << "Arc length decreased at point " << i;
+            EXPECT_LE(pt.s - prev_s, 1.0) << "Arc length step too large at point " << i;
+        }
+        prev_s = pt.s;
+    }
+
+    EXPECT_TRUE(has_right_extreme);
+    EXPECT_TRUE(has_left_extreme);
+    EXPECT_GT(max_y, 18.0);   // cy_r(9.125) + r_mid(9.125) = 18.25
+    EXPECT_LT(min_y, -18.0);  // cy_l(-9.125) - r_mid(9.125) = -18.25
+
+    EXPECT_TRUE(has_pos_curvature);
+    EXPECT_TRUE(has_neg_curvature);
+
+    // 4. 总里程与起点终点断言
+    EXPECT_GT(skidpad.total_length, 250.0);
+    EXPECT_NEAR(skidpad.centerline.front().x, -15.0, 1e-6);
+    EXPECT_NEAR(skidpad.centerline.front().y, 0.0, 1e-6);
+    EXPECT_NEAR(skidpad.centerline.back().x, 15.0, 1e-6);
+    EXPECT_NEAR(skidpad.centerline.back().y, 0.0, 1e-6);
+}
