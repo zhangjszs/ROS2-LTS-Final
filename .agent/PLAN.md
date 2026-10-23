@@ -1,84 +1,86 @@
 # PLAN.md — 路线、当前阶段与可执行队列
 
-> 维护者：Planning Agent（时间流接力）｜最后更新：2026-10-22T11:00+08:00（`plan-20261022`：S2b 首批 3 项 ready-for-agent 保持就绪，Nightly 连续 10 天全绿入账，等候 Execution 会话开工）
-> 事实基线：`main` = `origin/main` = `b30af56`（0/0 同步）。本轮入账 Nightly 10-21 run `39676356203` 与 `b30af56` CI run `39627061249`，状态全绿。环境事实见 `.agent/ENV.md`（D-017 口径）。
+> 维护者：Planning Agent（时间流接力）｜最后更新：2026-10-24T12:00+08:00（`plan-20261024`：S2b 首批三单验收关闭 3/3，第二批闭环门禁线 #90/#91/#92 立项 ready，Nightly 12 连绿入账）
+> 事实基线：`main` = `origin/main` = `c7c55d6`（0/0 同步）。三单 merge run（`39776596508`/`39778505010`/`39779563232`）全部 success；`c7c55d6` 纯 `.agent/` 提交 run `40027760400` 规划时在跑（树等价绿，待下一棒顺手复核）。环境事实见 `.agent/ENV.md`（D-017 口径）。
 > 文档体量约定：本文件只写**当前**状态与结论；历史以 `git log -- .agent/PLAN.md` 与各 Issue 评论为准。
 
-## 〇、本轮结论：正式启动 Milestone S2b「八字绕环仿真闭环与规划加固」
+## 〇、本轮结论：S2b 首批基础层验收出清，进入闭环门禁线
 
-在 S2a「直线加速事件闭环」与首批 P3 积压全面达成并验收出清后，依据用户交互掌舵指令（裁 **D-022**），项目由维持模式切换为新功能推进态，正式开启 **Milestone S2b「八字绕环仿真闭环与规划加固」**。
+Milestone S2b 首批三单（#88 几何真值 / #87 契约 QoS / #89 参数清洗）已于 2026-10-24 验收关闭（证据独立复核：代码 diff、单测计数 592→599、三 merge CI success、CSV 校验和机制）。10-23 全天无会话、10-24 凌晨 Executor 空队列空转一轮后，本轮补上规划侧动作，立项第二批「闭环门禁线」三单（#90 → #91 → #92，严格串行依赖）：
 
-首批通过 4.2 ready 门禁的 3 项任务已在远端 GitHub Issues 正式立项入轨：
-1. **#88（P1）**：`TrackGenerator` 补齐八字绕环规范中心线（进场 + 右双圈 + S 弯过渡切线 + 左双圈 + 出场停稳）；
-2. **#87（P2）**：`skidpad_planner` 节点对齐契约 QoS（kQosPath / kQosState）与默认话题 `/planning/pathlimits`，消除重复圆拟合计算；
-3. **#89（P2）**：`skidpad_planner` 核心边界参数清洗与退化守卫（非法值回退默认并构造期 WARN，防除零与清空锥桶）。
+1. **#90（P1）**：skidpad 完赛判据核——八字计圈状态机 + 赛道元数据 + 中心线导出（纯 std）；
+2. **#91（P1）**：`skidpad_finish_smoke.sh` 真值中心线驱动的 ROS 闭环完赛门禁（复刻 #82 模式，可证伪）；
+3. **#92（P2）**：`skidpad_planner` 在线闭环接入冒烟——锥桶图驱动的数据面门禁（完赛为非目标）。
+
+分解逻辑：先把「控制/仿真链能物理完成八字」（#91，真值驱动）与「规划器能在线产线」（#92，数据面）解耦，避免单一巨型集成任务反复失败；两者共用的计圈判据下沉 #90 纯核，离线 runner 与 ROS 门禁单一来源（沿 #80 先例）。
 
 ## 一、当前方向
 
 当前主线推进 **Milestone S2b 八字绕环仿真闭环与规划加固**：
-1. **赛道几何真值完善**：将 `TrackGenerator::GenerateSkidpad()` 由当前的单圈右半圆扩充为 FSAC 规范的双圆全景轨迹，消除基线评测撞锥缺陷；
-2. **规划契约与健壮性**：将 `skidpad_planner` 全面纳入 D-002 接口契约单一权威（`makeQoS`、标准话题），清洗未定义输入参数；
-3. **低速闭环与门禁建立**：基于现有纯 INS 站心定位基线（D-015）与 Pure Pursuit 基线控制器，打通仿真中的八字多节点闭环与可证伪门禁。
+1. ~~赛道几何真值完善~~ ✅（#88 已验收：259.836m 完整八字中心线，RMSE 0.320m）；
+2. ~~规划契约与健壮性~~ ✅（#87/#89 已验收：makeQoS 契约对齐 + 8 参数清洗双层防御）；
+3. **低速闭环与门禁建立**（进行中）：判据核 → 真值闭环完赛门禁 → 规划器在线接入，三步走。
 
-## 二、今日目标（2026-10-22）
+## 二、今日目标（2026-10-24）
 
-- [x] 核查入账 Nightly 10-21 运行结果（run `39676356203`，16m17s，全绿，连续 10 天全绿达成）
-- [x] 核对主干 HEAD `b30af56` 状态与 push CI run `39627061249`（15m23s，全绿）
-- [x] 复核 GitHub Issues 与 4.2 ready 门禁，确认 S2b 首批 3 项任务（#88、#87、#89）无漂移、可立即开工
-- [x] 更新 `TASKS.md` 与 `PLAN.md` 镜像至 2026-10-22 事实基线
-- [x] 提交推送 `.agent/` 变更，按 D-012 提醒用户发起 Execution 会话开工 S2b 队列
-## 三、当前 Milestone：Milestone S2b「八字绕环仿真闭环与规划加固」（进度：0 / 3 ready 任务开工）
+- [x] 验收 S2b 首批 #88/#87/#89（证据独立复核，三单关闭，验收评论落盘 Issue）
+- [x] 队列治理：GitHub 实测 25→28 open，ready 由 0 恢复为 3，TASKS.md 整体重写对齐
+- [x] 立项第二批 #90/#91/#92（4.2 门禁七条全过，技术断言经代码实测验证）
+- [x] Nightly 12 连绿入账（10-23 run `40022745048`）
+- [ ] 提交推送本轮 `.agent/` 变更，按 D-012 提醒用户发起 Execution 会话
+
+## 三、当前 Milestone：Milestone S2b「八字绕环仿真闭环与规划加固」（进度：3 / 6）
 
 ### 目标与验收
-- **目标**：在可复现仿真（纯 INS 基线）中完成八字绕环闭环——赛道生成器产出符合 FSAC 规则的完整八字轨迹（右双圈 + 切线换圆 + 左双圈 + 出场）；`skidpad_planner` 接入契约 QoS 与参数清洗守卫；离线 benchmark 与多节点 ROS 仿真均能稳定完赛。
+- **目标**：在可复现仿真（纯 INS 基线）中完成八字绕环闭环——赛道生成器产出符合 FSAC 规则的完整八字轨迹；`skidpad_planner` 接入契约 QoS 与参数清洗守卫；建立可证伪的八字 ROS 闭环门禁，证明端到端数据流动与可控性。
 - **完成判据**：
-  1. **#88 几何真值**：`TrackGenerator::GenerateSkidpad()` 生成完整八字参考中心线（含曲率极值与各段连续性单测断言）；导出 `skidpad_track.csv`；
-  2. **#87 契约对齐**：`skidpad_planner` 经 `makeQoS` 接入 `kQosPath` / `kQosState`，默认输出话题对齐 `/planning/pathlimits`；
-  3. **#89 边界鲁棒**：参数非法值（NaN/负值/除零）构造期清洗回退默认并 WARN，核心计算防除零兜底，5+ 非法组合用例通过；
-  4. **闭环门禁（后续任务）**：建立类似 `accel-finish` 的八字绕环闭环门禁或基线更新，证明端到端数据流动与可控性。
-- **完成信号（Success signal）**：S2b 核心任务验收合入 + `core_standalone_check.sh` 干净 + 完整 drive_gates 全 PASS + 远端 CI 全绿。
+  1. ~~#88 几何真值~~ ✅ 2026-10-24 验收关闭；
+  2. ~~#87 契约对齐~~ ✅ 2026-10-24 验收关闭；
+  3. ~~#89 边界鲁棒~~ ✅ 2026-10-24 验收关闭；
+  4. **闭环门禁**（进行中）：#90 判据核 + #91 真值驱动完赛门禁 + #92 在线数据面门禁全部合入并验收。
+- **完成信号（Success signal）**：#90/#91/#92 验收合入 + `core_standalone_check.sh` 干净 + 完整 drive_gates 全 PASS + 远端 CI 全绿。
 - **明确非目标（Non-goals）**：
   - 恪守 D-015：不引入 ESKF / LocationMapper / GTSAM 因子图，坚持纯 INS 站心基线；
-  - 恪守 D-003：不修改 MPC 控制律与判据，不私动比较基线；
+  - 恪守 D-003：不修改 MPC 控制律与判据，不私动比较基线（#91 明确：门禁产物是 run JSON 不是调参基线）；
   - 恪守 D-004：不宣称实车能力，不替代实车/台架关闭条件；
-  - 恪守 D-002：不更改公共契约话题类型与字段定义。
+  - 恪守 D-002：不更改公共契约话题类型与字段定义；
+  - #92 完赛为非目标（在线规划质量调优若需要，另立任务走正当口径）。
 
 ## 四、执行队列（给 Executor 的建议顺序，3 项 ready）
 
-> **队列状态**：3 项（处于 2–5 规范区间内，全部通过 4.2 ready 门禁）。
-> **文件冲突规避与依赖分析**：
-> - **#88（P1）**：独占 `src/simulation/track_benchmark/`，无文件冲突，建议最先开工并合入；
-> - **#87（P2）与 #89（P2）**：同处 `src/planning/skidpad_planner/`。#87 触及适配层与 launch，#89 触及 core 算法与单测。**两单建议严格串行**（先 #87 合入 main、pull rebase 后再开工 #89，或在同一分支连续提交）。
-> - 推荐执行顺序：**#88 → #87 → #89**。
+> **队列状态**：3 项（2–5 规范区间内，全部通过 4.2 ready 门禁）。
+> **依赖与冲突**：#90 → #91 → #92 严格串行（#91 消费 #90 的判据核与中心线 CSV；#92 复用 #91 的拓扑 harness；#91/#92 均触 `scripts/` 与 CI workflow）。
 
-1. **#88** `[S2b] TrackGenerator 补齐八字绕环完整中心线（右双圈+过渡切入+左双圈+出场）`（P1）
-   - 落点：`src/simulation/track_benchmark/src/track_generator.cpp`、`test/test_track_generator.cpp`、`src/simulation/vehicle_simulator/tracks/skidpad_track.csv`
-2. **#87** `[S2b] skidpad_planner 节点对齐契约 QoS 与接口话题规范（kQosPath / kQosState / 默认话题对齐）`（P2）
-   - 落点：`src/planning/skidpad_planner/src/skidpad_planner_node.cpp`、`config/skidpad_planner.yaml`、`huat_launch`
-3. **#89** `[S2b] skidpad_planner 核心边界参数清洗与退化守卫（非法值回退默认与 WARN）`（P2）
-   - 落点：`src/planning/skidpad_planner/include/centerline_core.hpp`、`src/planning/skidpad_planner/src/icp_apf_planner.cpp`、`test/`
+1. **#90** `[S2b] skidpad 完赛判据核：八字计圈状态机 + 赛道元数据 + 中心线导出（纯 std）`（P1）
+   - 落点：`src/simulation/track_benchmark/include/track_benchmark/skidpad_finish_judge.hpp`（新增）、`track_generator.hpp/.cpp`（元数据）、`benchmark_runner.cpp`（导出）、`test/`
+2. **#91** `[S2b] skidpad_finish_smoke.sh：八字绕环 ROS 闭环完赛门禁（真值中心线驱动，可证伪）`（P2→P1）
+   - 落点：`scripts/skidpad_finish_smoke.sh`（新增）、`src/simulation/track_benchmark/src/finish_event_node.cpp`（skidpad 赛制扩展）、`.github/workflows/ci.yml`、`scripts/drive_gates.sh`
+3. **#92** `[S2b] skidpad_planner 在线闭环接入冒烟：锥桶图驱动的八字数据面门禁`（P2）
+   - 落点：`scripts/skidpad_closed_loop_smoke.sh`（新增）、`src/launch/huat_launch/`（如需）、`.github/workflows/ci.yml`
 
 ## 五、已完成（阶段性摘要）
 
 - **S0 可重复启动**：已完成（#13/#14 已关闭）。
-- **S2a 直线加速事件闭环**：✅ 全部达成（#78、#79、#80、#81、#82 五单关闭，四层判据收敛）。
-- **首批 P3 积压清理**：✅ 全部达成（#83、#84、#85、#86 四单验收关闭，CI 全绿）。
-- **ADR 下沉线**：全部完成（#59/#60/#61/#62 均关闭）。
+- **S2a 直线加速事件闭环**：✅ 全部达成（#78–#82 五单关闭，四层判据收敛）。
+- **首批 P3 积压清理**：✅ 全部达成（#83–#86 四单验收关闭，CI 全绿）。
+- **S2b 基础层**：✅ 全部达成（#88/#87/#89 三单 2026-10-24 验收关闭）。
+- **ADR 下沉线**：全部完成（#59–#62 均关闭）。
 
 ## 六、CI / Nightly 状态（本轮复核）
 
-- **主干 origin/main 全绿**：
-  - 最近提交全部 CI success（#83 `cb09a6b` · #84 `c7d7e8c` · #85 `4d303d1` · #86 `6b6697f` · agent 提交 `39600468883` / `39614818759` / `39616221072` / `39624708526`，以及 `b30af56` CI `39627061249` 15m23s 全绿）。
-- **Nightly 连续 10 天 success**（10-13 起，最新 10-21 `39676356203` 16m17s）。
+- **主干 origin/main 全绿**：S2b 三单 merge run 全 success（#88 `39776596508` 16m15s · #87 `39778505010` · #89 `39779563232` 17m31s）；`2cf6b06` docs run success。
+- **Nightly 连续 12 天 success**（10-13 起，最新 10-23 `40022745048` 16m33s）。
+- 已知无影响项：`3470a39` 纯 `.agent/` 提交 run cancelled（树等价绿 run，10-24 Executor 已核）；`c7c55d6` run `40027760400` 规划时在跑（同性质，待下一棒确认）。
 - 本地与远端 0/0 同步，无未推送提交，无 dangling 临时分支。
+
 ## 七、已知阻塞与依赖（D-013 口径逐项复验）
 
 7 项外部阻塞（#15/#16/#17/#18/#19/#24/#37）维持 blocked，无外部数据/运行时到位；3 项 needs-info（#25/#26/#27）待真实数据。
-S2b 的当前 3 项任务不依赖上述任何外部输入，纯仿真可推进。
+S2b 第二批 3 项任务不依赖上述任何外部输入，纯仿真可推进。
 
 ## 八、下一阶段
 
-- **S2b 闭环建立**：完成 #88/#87/#89 基础层后，立项八字仿真闭环冒烟门禁（如 `skidpad_finish_smoke.sh`）与离线基线回归。
+- **S2b 收口**：#92 若数据面达标且在线链恰好完赛，评估「在线完赛门禁升级」是否值得立项；若规划器质量差距明显，按 #92 报告差距决定是否立「在线规划质量提升」任务（需先过 4.2 门禁，注意与 D-003 调参口径的边界）。
 - **S3 高速循迹**：待 S2b 稳定后评估高速工况。
 
 ## 九、已明确放弃 / 不做
@@ -90,7 +92,7 @@ S2b 的当前 3 项任务不依赖上述任何外部输入，纯仿真可推进�
 
 ## 十、Decision Gate 状态与给 Executor 的指令
 
-- **Decision Gate**：裁定 **D-022**（启动 S2b）；当前**无 pending 决策**。
+- **Decision Gate**：D-022（S2b 推进中）继续有效；当前**无 pending 决策**。
 - **给 Executor 的指令**：
-  > 请按 **#88 → #87 → #89** 顺序领取开工；#87 与 #89 同处 `skidpad_planner`，请严格串行执行并留意契约 QoS 规范。
-- **D-012 循环提醒**：Ready 队列（#88、#87、#89）已就绪待领，可直接发起 Execution 会话开工。
+  > 请按 **#90 → #91 → #92** 严格串行领取（后单消费前单产物）；#91/#92 是 runtime 多节点门禁，牢记本机 `FASTDDS_BUILTIN_TRANSPORTS=SHM` + ros2 daemon 显式 start；#92 遇在线规划质量不达标时转 needs-info 报差距，不要在门禁单里调参救场。
+- **D-012 循环提醒**：Ready 队列（#90、#91、#92）已就绪待领，可直接发起 Execution 会话开工。
