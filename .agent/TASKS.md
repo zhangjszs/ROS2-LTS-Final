@@ -1,31 +1,22 @@
 # TASKS.md — Issue 本地镜像（权威：GitHub Issue；本文件由 Planner 每轮整体重写）
 
-> 维护者：Planning Agent｜最后更新：2026-10-24T12:00+08:00（`plan-20261024`：验收关闭 S2b 首批 #88/#87/#89，立项第二批 #90/#91/#92 闭环门禁线）
+> 维护者：Planning Agent｜最后更新：2026-10-25T00:45+08:00（`plan-20261025`：#90/#91 验收关闭，S2b 5/6，#92 唯一 ready）
 > 规则：本文件为只读镜像，Executor 改状态时先改 Issue 再同步对应行；冲突以 Issue 为准。
-> 权威来源状态：`gh issue list --state open` 实测 **28 open**（ready 3 · in-review 0 · in-progress 0 · 仓库外阻塞 7 · needs-info 3 · ready-for-human 14 · 路线图伞形 1）。
+> 权威来源状态：`gh issue list --state open` 实测 **26 open**（ready 1 · in-review 0 · in-progress 0 · 仓库外阻塞 7 · needs-info 3 · ready-for-human 14 · 路线图伞形 1）。
 
-## 今日队列（2026-10-24 起有效，给 Executor 的建议顺序）
+## 今日队列（2026-10-25 起有效，给 Executor 的建议顺序）
 
-> **执行顺序建议（严格串行，依赖链 #90 → #91 → #92）**：
-> - **#90（P1）** 纯 core 判据核 + 元数据 + 中心线导出，无 ROS 依赖，独立合入；
-> - **#91（P1）** 依赖 #90 的判据核与中心线 CSV，复刻 #82 accel-finish 模式建真值驱动完赛门禁；
-> - **#92（P2）** 依赖 #91 的拓扑 harness，把真值 pathsource 换成在线 skidpad_planner 做数据面门禁。
-> - 三单落点有包含关系（#91 触 finish_event_node，#92 触 scripts），串行可免 rebase 冲突。
+> **执行顺序建议**：仅 1 项——#92 是 S2b 最后一项（收口件）。开工前**必读** Issue #92 的 Planner 交接 comment（plan-20261025）：#91 三条实测发现（PP 重锚劫持处置边界 / watchdog 覆盖按在线实测定 / Jazzy 订阅计数陷阱用 profiler 转发确认）。
+> 调查先行：先实测 `src/planning/skidpad_planner` 输出几何/频率，再定数据面与门禁断言（恢复点见 HANDOFF「未完成」节 + STATE.md「#91 关键实测事实」）。
 
-1. **#90** `[S2b] skidpad 完赛判据核：八字计圈状态机 + 赛道元数据 + 中心线导出（纯 std）`（P1，**in-review**，会话2 已合入 main `8828780`）
-   - `TrackDefinition` 增 skidpad 元数据（圆心 ±9.125 / 半径 9.125 / 圈数 2）；纯 std `skidpad_finish_judge.hpp` 绕角累积计圈 + 相位状态机；`--export-tracks` 增中心线 CSV；退化轨迹单测。
-2. **#91** `[S2b] skidpad_finish_smoke.sh：八字绕环 ROS 闭环完赛门禁（真值中心线驱动，可证伪）`（P1，**in-review**，会话2 已合入 main `0e58555`）
-   - pathsource 读 #90 中心线 CSV 发 `/planning/raw_pathlimits` → profiler → PP → arbiter → simulator（skidpad_track.csv）；finish_event_node 接 #90 判据核；断言 finished + REQUEST 停 + 横向偏差 ≤1.0m；负样本可证伪；接入 drive_gates 与 CI。
-3. **#92** `[S2b] skidpad_planner 在线闭环接入冒烟：锥桶图驱动的八字数据面门禁`（P2，ready）
-   - 以 #91 拓扑为基，pathsource 换在线 skidpad_planner（输出重映射喂 profiler）；断言节点注册 + ≥1Hz 有限 pathlimits + 右圆绕角 ≥2π + 横向 ≤1.0m；完赛为非目标（观察字段）；负样本屏蔽规划器必败。
+1. **#92** `[S2b] skidpad_planner 在线闭环接入冒烟：锥桶图驱动的八字数据面门禁`（P2，**ready**）
+   - 以 #91 拓扑为基，pathsource 换在线 skidpad_planner（`output_pathlimits_topic` 重映射喂 profiler）；断言节点注册 + ≥1Hz 有限 pathlimits + 右圆绕角 ≥2π + 横向 ≤1.0m；完赛为非目标（观察字段）；负样本屏蔽规划器必败。
 
-## ready（可执行，3）
+## ready（可执行，1）
 
 | Issue | 标题 | 优先级 | 模块 | 依赖 |
 |---|---|---|---|---|
-| #90 | [S2b] skidpad 完赛判据核：八字计圈状态机 + 赛道元数据 + 中心线导出（纯 std） | P1 | `track_benchmark` | 无 |
-| #91 | [S2b] skidpad_finish_smoke.sh：八字绕环 ROS 闭环完赛门禁（真值中心线驱动，可证伪） | P1 | `scripts` + `track_benchmark` | #90 |
-| #92 | [S2b] skidpad_planner 在线闭环接入冒烟：锥桶图驱动的八字数据面门禁 | P2 | `scripts` + `huat_launch` | #91 |
+| #92 | [S2b] skidpad_planner 在线闭环接入冒烟：锥桶图驱动的八字数据面门禁 | P2 | `scripts` + `huat_launch` | #91 ✅ 已合入 |
 
 ## in-review（0）
 
@@ -67,7 +58,8 @@
 
 ## 已关闭（近期备查）
 
-- **#88 / #87 / #89**（2026-10-24 验收关闭）：S2b 首批三单——八字完整中心线（259.836m，RMSE 0.411→0.320）/ 契约 QoS 对齐 + Taubin 去重 / 8 参数清洗双层防御（+7 用例）；三单 merge CI 全 success，证据独立复核通过。
+- **#90 / #91**（2026-10-25 验收关闭）：S2b 闭环门禁线前两单——判据核（元数据+绕角计圈+中心线 349 点）/ 真值完赛门禁（61.2s 正样本 + 双负样本可证伪 + CI step）；Planner 对 12 条验收标准独立复核（tracks.json/CSV/JSON 留痕/挂载点/diff 范围亲验），PR #93/#94 CI 全绿。
+- **#88 / #87 / #89**（2026-10-24 验收关闭）：S2b 首批三单——八字完整中心线（259.836m，RMSE 0.411→0.320）/ 契约 QoS 对齐 + Taubin 去重 / 8 参数清洗双层防御（+7 用例）。
 - **#86**（2026-10-21）：AGENTS.md/CLAUDE.md daemon 口径纠错。
 - **#85**（2026-10-21）：MIGRATION_BASELINE.md 决策引用回填。
 - **#84**（2026-10-21）：straight_line_planner 时序滤波与参数清洗。
@@ -78,7 +70,8 @@
 
 ## 环境与流程注意
 
-- 基线：`main` = `origin/main` = `c7c55d6`（0/0 同步，工作树 clean）。
-- **CI 尾巴待复核**：`c7c55d6`（10-24 凌晨 Executor 纯 `.agent/` 提交）run `40027760400` 本轮规划时仍在 in_progress——树等价绿 run（代码与 `be03070` 一致），预期无影响，下一棒开工前顺手 `gh run view 40027760400` 确认即可。
-- 支持环境（D-017）：CI = ROS 2 **Jazzy**，本机 = **lyrical**；验证入口唯一为 `bash scripts/drive_gates.sh`；多节点 runtime 门禁必须 `export FASTDDS_BUILTIN_TRANSPORTS=SHM` + ros2 daemon 显式 start。
+- 基线：`main` = `origin/main` = `06374cf`（0/0 同步，工作树 clean）。
+- **CI 尾巴待复核**：merge run `40111773587` 与 docs run `40111929415` 在 `06374cf` 前后在跑（规划时 ~11min，正常时长内，PR 预合检查均已绿）——下一棒开工前 `gh run list --branch main --limit 3` 顺手确认。
+- **延后候选（已定策，见 PLAN §八）**：PP 锚点保留（等 #92 实测证实）/ speed_high_threshold 分场景（无活体消费方）/ accel-finish 补挂 PR CI（等 #63/#66 CI 提效）。Executor 勿在 #92 内顺手做这三项。
+- 支持环境（D-017）：CI = ROS 2 **Jazzy**，本机 = **lyrical**；验证入口唯一为 `bash scripts/drive_gates.sh`；多节点 runtime 门禁必须 `export FASTDDS_BUILTIN_TRANSPORTS=SHM` + ros2 daemon 显式 start；Jazzy 下 `get_subscription_count()` 不刷新（#91 CI 实测），就绪探测用 profiler 转发确认。
 - 代码与 `.agent/` 提交分立（conventional commits，正文 `Refs #<任务号>`）。
