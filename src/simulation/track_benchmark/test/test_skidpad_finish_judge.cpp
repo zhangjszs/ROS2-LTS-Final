@@ -78,6 +78,21 @@ TEST(SkidpadFinishJudgeTest, FullCenterlineFinishes) {
     EXPECT_TRUE(judge.IsFinished());
 }
 
+TEST(SkidpadFinishJudgeTest, UpdateReturnsTrueExactlyOnce) {
+    // #91：finish_event_node 的「恰好一次」依赖 Update 只在首次完赛返回 true——
+    // 完赛后的继续观测/状态抖动/乱序重放都不得二次触发。
+    const auto track = TrackGenerator::GenerateSkidpad();
+    SkidpadFinishJudge judge(SpecFromTrack(track));
+    int fired = 0;
+    for (const auto& [x, y] : PointsFrom(track.centerline, 0, track.centerline.size()))
+        fired += judge.Update(x, y) ? 1 : 0;
+    // 完赛后的重放（整条轨迹再喂一遍）也不得再触发。
+    for (const auto& [x, y] : PointsFrom(track.centerline, 0, track.centerline.size()))
+        fired += judge.Update(x, y) ? 1 : 0;
+    EXPECT_TRUE(judge.IsFinished());
+    EXPECT_EQ(fired, 1);
+}
+
 TEST(SkidpadFinishJudgeTest, NoisyCenterlineStillFinishes) {
     // ≤0.3m 横向噪声（固定种子）：绕角累积在整圈尺度上抵消扰动，计圈不得依赖位置采样。
     const auto track = TrackGenerator::GenerateSkidpad();
