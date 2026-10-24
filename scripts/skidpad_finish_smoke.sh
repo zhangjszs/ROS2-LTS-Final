@@ -17,12 +17,13 @@
 #   finish_event_node：mode=skidpad，订阅 vehicle_state，首次完赛**恰好一次**发 finish
 #     （#90 判据核：进场→右圆2圈→换圆→左圆2圈→出场）
 #
-# 数据面设计（与 accel 门禁的两处刻意差异，均有实测依据）：
-#   1) 路径**只发一条**（等 profiler 订阅就绪后发布一次，之后停发）：PP 每条路径消息
-#      都重置最近点索引并全局重锚，而八字中心线的进场/切点/出场段几何重叠在 x 轴上，
-#      持续重发会被出场段劫持（本机实测：10Hz 重发 → 车直行冲出赛道）。单次发布下
-#      PP 首次锚定唯一正确（车在唯一起点 -15），此后索引单调推进。八字赛程参考线
-#      本就是静态已知的——这与真实系统"一次下发赛程参考线"的语义一致。
+# 数据面设计（与 accel 门禁的刻意差异，均有实测依据）：
+#   1) 路径**确认后停发**（车起步前 0.5s 低频重发同一条全量参考线，收到 profiler
+#      转发即停）：PP 每条路径消息都重置最近点索引并全局重锚，而八字中心线的
+#      进场/切点/出场段几何重叠在 x 轴上，持续重发会被出场段劫持（本机实测：10Hz
+#      重发 → 车直行冲出赛道）。停发后索引单调推进；重发窗口被 profiler 转发确认
+#      （= PP 已收到同一份）钉死在车辆静止期，无劫持窗口。不用 get_subscription_count
+#      门控——Jazzy/部分 RMW 下图发现计数不刷新（CI 实测恒 0），不可移植。
 #   2) 参数覆盖三处（一次调整，issue #91 允许并要求记录；均为静态参考线场景的
 #      时序适配，不改变任何安全语义的判停行为本身）：
 #      - pure_pursuit safety.path_timeout 0.5→600 与 safety_monitor planner_timeout
@@ -236,13 +237,13 @@ if len(pts) < 100:
 
 
 class Watch(Node):
-    """单次发布八字参考线，并观测完赛判据与横向走廊。"""
+    """发布八字参考线（确认前低频重试），并观测完赛判据与横向走廊。"""
 
     def __init__(self):
         super().__init__("skidpad_finish_watch")
         self.pub = self.create_publisher(HuatPathLimits, "/planning/raw_pathlimits", 10)
-        self.published = False
-        self.create_timer(0.2, self.tick)
+        self.confirmed = False   # 收到 profiler 转发 = PP 同样收到了（同一话题）
+        self.create_timer(0.5, self.tick)
 
         self.state_n = 0
         self.raw_path_n = 0
@@ -264,11 +265,16 @@ class Watch(Node):
         self.create_subscription(String, "/system/task_event", self.on_event, 50)
         self.create_subscription(HuatPathLimits, "/planning/raw_pathlimits",
                                  lambda m: setattr(self, "raw_path_n", self.raw_path_n + 1), 10)
+        self.create_subscription(HuatPathLimits, "/planning/pathlimits", self.on_plimits, 10)
 
     def tick(self):
-        # 单次发布：等 velocity_profiler 订阅就绪再发一条全量参考线，之后停发。
-        # （持续重发会让 PP 全局重锚被 x 轴重叠段劫持，见脚本头部说明。）
-        if self.published or self.pub.get_subscription_count() < 1:
+        # 发布窗口策略（车动前完成，见脚本头部「数据面设计」）：
+        # 0.5s 低频重发同一条全量参考线，直到**收到 profiler 转发**（/planning/pathlimits
+        # 上出现第一条消息 = PP 也收到了同一份——确认即停发）。确认前车处于静止
+        # （PP 无路径不驱动），重锚只发生在 (-15,0) 唯一正确锚点，无劫持窗口。
+        # 不用 get_subscription_count() 做门控：Jazzy/部分 RMW 下图发现计数不刷新
+        # （CI 实测恒 0，本机 lyrical 恰好可用——不可移植）。
+        if self.confirmed:
             return
         m = HuatPathLimits()
         m.header.stamp = self.get_clock().now().to_msg()
@@ -276,8 +282,11 @@ class Watch(Node):
         m.path = [Point(x=p[0], y=p[1], z=0.0) for p in pts]
         m.replan = False
         self.pub.publish(m)
-        self.published = True
-        self.get_logger().info(f"八字参考线已发布（{len(pts)} 点，单次）")
+
+    def on_plimits(self, m):
+        if not self.confirmed:
+            self.confirmed = True
+            self.get_logger().info(f"参考线已被 profiler 转发（{len(m.path)} 点）——停止发布，车即将起步")
 
     def on_state(self, m):
         self.state_n += 1
