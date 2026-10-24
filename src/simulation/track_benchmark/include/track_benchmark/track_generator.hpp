@@ -32,6 +32,23 @@ struct CenterlinePoint {
 };
 
 /**
+ * @brief #90：八字绕环（skidpad）完赛判据元数据。
+ *
+ * 完赛 = 进场 → 第一圆（y>0）绕 required_laps 圈 → 换圆 → 第二圆（y<0）反向绕
+ * required_laps 圈 → 出场。数值由 GenerateSkidpad() 随几何一同填充（唯一事实
+ * 来源），消费方（skidpad_finish_judge.hpp、ROS 闭环门禁）不得硬编码 9.125 / 2。
+ */
+struct SkidpadCircuitMetadata {
+    double right_center_x{0.0};    // 第一绕行圆（y>0）圆心 X (m)
+    double right_center_y{9.125};  // 第一绕行圆圆心 Y (m)
+    double left_center_x{0.0};     // 第二绕行圆（y<0）圆心 X (m)
+    double left_center_y{-9.125};  // 第二绕行圆圆心 Y (m)
+    double path_radius{9.125};     // 中心线绕圈半径 (m)
+    int required_laps{2};          // 每圆要求圈数（FSAC 规则 = 2）
+    double exit_x{0.0};            // 出场通道起点 X (m)：越过即视为驶向出场区
+};
+
+/**
  * @brief 完整赛道定义 (包含边界锥桶与中心参考线)
  *
  * #17：`id` + `version` 是全仓唯一的赛道标识：仿真器读的 CSV、评测器生成的几何、
@@ -56,12 +73,20 @@ struct TrackDefinition {
     std::optional<double> finish_x;      // 终点线 X 坐标 (m)
     std::optional<double> runout_end_m;  // 终点后停车缓冲区末端 X 坐标 (m)
 
+    // #90：八字绕环完赛元数据（机读）。skidpad 的完赛语义是「进场 → 右圆两圈 →
+    // 换圆 → 左圆两圈 → 出场」，圆心/半径/圈数只能从这里取，消费方不得硬编码
+    // 9.125 / 2。非 skidpad 赛道保持空值（hasSkidpad() 为 false）。
+    std::optional<SkidpadCircuitMetadata> skidpad;
+
     // 写入报告/回归基线的版本串（单一构造点）。
     [[nodiscard]] std::string versionedId() const { return id + "/" + version; }
 
     // #81：终点语义是否完整（终点线与缓冲区末端同时存在）。消费者据此决定
     // 「本赛道能否做直线赛完赛判定」，而不是各自去猜字段是否存在。
     [[nodiscard]] bool hasFinish() const noexcept { return finish_x.has_value() && runout_end_m.has_value(); }
+
+    // #90：八字绕环完赛语义是否完整（元数据随几何生成）。
+    [[nodiscard]] bool hasSkidpad() const noexcept { return skidpad.has_value(); }
 };
 
 /**

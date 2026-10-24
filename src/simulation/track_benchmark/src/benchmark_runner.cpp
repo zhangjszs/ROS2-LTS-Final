@@ -578,6 +578,18 @@ int exportTracks(const std::string& dir) {
         std::cerr << "[export] " << files[i] << " cones=" << tracks[i].cones.size() << " geometry_fnv1a64=" << std::hex
                   << TrackGenerator::geometryChecksum(tracks[i].cones) << std::dec << "\n";
     }
+    // #90：八字中心线单独导出——#91 的 ROS 闭环门禁 pathsource 从这份 CSV 取参考线，
+    // 几何公式不在第二个地方重写（与锥桶 CSV 同一生成器、同一份几何）。
+    for (size_t i = 0; i < tracks.size(); ++i) {
+        if (!tracks[i].hasSkidpad())
+            continue;
+        const std::string centerline = dir + "/skidpad_centerline.csv";
+        if (!TrackGenerator::SaveCenterlineToCSV(tracks[i].centerline, centerline)) {
+            std::cerr << "ERROR: cannot write " << centerline << "\n";
+            return 2;
+        }
+        std::cerr << "[export] skidpad_centerline.csv points=" << tracks[i].centerline.size() << "\n";
+    }
     if (!TrackGenerator::SaveTrackManifest(tracks, dir, files)) {
         std::cerr << "ERROR: cannot write " << dir + "/tracks.json\n";
         return 2;

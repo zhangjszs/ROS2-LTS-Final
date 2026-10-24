@@ -189,3 +189,80 @@ TEST(TrackSkidpadGeometryTest, SkidpadCenterlineCoversBothCirclesWithCurvature) 
     EXPECT_NEAR(skidpad.centerline.back().x, 15.0, 1e-6);
     EXPECT_NEAR(skidpad.centerline.back().y, 0.0, 1e-6);
 }
+
+// —— #90：skidpad 完赛元数据随几何一同生成，且与几何一致 ——
+
+TEST(TrackSkidpadMetadataTest, SkidpadMetadataMatchesGeometry) {
+    const auto skidpad = TrackGenerator::GenerateSkidpad();
+    ASSERT_TRUE(skidpad.hasSkidpad());
+    const auto& m = *skidpad.skidpad;
+    // 元数据就是 FSAC 规则几何（右/左圆心 ±9.125、中心线半径 9.125、每圆 2 圈）。
+    EXPECT_DOUBLE_EQ(m.right_center_x, 0.0);
+    EXPECT_DOUBLE_EQ(m.right_center_y, 9.125);
+    EXPECT_DOUBLE_EQ(m.left_center_x, 0.0);
+    EXPECT_DOUBLE_EQ(m.left_center_y, -9.125);
+    EXPECT_DOUBLE_EQ(m.path_radius, 9.125);
+    EXPECT_EQ(m.required_laps, 2);
+    // 元数据不是凭空写死的数字：右圆段的中心线点到右圆圆心的距离 = path_radius。
+    // 右圆段为进场 30 点之后的 144 点（见 GenerateSkidpad 构造顺序）。
+    ASSERT_GT(skidpad.centerline.size(), 30u + 144u);
+    for (size_t i = 30; i < 30 + 144; ++i) {
+        const auto& pt = skidpad.centerline[i];
+        EXPECT_NEAR(std::hypot(pt.x - m.right_center_x, pt.y - m.right_center_y), m.path_radius, 1e-9) << i;
+    }
+}
+
+TEST(TrackSkidpadMetadataTest, NonSkidpadTracksHaveNoSkidpadMetadata) {
+    EXPECT_FALSE(TrackGenerator::GenerateAcceleration().hasSkidpad());
+    EXPECT_FALSE(TrackGenerator::GenerateTrackdriveLoop().hasSkidpad());
+}
+
+TEST(TrackSkidpadMetadataTest, ManifestWritesSkidpadMetadata) {
+    const std::vector<TrackDefinition> tracks = {TrackGenerator::GenerateAcceleration(),
+                                                 TrackGenerator::GenerateSkidpad(),
+                                                 TrackGenerator::GenerateTrackdriveLoop()};
+    const std::vector<std::string> files = {"acceleration_track.csv", "skidpad_track.csv", "trackdrive_loop.csv"};
+    const std::string manifest = ExportManifest(tracks, files);
+    ASSERT_FALSE(manifest.empty());
+
+    // skidpad 行带完整完赛元数据（消费方不得硬编码 9.125 / 2）。
+    const std::string line = ManifestLine(manifest, "skidpad-figure8");
+    ASSERT_FALSE(line.empty());
+    EXPECT_NE(line.find("\"skidpad\": {"), std::string::npos) << line;
+    EXPECT_NE(line.find("\"right_center_x\": 0.000"), std::string::npos) << line;
+    EXPECT_NE(line.find("\"right_center_y\": 9.125"), std::string::npos) << line;
+    EXPECT_NE(line.find("\"left_center_x\": 0.000"), std::string::npos) << line;
+    EXPECT_NE(line.find("\"left_center_y\": -9.125"), std::string::npos) << line;
+    EXPECT_NE(line.find("\"path_radius\": 9.125"), std::string::npos) << line;
+    EXPECT_NE(line.find("\"required_laps\": 2"), std::string::npos) << line;
+
+    // 其余赛道显式 null（与 #81 finish_x 同一显式缺省约定）。
+    for (const char* id : {"acceleration-75m", "trackdrive-loop"}) {
+        const std::string other = ManifestLine(manifest, id);
+        ASSERT_FALSE(other.empty()) << id;
+        EXPECT_NE(other.find("\"skidpad\": null"), std::string::npos) << other;
+    }
+}
+
+TEST(TrackSkidpadMetadataTest, CenterlineCsvRoundTripPreservesGeometry) {
+    // --export-tracks 落盘的中心线 CSV 必须能原样读回（#91 pathsource 的消费入口）：
+    // 点数一致、首尾点落在进场/出场段、绕圈半径不漂移。
+    const auto skidpad = TrackGenerator::GenerateSkidpad();
+    const auto dir = std::filesystem::temp_directory_path() / "fsac_skidpad_centerline";
+    std::filesystem::create_directories(dir);
+    const std::string path = (dir / "skidpad_centerline.csv").string();
+    ASSERT_TRUE(TrackGenerator::SaveCenterlineToCSV(skidpad.centerline, path));
+
+    const auto loaded = TrackGenerator::LoadCenterlineFromCSV(path);
+    ASSERT_EQ(loaded.size(), skidpad.centerline.size());
+    EXPECT_NEAR(loaded.front().x, -15.0, 1e-6);
+    EXPECT_NEAR(loaded.front().y, 0.0, 1e-6);
+    EXPECT_NEAR(loaded.back().x, 15.0, 1e-6);
+    EXPECT_NEAR(loaded.back().y, 0.0, 1e-6);
+    // 默认流精度（6 位有效数字）下坐标/曲率逐点还原（相对 1e-4 容差）。
+    for (size_t i = 0; i < loaded.size(); ++i) {
+        EXPECT_NEAR(loaded[i].x, skidpad.centerline[i].x, 1e-4) << i;
+        EXPECT_NEAR(loaded[i].y, skidpad.centerline[i].y, 1e-4) << i;
+        EXPECT_NEAR(loaded[i].curvature, skidpad.centerline[i].curvature, 1e-6) << i;
+    }
+}

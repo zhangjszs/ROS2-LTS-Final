@@ -119,6 +119,15 @@ TrackDefinition TrackGenerator::GenerateSkidpad() {
     }
 
     track.total_length = s;
+    // #90：完赛元数据随几何一同生成（唯一事实来源）：数值必须与上面的几何常量同源，
+    // 消费方（skidpad_finish_judge.hpp / ROS 闭环门禁）不得硬编码 9.125 / 2。
+    track.skidpad = SkidpadCircuitMetadata{.right_center_x = 0.0,
+                                           .right_center_y = cy_r,
+                                           .left_center_x = 0.0,
+                                           .left_center_y = cy_l,
+                                           .path_radius = r_mid,
+                                           .required_laps = 2,
+                                           .exit_x = 0.0};
     return track;
 }
 
@@ -268,6 +277,18 @@ bool TrackGenerator::SaveTrackManifest(const std::vector<TrackDefinition>& track
         write_optional_m(f, t.finish_x);
         f << ", \"runout_end_m\": ";
         write_optional_m(f, t.runout_end_m);
+        // #90：八字绕环完赛元数据（有值写对象，其余赛道写显式 null——与 #81 同一
+        // 显式缺省约定，消费方不必区分「无该语义」与「字段缺失」）。
+        f << ", \"skidpad\": ";
+        if (t.skidpad.has_value()) {
+            const auto& m = *t.skidpad;
+            f << "{\"right_center_x\": " << m.right_center_x << ", \"right_center_y\": " << m.right_center_y
+              << ", \"left_center_x\": " << m.left_center_x << ", \"left_center_y\": " << m.left_center_y
+              << ", \"path_radius\": " << m.path_radius << ", \"required_laps\": " << m.required_laps
+              << ", \"exit_x\": " << m.exit_x << "}";
+        } else {
+            f << "null";
+        }
         f << ", \"geometry_fnv1a64\": \"" << sum.str() << "\"}" << (i + 1 == tracks.size() ? "" : ",") << "\n";
     }
     f << "  ]\n}\n";
@@ -278,7 +299,9 @@ bool TrackGenerator::SaveCenterlineToCSV(const std::vector<CenterlinePoint>& cen
     std::ofstream f(path);
     if (!f.is_open())
         return false;
-    f << "# x,y,theta,curvature,s\n";
+    // #90：固定小数精度（沿 SaveConesToCSV 约定：位级确定才可逐字节 diff/往返校验；
+    // 默认 6 位有效数字会让大小坐标的尾数精度不一致）。
+    f << "# x,y,theta,curvature,s\n" << std::fixed << std::setprecision(6);
     for (const auto& pt : centerline) {
         f << pt.x << "," << pt.y << "," << pt.theta << "," << pt.curvature << "," << pt.s << "\n";
     }
