@@ -12,9 +12,9 @@
 > - **#92（P2）** 依赖 #91 的拓扑 harness，把真值 pathsource 换成在线 skidpad_planner 做数据面门禁。
 > - 三单落点有包含关系（#91 触 finish_event_node，#92 触 scripts），串行可免 rebase 冲突。
 
-1. **#90** `[S2b] skidpad 完赛判据核：八字计圈状态机 + 赛道元数据 + 中心线导出（纯 std）`（P1，ready）
+1. **#90** `[S2b] skidpad 完赛判据核：八字计圈状态机 + 赛道元数据 + 中心线导出（纯 std）`（P1，**in-review**，会话2 已合入 main `8828780`）
    - `TrackDefinition` 增 skidpad 元数据（圆心 ±9.125 / 半径 9.125 / 圈数 2）；纯 std `skidpad_finish_judge.hpp` 绕角累积计圈 + 相位状态机；`--export-tracks` 增中心线 CSV；退化轨迹单测。
-2. **#91** `[S2b] skidpad_finish_smoke.sh：八字绕环 ROS 闭环完赛门禁（真值中心线驱动，可证伪）`（P1，ready）
+2. **#91** `[S2b] skidpad_finish_smoke.sh：八字绕环 ROS 闭环完赛门禁（真值中心线驱动，可证伪）`（P1，**in-review**，会话2 已合入 main `0e58555`）
    - pathsource 读 #90 中心线 CSV 发 `/planning/raw_pathlimits` → profiler → PP → arbiter → simulator（skidpad_track.csv）；finish_event_node 接 #90 判据核；断言 finished + REQUEST 停 + 横向偏差 ≤1.0m；负样本可证伪；接入 drive_gates 与 CI。
 3. **#92** `[S2b] skidpad_planner 在线闭环接入冒烟：锥桶图驱动的八字数据面门禁`（P2，ready）
    - 以 #91 拓扑为基，pathsource 换在线 skidpad_planner（输出重映射喂 profiler）；断言节点注册 + ≥1Hz 有限 pathlimits + 右圆绕角 ≥2π + 横向 ≤1.0m；完赛为非目标（观察字段）；负样本屏蔽规划器必败。
