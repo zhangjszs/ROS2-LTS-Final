@@ -141,6 +141,13 @@ if(BUILD_TESTING)
   target_link_libraries(test_finish_judge
     track_benchmark_lib
   )
+  # #90：八字绕环完赛判据（绕角累积计圈 + 相位状态机）——判据可证伪 + 退化防御
+  ament_add_gtest(test_skidpad_finish_judge
+    test/test_skidpad_finish_judge.cpp
+  )
+  target_link_libraries(test_skidpad_finish_judge
+    track_benchmark_lib
+  )
 endif()
 
 ament_export_include_directories(include)

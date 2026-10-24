@@ -155,6 +155,13 @@ add_core_test(test_finish_judge
         "${REPO_ROOT}/src/simulation/track_benchmark/test/test_finish_judge.cpp"
         "${REPO_ROOT}/src/simulation/track_benchmark/src/track_generator.cpp")
 
+# #90：八字绕环完赛判据（绕角累积计圈 + 相位状态机）——header-only 纯 std
+# （track_generator.cpp 同上：合成轨迹取自 GenerateSkidpad() 中心线与元数据）
+add_core_test(test_skidpad_finish_judge
+    SOURCES
+        "${REPO_ROOT}/src/simulation/track_benchmark/test/test_skidpad_finish_judge.cpp"
+        "${REPO_ROOT}/src/simulation/track_benchmark/src/track_generator.cpp")
+
 # 安全：停车状态机（锁存/重启语义，纯 std 共用层）
 add_core_test(test_stop_state_machine
     SOURCES
