@@ -60,12 +60,15 @@ class SkidpadFinishJudge {
             std::hypot(spec_.right_center_x - spec_.left_center_x, spec_.right_center_y - spec_.left_center_y) > 0.0;
     }
 
-    /// 每拍喂入观测（位置 m）。非法 spec 或非有限输入拍被安全忽略（不推进、不 UB）。
-    void Update(double x, double y) {
+    /// 每拍喂入观测（位置 m）。返回 true = 本拍**首次**判定完赛（#91：finish_event_node
+    /// 的「恰好一次」依赖，与 #80 FinishJudge::Update 的首次越线语义对称——kFinished
+    /// 是吸收态，状态抖动/重复投递/乱序重放都不会二次返回 true）。
+    /// 非法 spec 或非有限输入拍被安全忽略（不推进、不 UB）。
+    bool Update(double x, double y) {
         if (!valid_ || phase_ == Phase::kFinished)
-            return;
+            return false;
         if (!std::isfinite(x) || !std::isfinite(y))
-            return;
+            return false;
         switch (phase_) {
             case Phase::kEnter:
                 // 等待进入第一圆环带（进场通道对圆心的绕角不足以误触发，见头注释）。
@@ -98,11 +101,13 @@ class SkidpadFinishJudge {
                 // 绕满双圆后驶入出场通道（越过 exit_x 且横向回到通道内）→ 完赛。
                 if (x >= spec_.exit_x && std::abs(y) <= spec_.corridor_half_width) {
                     phase_ = Phase::kFinished;
+                    return true;
                 }
                 break;
             case Phase::kFinished:
                 break;
         }
+        return false;
     }
 
     [[nodiscard]] bool IsFinished() const noexcept { return phase_ == Phase::kFinished; }
