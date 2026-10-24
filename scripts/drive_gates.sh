@@ -138,6 +138,12 @@ if [ "${QUICK:-0}" != 1 ]; then
     # REQUEST 锁存停 + 停进缓冲区；ENABLE_FINISH_EVENT=0 时**必须非 0 退出**——这一臂把
     # “靠看门狗/后门停车也能过”从门禁里排除掉，没有它整场门禁只是自证。
     run_gate accel-finish 1 bash -c 'bash scripts/acceleration_finish_smoke.sh build/accel_finish positive && ! ENABLE_FINISH_EVENT=0 bash scripts/acceleration_finish_smoke.sh build/accel_finish negative'
+    # #91：八字绕环 **ROS 闭环**完赛（同一仲裁器链，两臂）：正样本需 #90 判据核 finish
+    # 恰好一次（绕满双圆经出场通道）+ REQUEST 锁存停 + 横向走廊 ≤1.0m + 末速 <0.1；
+    # REQUIRED_LAPS=3 时**必须非 0 退出**——车按赛程只绕 2 圈而判据按 3 圈计数永不满足，
+    # 这证明计圈真的在工作（不是“到点就 finish”）；负样本选圈数臂而非事件禁用臂，
+    # 与 accel 门禁的证伪维度互补。
+    run_gate skidpad-finish 1 bash -c 'bash scripts/skidpad_finish_smoke.sh build/skidpad_finish positive && ! REQUIRED_LAPS=3 bash scripts/skidpad_finish_smoke.sh build/skidpad_finish negative'
 fi
 
 elapsed=$(( $(date +%s) - t0 ))

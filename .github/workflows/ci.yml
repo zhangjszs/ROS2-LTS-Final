@@ -139,6 +139,19 @@ jobs:
           source install/setup.bash
           bash scripts/fault_injection_smoke.sh
 
+      # #91：八字绕环 ROS 闭环完赛（两臂，与 drive_gates 的 skidpad-finish 同判据）：
+      # 正样本 = #90 判据核 finish 恰好一次 + REQUEST 锁存停 + 横向走廊 ≤1.0m；
+      # REQUIRED_LAPS=3 负样本必须非 0 退出（计圈真实工作，不是“到点就 finish”）。
+      - name: Skidpad finish closed-loop smoke (#91, positive + falsifiable negative)
+        timeout-minutes: 8
+        run: |
+          source "/opt/ros/${ROS_DISTRO}/setup.bash"
+          source install/setup.bash
+          bash scripts/skidpad_finish_smoke.sh build/skidpad_finish_ci/positive
+          if REQUIRED_LAPS=3 bash scripts/skidpad_finish_smoke.sh build/skidpad_finish_ci/negative; then
+            echo "FAIL: REQUIRED_LAPS=3 负样本应非 0 退出（计圈判据未真正证伪）"; exit 1
+          fi
+
       - name: Upload benchmark results
         if: always()
         uses: actions/upload-artifact@v4
