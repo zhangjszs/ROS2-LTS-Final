@@ -1,10 +1,10 @@
 # STATE
 
-- 更新时间：2026-10-25T23:30:00+08:00（exec-20261025 收尾中）
-- 当前任务：#92（needs-info，skidpad 在线闭环数据面门禁）
-- 分支：`agent/issue-92-skidpad-closed-loop-smoke`
-- 未完成工作：无当前进行中工作（#92 已部分完成转 needs-info，新门禁脚本 `scripts/skidpad_closed_loop_smoke.sh` 已合入本分支并推送，提出 auto-discovered #95）
-- 最近提交：`4e5e668` feat(gates): 新增 skidpad 在线闭环数据面门禁脚本 (Refs #92)
+- 更新时间：2026-10-25T23:50:00+08:00（exec-20261025 会话2 巡查收尾）
+- 当前任务：无（今日队列已出清；#92 为 needs-info，待 #95 规划重构）
+- 分支：`main`
+- 未完成工作：无（队列空；等待 Planning Agent 接入对 #95 立项排期并补充队列）
+- 最近提交：`65f7834` chore(agent): exec-20261025 收官——#92 实测推进转 needs-info，立项 #95 规划器跨圆平均缺陷
 - 今日日报：已写（见 .agent/DIARY/2026-10-25.md）
 - CI 事实：main 上 PR #93/#94 merge run 与 docs run 均 success 收敛；分支 `agent/issue-92-skidpad-closed-loop-smoke` 已推
 - 已知环境限制：
