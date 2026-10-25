@@ -9,14 +9,12 @@
 > **执行顺序建议**：仅 1 项——#92 是 S2b 最后一项（收口件）。开工前**必读** Issue #92 的 Planner 交接 comment（plan-20261025）：#91 三条实测发现（PP 重锚劫持处置边界 / watchdog 覆盖按在线实测定 / Jazzy 订阅计数陷阱用 profiler 转发确认）。
 > 调查先行：先实测 `src/planning/skidpad_planner` 输出几何/频率，再定数据面与门禁断言（恢复点见 HANDOFF「未完成」节 + STATE.md「#91 关键实测事实」）。
 
-1. **#92** `[S2b] skidpad_planner 在线闭环接入冒烟：锥桶图驱动的八字数据面门禁`（P2，**ready**）
-   - 以 #91 拓扑为基，pathsource 换在线 skidpad_planner（`output_pathlimits_topic` 重映射喂 profiler）；断言节点注册 + ≥1Hz 有限 pathlimits + 右圆绕角 ≥2π + 横向 ≤1.0m；完赛为非目标（观察字段）；负样本屏蔽规划器必败。
+1. **#92** `[S2b] skidpad_planner 在线闭环接入冒烟：锥桶图驱动的八字数据面门禁`（P2，**needs-info**）
+   - 以 #91 拓扑为基，pathsource 换在线 skidpad_planner（`output_pathlimits_topic` 重映射喂 profiler）；因规划器跨圆平均缺陷（见 #95）阻断车辆右圆推进，门禁脚本已落地分支但转 needs-info 待算法重构。
 
-## ready（可执行，1）
+## ready（0）
 
-| Issue | 标题 | 优先级 | 模块 | 依赖 |
-|---|---|---|---|---|
-| #92 | [S2b] skidpad_planner 在线闭环接入冒烟：锥桶图驱动的八字数据面门禁 | P2 | `scripts` + `huat_launch` | #91 ✅ 已合入 |
+无。
 
 ## in-review（0）
 
@@ -25,7 +23,6 @@
 ## in-progress（0）
 
 无。
-
 ## 仓库外阻塞（7，均为外部输入缺失，非代码可推进）
 
 | Issue | 标题 | 阻塞原因（D-013 分类） | 本轮复核 |
@@ -38,14 +35,14 @@
 | #24 | 跨 ROS 版本语义差分回放与故障回归（P1） | **运行时缺失**：验收第 2 条需 ROS1 运行环境（本机无 Noetic、无 docker） | 无外部输入 |
 | #37 | 翻转 use_arbiter 默认（P3，needs-triage + blocked） | **资料缺失**：需 #15 标定完成 | 无外部输入 |
 
-## needs-info / 待条件（3）
+## needs-info / 待条件（4）
 
 | Issue | 标题 | 等待 |
 |---|---|---|
+| #92 | [S2b] skidpad_planner 在线闭环接入冒烟：锥桶图驱动的八字数据面门禁 | #95 规划器跨圆平均与点序回跳算法重构 |
 | #25 | 技术博客系列（P2） | #17①② / #18 证据 |
 | #26 | 完整项目展示（P2，父跟踪） | 同上 |
 | #27 | 跨仓库路线总入口（P2） | 同上 |
-
 ## ready-for-human（14，用户/人工跟进，不计入 agent 队列与饥饿规则）
 
 #63 CI 路径过滤与并发取消（P2）· #64 `check_cpp20.sh` 参数统一（P2）· #65 closed-loop-fault 六臂并行（P2）· #66 CI job 三段拆分（P2）· #67 `affected_gates.sh`（P3）· #68 ccache 键头文件通配（P3）· #69 DDS 环境性失败区分（P2，含 daemon 预热回填其余 5 脚本范围 + D-021 两类环境陷阱）· #70 门禁时长预算监控（P3）· #71 core_standalone 覆盖率基线（P3）· #72 Prepare ROS 2 步骤超时（P3）· #73 评分核测试双轨去重（P3）· #74 本地快速反馈文档（P3）· #75 测试编写规范入库（P3）· #76 伞形：12 个仅 colcon 轨测试下沉（P3）
