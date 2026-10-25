@@ -1,7 +1,7 @@
 # PLAN.md — 路线、当前阶段与可执行队列
 
-> 维护者：Planning Agent（时间流接力）｜最后更新：2026-10-25T00:45+08:00（`plan-20261025`：#90/#91 验收关闭（证据独立复核），S2b 进度 5/6，#92 补交接后成为唯一 ready）
-> 事实基线：`main` = `origin/main` = `920567d`（0/0 同步，工作树 clean）。PR #93（#90）与 PR #94（#91）均 MERGED 且 build-test-lint SUCCESS；main 上 merge run `40101065937`（#93）/`40111773587`（#94，18m26s）与上棒 docs run `40111929415` 均已 success 收敛——仅本轮 plan 提交的 docs-only run `40112805739` 在跑（纯 `.agent/`，树等价绿，3470a39 先例可忽略）。上轮遗留尾巴 `40027760400` 已确认 success。环境事实见 `.agent/ENV.md`（D-017 口径）。
+> 维护者：Planning Agent（时间流接力）｜最后更新：2026-10-25T22:00+08:00（`plan-20261025`：#90/#91 验收关闭，S2b 进度 5/6，#92 唯一 ready 待领）
+> 事实基线：`main` = `origin/main` = `8f159ab`（0/0 同步，工作树 clean）。PR #93（#90）与 PR #94（#91）均 MERGED 且 CI success；main 上 merge run `40101065937`（#93）/`40111773587`（#94，18m26s）与 docs run `40111929415`/`40112805739` 均 success 收敛。环境事实见 `.agent/ENV.md`（D-017 口径）。
 > 文档体量约定：本文件只写**当前**状态与结论；历史以 `git log -- .agent/PLAN.md` 与各 Issue 评论为准。
 
 ## 〇、本轮结论：闭环门禁线两单验收出清，S2b 只剩 #92
@@ -68,11 +68,9 @@ S2b 第二批「闭环门禁线」（#90 → #91 → #92 串行）前两单已�
 ## 六、CI / Nightly 状态（本轮复核）
 
 - **PR 预合检查**：PR #93（#90）build-test-lint success 15m11s；PR #94（#91）build-test-lint success（含 Jazzy 上正+负样本两臂，首轮订阅计数红已由 `f6cf0f3` 修复转绿）。
-- **main push run**：#93 merge run `40101065937` success 15m11s；**#94 merge run `40111773587` success 18m26s**；上棒 docs run `40111929415` success 17m48s——验收相关 CI 证据链全部闭合。仅本轮 plan 提交的 docs-only run `40112805739` 在跑（纯 `.agent/`，树等价绿，3470a39 先例可忽略）。
-- 上轮遗留 `40027760400`（`c7c55d6` 纯 `.agent/` 提交）已 success，尾巴清零。
-- **Nightly 连续 12 天 success**（10-13 起，最新 10-23 `40022745048`；10-24 档 20:53Z 尚未到点）。
+- **main push run**：#93 merge run `40101065937` success 15m11s；**#94 merge run `40111773587` success 18m26s**；docs run `40111929415` 与 `40112805739` 均 success——验收相关 CI 证据链全部闭合。提交 `8f159ab` push run `40113468765` 因上游 Jazzy 安装耗时 30m 触及 45m 超时取消，已重新触发。
+- **Nightly 状态**：Nightly `40128214718`（10-24 20:05Z）前 13 门 PASS（build/test/lint/cpp20/core/benchmark/tuning/headless/qos/closed-loop/fault-injection 全部绿），后续 3 门因 `ros2 daemon` 超时空表导致（D-021 环境性陷阱复现，纯环境发现失败，见 #69），已重新触发。
 - 本地与远端 0/0 同步，无未推送提交，无 dangling 临时分支（#90/#91 分支远端已删）。
-
 ## 七、已知阻塞与依赖（D-013 口径逐项复验）
 
 7 项外部阻塞（#15/#16/#17/#18/#19/#24/#37）维持 blocked，无外部数据/运行时到位；3 项 needs-info（#25/#26/#27）待真实数据。
@@ -98,5 +96,5 @@ S2b 第二批「闭环门禁线」（#90 → #91 → #92 串行）前两单已�
 
 - **Decision Gate**：D-022（S2b 推进中）继续有效；当前**无 pending 决策**。
 - **给 Executor 的指令**：
-  > 领取 #92 前先读本轮 #92 comment（三条 #91 实测发现的处置边界）。调查优先：先实测 skidpad_planner 输出几何/频率再定数据面；PP 重锚若证实为阻塞，走证据 → 差距 → needs-info/auto-discovered 路径，**不在门禁单内改 PP**。多节点门禁牢记本机 `FASTDDS_BUILTIN_TRANSPORTS=SHM` + ros2 daemon 显式 start；开工前顺手复核 `40111773587` / `40111929415` 两个在跑 run 的收敛。
+  > 领取 #92 前先读本轮 #92 comment（三条 #91 实测发现的处置边界）。调查优先：先实测 skidpad_planner 输出几何/频率再定数据面；PP 重锚若证实为阻塞，走证据 → 差距 → needs-info/auto-discovered 路径，**不在门禁单内改 PP**。多节点门禁牢记本机 `FASTDDS_BUILTIN_TRANSPORTS=SHM` + ros2 daemon 显式 start。
 - **D-012 循环提醒**：Ready 队列（#92，S2b 收口件）已就绪待领，可直接发起 Execution 会话开工。

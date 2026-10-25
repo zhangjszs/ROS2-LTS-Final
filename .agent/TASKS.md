@@ -1,6 +1,6 @@
 # TASKS.md — Issue 本地镜像（权威：GitHub Issue；本文件由 Planner 每轮整体重写）
 
-> 维护者：Planning Agent｜最后更新：2026-10-25T00:45+08:00（`plan-20261025`：#90/#91 验收关闭，S2b 5/6，#92 唯一 ready）
+> 维护者：Planning Agent｜最后更新：2026-10-25T22:00+08:00（`plan-20261025`：#90/#91 验收关闭，S2b 5/6，#92 唯一 ready）
 > 规则：本文件为只读镜像，Executor 改状态时先改 Issue 再同步对应行；冲突以 Issue 为准。
 > 权威来源状态：`gh issue list --state open` 实测 **26 open**（ready 1 · in-review 0 · in-progress 0 · 仓库外阻塞 7 · needs-info 3 · ready-for-human 14 · 路线图伞形 1）。
 
@@ -70,8 +70,8 @@
 
 ## 环境与流程注意
 
-- 基线：`main` = `origin/main` = `920567d`（0/0 同步，工作树 clean）。
-- **CI 已收敛**：#93/#94 merge run（`40101065937`/`40111773587`）与上棒 docs run `40111929415` 全部 success；仅本轮 plan 提交的 docs-only run `40112805739` 在跑（纯 `.agent/`，树等价绿，3470a39 先例可忽略）——下一棒开工前 `gh run list --branch main --limit 3` 顺手确认即可。
+- 基线：`main` = `origin/main` = `8f159ab`（0/0 同步，工作树 clean）。
+- **CI 状态**：PR #93/#94 merge run（`40101065937`/`40111773587`）与 docs run `40111929415`/`40112805739` 全部 success；push run `40113468765` 超时取消与 Nightly `40128214718`（daemon 超时假红）均已重新触发。
 - **延后候选（已定策，见 PLAN §八）**：PP 锚点保留（等 #92 实测证实）/ speed_high_threshold 分场景（无活体消费方）/ accel-finish 补挂 PR CI（等 #63/#66 CI 提效）。Executor 勿在 #92 内顺手做这三项。
 - 支持环境（D-017）：CI = ROS 2 **Jazzy**，本机 = **lyrical**；验证入口唯一为 `bash scripts/drive_gates.sh`；多节点 runtime 门禁必须 `export FASTDDS_BUILTIN_TRANSPORTS=SHM` + ros2 daemon 显式 start；Jazzy 下 `get_subscription_count()` 不刷新（#91 CI 实测），就绪探测用 profiler 转发确认。
 - 代码与 `.agent/` 提交分立（conventional commits，正文 `Refs #<任务号>`）。
