@@ -7,7 +7,7 @@
 
 ## 今日队列（2026-10-26 起有效，给 Executor 的建议顺序）
 
-> **Executor 进展（exec-20261026）**：#96 **完成**（PR #97 已合入 `main` = `7733cbb`，CI 绿）；#69 **代码完成**（PR #98，CI 运行中）；#95 **部分完成**（PR #99，CI 运行中，判据 8 = 4/5，判据 1 待 Planner 重新表述）。详见各自 Issue 的执行报告与 `.agent/DIARY/2026-10-26.md`。
+> **Executor 进展（exec-20261026 会话2）**：#96 **完成**（PR #97 已合入 `main` = `7733cbb`，CI 绿）；#69 **代码完成**（PR #98，CI attempt 2 运行中）；#95 **完成**（PR #99，CI 重跑中）——新增「同心双壁瓣模型」后，端到端闭环**首次全绿**（rc=0，`cum_right_angle_rad` 1.3134 → **6.2864**，`max_lateral_dev_m` 0.433，PP 日志 `Approaching path end`/`refusing goal` 计数**全 0**），判据 8 = 5/5；**判据 1 待 Planner 重新表述**（字面条件与 #90 真值互斥）。详见各自 Issue 的执行报告与 `.agent/DIARY/2026-10-26.md`。
 
 > **顺序理由**：#69 先行是因为 `main` 当前**是红的**（run `40205834746`），合并路径不通则后两单无从谈起；#96 半小时内可落地，为 #95 提供端到端复验工具；#95 是 S2b 收口主线，需要剩下的整段时间。
 > **开工前必读**：#69 的「就绪探测单点失效」实测证据 + #95 的 D-011 实测数字（两单正文都已写全，不必再问 Planner）。
@@ -29,13 +29,19 @@
 | Issue | 标题 | 级别 | 结论与待办 |
 |---|---|---|---|
 | #96 | 把 skidpad_closed_loop_smoke.sh 合入 main | P2 | **完成**：PR #97 已 squash merge 进 `main`（`7733cbb`），未挂载，CI run `40336692425` attempt 2 = success；7 条验收判据逐条 `[x]` |
-| #95 | skidpad_planner 路径生成无法支撑八字闭环 | P1 | **部分完成**：Core 层三处几何缺陷已修 + 11 例纯 std 单测（626 tests 全绿、core_standalone 34/34）；端到端 0.409 → **1.313 rad**、`refusing goal` 归零、`max_lateral_dev 0.25`；**判据 8 = 4/5**（`Approaching path end` 仍 50 次：切点处两瓣交错 → 可见中线仅 ~4.5 m）、**判据 1 待 Planner 重新表述**（字面条件与 #90 真值互斥） |
+| #95 | skidpad_planner 路径生成无法支撑八字闭环 | P1 | **完成**（待 CI 绿后合并）：Core 层三处几何缺陷 + **新增同心双壁瓣模型**（切点处左右两组各混两个瓣的锥桶 → 跨左右配对配错，实测中点半径 11.85 vs 真中线 9.125）；12 例纯 std 单测（**639 tests 全绿**、core_standalone **35/35** ASan+UBSan clean）；端到端 **rc=0 首次全绿**：`cum_right_angle_rad` 0.409 → **6.2864**、`max_lateral_dev_m` 0.433、`Approaching path end`/`refusing goal` 计数**全 0**、**判据 8 = 5/5**；**判据 1 待 Planner 重新表述**（字面条件与 #90 真值互斥：真值到瓣心恒为 9.125 m） |
+
+## auto-discovered（1，Executor 发现，Planner 定级）
+
+| Issue | 现象 | 影响 | 建议方向 |
+|---|---|---|---|
+| （待 Planner 建单） | 切点处左右两瓣的锥桶集合**镜像对称**、几何上不可区分 → 规划器靠上一帧路径连续性保持单瓣，**不会自主换瓣**（真值中心线是「右瓣 2 圈 + 左瓣 2 圈」） | 端到端脚本目标（2π 单圈）已达成，但**整条赛道（4π + 换瓣）跑不完** | 需赛道特征/标记或产品决策，**单独立项**，不并入 #95 |
 
 ## in-progress（1）
 
 | Issue | 标题 | 级别 | 下一步 |
 |---|---|---|---|
-| #69 | DDS 门禁区分环境性失败与真失败 | P1 | 等 PR #98 CI 绿 → squash merge → 删临时分支 → 转 `in-review`（执行报告已备好） |
+| #69 | DDS 门禁区分环境性失败与真失败 | P1 | 等 PR #98 CI 绿（run `40355980015` attempt 2；attempt 1 被 cancelled 已 re-run）→ squash merge → 删临时分支 → 转 `in-review`（执行报告已备好） |
 
 ## 仓库外阻塞（7，均为外部输入缺失，非代码可推进；本轮零成本复查无变化）
 
