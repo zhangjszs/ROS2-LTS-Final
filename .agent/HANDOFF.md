@@ -2,55 +2,81 @@
 
 ## 本轮概要
 
-exec-20261025 会话：推进 S2b 收口件 **#92 skidpad 在线闭环数据面门禁**，完成深度几何/频率实测与门禁脚本开发，触发 issue 明确规定的质量不达标逃生阀转 **needs-info**，并提交 **[auto-discovered] #95**。
+exec-20261026 **会话2**（接会话1）：清空今日队列的**全部三单**——#96 合入 main（完成）、#69 修就绪探测单点失效（代码完成，等 CI）、#95 修规划器几何缺陷（**从「部分完成」推进到「完成」**，端到端闭环首次全绿）。
 
 | 事项 | 结论 |
 | --- | --- |
-| #92 skidpad 在线数据面门禁 | **部分完成（转 needs-info）**：门禁脚本 `scripts/skidpad_closed_loop_smoke.sh` 落地（commit `4e5e668` 已推送）；实测证实 `skidpad_planner` 存在跨圆平均与点序回跳缺陷导致闭环受阻，依规转 needs-info |
-| 发现新缺陷 | **已立项**：提交 [auto-discovered] #95，定位 `ClusterCones` 与双圆拟合的数学机理缺陷 |
-| 主干健康 | 既有 13 门全量门禁无回归；core_standalone 33/33 PASS；QUICK 门 PASS（37s） |
+| #96 合入 skidpad_closed_loop_smoke.sh | **完成**：PR #97 已 squash merge 进 `main`（`7733cbb`），未挂载，CI 绿（attempt 2） |
+| #69 DDS 门禁区分环境性/真失败 | **代码完成**（PR #98）：就绪探测改为进程存活优先 + daemon 视图降为辅助；真失败仍判红并点名 |
+| #95 skidpad_planner 路径生成三处几何缺陷 | **完成**（PR #99）：新增「同心双壁瓣模型」，端到端闭环 **rc=0 首次全绿**，`cum_right_angle_rad` 1.3134 → **6.2864**，`Approaching path end` 50 → **0**；仅判据 1 待 Planner 裁定 |
 
 ## 已完成
 
-- #92：新增 `scripts/skidpad_closed_loop_smoke.sh`（复刻 #91 拓扑与进程安全编排），覆盖 6 节点注册、规划器 20Hz 非空有限发布断言、右圆绕角（≥2π）与横向走廊（≤1.0m）观测、指令帧契约；实现 `ENABLE_PLANNER=0` 可证伪负样本（rc=1）；输出 `skidpad_closed_loop_report.json` 快照。
-- 关键工程发现：
-  1. `skidpad_planner` 在线发布正常（~20Hz，无 NaN/Inf），profiler 转发正常，车机指令帧契约 100% 合规。
-  2. **跨圆平均缺陷（根本阻塞）**：`ClusterCones` 简单按 y=0 切分点云。在八字切点 (0,0) 处，左圆（cy=-9.125）入 left，右圆（cy=+9.125）入 right。`centerline_core.hpp` 将两圆直接平均为 `cy = 0.0`，产生以车自身为圆心、半径 9.125m 的虚假同心圆，全路径距车身恒为 9.125m，触发 Pure Pursuit 拒解紧停（`crosstrack 10.03m > 6.00m`）。
-  3. **进场段畸变与中点回跳**：进场段视场混杂直道与双圆后弧，Taubin 拟合畸变圆导致车辆在 `[-6.16, -0.66]` 停滞（绕角仅 0.409 rad < 2π）；回退中点法点序非单调（x=2.88→15.43→2.90 回跳）触发 Pure Pursuit `Approaching path end (40/41), braking`。
-- 新增 `[auto-discovered] #95`：记录上述证据与重构方向。
+- **#96**：`scripts/skidpad_closed_loop_smoke.sh` 经 PR #97 合入 `main`（`7733cbb`），**保持未挂载**（`drive_gates.sh`/`ci.yml` grep 无命中）。改动仅 `scripts/`（422 行）。负样本臂 rc=1 且原因指向「无 pathlimits 产出」。CI run `40336692425` attempt 2 = success。→ Issue #96 已 `in-review` + 执行报告已贴。
+- **#69**：
+  - 新增 `scripts/lib/node_readiness.sh`（共用件）：**进程存活为主判据**（`ps -o stat=` 排僵尸态 —— `kill -0` 对僵尸仍返回成功）、`ros2 node list` 降为辅助确认、真失败立即判红并点名、环境性失败提示后由数据面定成败、节点视图查询可注入（`PROBE_NODE_LIST_CMD`）。
+  - `skidpad_finish_smoke.sh` / `skidpad_closed_loop_smoke.sh`：`start()` 登记「节点名 + PID」；就绪探测换两段式；数据面失败首行补「疑环境性失败（DDS 发现未收敛）」。
+  - 新增 `scripts/node_readiness_selftest.sh`（确定性构造三种情形），挂进 `lint_shell.sh` 的 `[3/4]` 段（**drive_gates 门清单不变**）。
+  - 验证：正样本 A/B 对照 —— `main`（无本改动）默认预算下同样红（index 346/349），本分支 `BUDGET_SEC=420` 绿（`finish_event_count: 1`）；负样本 `REQUIRED_LAPS=3` 仍 rc=1。
+- **#95**（Core 层，`src/planning/skidpad_planner/`）：
+  - **会话1 的成果（`bc6b0b5`）**：跨圆不再平均（同心→仍取平均；不同心→相位感知单选）；`Circle2D::rms_residual` + `max_fit_rms` 质量护栏；`OrderAlongCorridorCore` / `AppendMutualMidpointsCore` / `AnchorPathAtEgoCore` / `ExtendWithPrevPathCore`；`ComputeCenterlineCore` 排序语义逐位不变（#24 差分夹具的事实来源）。
+  - **会话2 的成果（`5da9fbf` + `f99951b`）——切点走廊太短的根因修复**：新增 `include/corridor_model_core.hpp`（纯 std）：
+    - `FitConcentricWallsCore`：给定瓣心，用半径直方图找**两条同心壁**；壁半径残差 RMS、弧角跨度、「瓣心在锥桶云外侧」、「两壁之间留空」四道判据把关；中线半径 = (r_in + r_out)/2。
+    - `FitCorridorModelCore`：瓣心候选按 (半径, 方位角) 网格多起点搜索 + 细化；评分 = 支持度 − 3×相位误差 − 1×连续性误差；「半径/半宽比 ≤ 10」排除直走廊伪弧。
+    - `GenerateCorridorArcCore`：弧的切向必须与自车航向同向（旧实现比较弧两端 x，弧顶处退化 → 方向选反 → x 回跳 11 次）；转向角上限 90°（判据 3：路径 x 不得回退）。
+    - `ComputeCorridorPathCore` 迁入本头（生产入口，瓣模型法 → 圆法 → 中点法）。
+  - 新增 `test/test_corridor_model.cpp`（12 例纯 std），按 #40 登记进 `tests/core_standalone/CMakeLists.txt`（+ `ament_add_gtest`）。
 
 ## 未完成 / 进行中（下一棒最优先看这里）
 
-- **#92（P2，needs-info）**：停在车辆右圆推进断言（绕角 ≥ 2π）被规划器缺陷阻断。
-  - 下一棒继续点：需等待 Planner 就 #95 立项重构 `skidpad_planner` 的 `ClusterCones` 与双圆分离拟合逻辑（`src/planning/skidpad_planner/src/icp_apf_planner.cpp` 与 `include/centerline_core.hpp`）。
-  - 算法修复后，直接运行 `bash scripts/skidpad_closed_loop_smoke.sh` 验证正样本（绕角 ≥ 2π），通过后挂载入 `drive_gates.sh` 与 `ci.yml` 即可完成 #92 收口。
+- **#69（PR #98）**：等 CI 绿（run `40355980015` attempt 2）。绿后：squash merge → 删临时分支 → Issue #69 去掉 `in-progress`、打 `in-review`、贴执行报告（报告正文在 PR #98 描述里）。
+- **#95（PR #99）**：CI 曾因 **clang-format 版本差异**判红（run `40367022848`，本地 21.1.8 vs CI apt 旧版，尾注释对齐不一致）→ 已用 `f99951b` 把新参数注释改为**独占行**修掉，run `40367937681` 重新跑。绿后：squash merge → 删临时分支 → 更新 Issue #95 的执行报告（`build/proto95/report95b.md` 全文）→ 保持 `in-review`。
+- **#95 判据 1 需 Planner 裁定**：中线到所在瓣心恒为 9.125 m，字面条件「路径进入两圆心 ±1.5 m 邻域」与 #90 已验收的真值互斥。已按最近意实现并单测锁定，建议改写为「非单圆 + 落在某个真实瓣的中线上（到瓣心 9.125 ± 0.3 m）」。
+- **换瓣能力（新增 auto-discovered）**：真值中心线是「右瓣 2 圈 + 左瓣 2 圈」，切点处两瓣几何镜像对称 → 规划器靠连续性保持单瓣，不会自主换瓣。端到端脚本目标是 2π（单圈）已达成，但整条赛道（4π + 换瓣）仍跑不完 → 需赛道标记或产品决策，建议单独立项。
 
 ## 验证情况
 
 | 验证 | 结果 |
 | --- | --- |
-| `colcon test --packages-select skidpad_planner track_benchmark` | 614 tests, 0 failures |
-| `core_standalone_check.sh` | 33/33 PASS（ASan+UBSan clean） |
-| `bash scripts/lint_shell.sh` | 18/18 PASS |
-| `bash scripts/lint_cpp.sh` | 0 issues PASS |
-| `QUICK=1 drive_gates.sh` | 全 PASS（37s） |
-| #92 负样本（ENABLE_PLANNER=0） | rc=1（5.0s，`无 pathlimits 产出` 证伪通过） |
-| #92 正样本（数据面遥测） | 6 节点注册、20.05 Hz、全有限、cmd 999 帧 0 违例、max_lateral 0.679m；右圆绕角 0.409 rad（差距暴露） |
+| `colcon test --packages-select skidpad_planner` | **639 tests, 0 errors, 0 failures** |
+| `colcon test --packages-select track_benchmark` | **71 tests, 0 errors, 0 failures** |
+| `bash scripts/core_standalone_check.sh` | **35/35 PASS**（ASan+UBSan clean，含新增 `test_corridor_model`） |
+| `bash scripts/lint_cpp.sh` | rc=0 · `✔ cppcheck passed with 0 issues!`（注：本地 clang-format 是 21.1.8，CI 是 apt 旧版，**尾注释对齐会打架** → 新代码注释一律独占行） |
+| `bash scripts/lint_shell.sh` | rc=0 · 19 脚本 clean + 就绪探测自测全过 |
+| `bash scripts/node_readiness_selftest.sh` | 三情形断言全过（就绪 / 环境性不判红 / 真失败点名） |
+| `bash scripts/skidpad_closed_loop_smoke.sh build/skidpad_closed_95f` | **rc=0 PASS** · `cum_right_angle_rad 6.2864`、`max_lateral_dev_m 0.433`、`pathlimits_finite True`；PP 日志 `Approaching path end`/`refusing goal`/`Crosstrack` 计数**全 0** |
+| `ENABLE_PLANNER=0 skidpad_closed_loop_smoke.sh` | rc=1（负样本可证伪守住） |
+| `bash scripts/skidpad_finish_smoke.sh`（正样本，默认 180 s 预算） | rc=1 —— **既有环境问题**：A/B 对照 `main` 上同样红；`BUDGET_SEC=420` → rc=0 绿（真值中心线喂入，不依赖规划器） |
+| `bash scripts/skidpad_finish_smoke.sh`（负样本） | rc=1（按设计判红） |
+| PR #97（#96）CI | **success**（run `40336692425` attempt 2） |
+| PR #98（#69）CI | 运行中（run `40355980015` attempt 2；attempt 1 被 cancelled，已 re-run） |
+| PR #99（#95）CI | run `40367022848` 因 clang-format 判红 → `f99951b` 修复 → run `40367937681` 运行中 |
+
+**未跑**：`bash scripts/drive_gates.sh` 全量门禁（本轮改动的覆盖由两个 PR 的 CI 承担：build/test/core-standalone/lint + 各 runtime 门禁）。
 
 ## 风险与注意事项
 
-1. `skidpad_planner` 现有算法无法在切点 (0,0) 分辨左圆与右圆，切勿在未重构算法前强行把门禁挂入 `drive_gates.sh` 或 `ci.yml`，否则 CI 必红。
-2. 现有门禁脚本 `scripts/skidpad_closed_loop_smoke.sh` 已具备完整观测与负样本证伪能力，重构验证可直接以其为基准。
+1. **#95 仍未挂 `skidpad_closed_loop_smoke.sh` 进 `drive_gates.sh`/`ci.yml`**（#95 范围约束）。现在正样本在本机已绿，可作为 #92 的收口前置，但挂载动作属 #92，请 Planner 排期。
+2. **本机默认 180 s 预算下 `skidpad_finish_smoke.sh` 正样本红是既有环境问题**（非代码）：A/B 对照 `main` 上同样红；`BUDGET_SEC=420` 绿。本机复现绿请加大预算。
+3. **CI 的 ros-apt-source 步骤偶发 404**（GitHub API/下载侧抖动，attempt 1 判红、re-run 绿）。遇到先 re-run 再判断是不是自己的锅。
+4. **clang-format 版本不一致**：本地 21.1.8 vs CI apt 旧版，**尾注释对齐**规则不同 → 新增/改动的 C++ 代码里注释一律**独占行**，不要写尾随注释（本轮已因此红过一次）。
+5. **`ComputeCenterlineCore` 是差分基线**：任何改动它都会破坏 `test_icp_apf_planner.cpp` 的 `DifferentialEquivalenceWithLegacyPCL`（1000 组逐点比对）。要改排序语义，先更新 `docs/DEFECT_DIFFERENTIAL.md`（#24 级变更）。
+6. **不要用「壁弧角 ≥ 40°」当直走廊判据**：实测会让模型在真实位姿闪断 → 退回中点法产生跨瓣路径 → 端到端横偏 7.88 m。直走廊靠「半径/半宽比 ≤ 10」排除（伪弧 15.4 vs 真走廊 5.6~7.6）。
 
 ## 给下一棒的第一步建议
 
-1. 确认已推分支 `agent/issue-92-skidpad-closed-loop-smoke`（commit `4e5e668`）。
-2. 查看 Issue #95 与 #92 状态，等待 Planner 针对规划器算法缺陷排定修复任务。
+1. `gh pr checks 98` / `gh pr checks 99`；绿了就 squash merge → 删临时分支 → 贴/更新执行报告（#95 用 `build/proto95/report95b.md` 全文）→ Issue 转 `in-review`。
+2. #95 的剩余动作只有两件：CI 绿后合并 + 把判据 1 的裁定请求交给 Planner。**不要再动算法**（已全绿，改动越多风险越大）。
+3. 若要继续推进 S2b，建议新开一单做「切点换瓣」：需要赛道特征/标记或产品决策，不属 #95 范围。
 
 ## 今日日报
 
-- 已写入 `.agent/DIARY/2026-10-25.md`。
+- 已写入 `.agent/DIARY/2026-10-26.md`（会话1 + 会话2 追加）。
 
 ## 给 Planner 的信号
 
-- **需要 Planner 介入**：#92 触发算法质量不达标逃生条款已转 `needs-info`。根本阻碍是 `skidpad_planner` 的跨圆平均与点序回跳缺陷（已立项 `auto-discovered #95`），需要 Planner 规划重构 `skidpad_planner`（特别是 `ClusterCones` 目标关联与两圆分离拟合），随后 #92 数据面门禁即可平滑闭环并收尾 S2b。
+- **需要 Planner 介入（两项）**：
+  1. **#95 判据 1 的表述**：字面条件（路径进入两**圆心** ±1.5 m 邻域）与 #90 已验收的真值中心线互斥（真值 349 点到两圆心的最小距离恒为 9.125 m，邻域内 0 点）；建议改为"非单圆 + 落在某个真实瓣的中线上"，或把"全量 108 锥桶下覆盖两瓣"单列为全局建图里程碑。
+  2. **#92 的挂载收口**：`skidpad_closed_loop_smoke.sh` 现在有绿的正样本臂了（rc=0 / 6.2864 rad），可以进入「挂进 drive_gates.sh / ci.yml」的收口动作（**本轮未挂**，遵守 #95 范围约束）。
+- **#69、#96 无需介入**：判据已逐条 `[x]` 或有实测证据，等 CI 绿即可验收关闭。
+- **新增 auto-discovered 1 条**：切点处两瓣镜像对称 → 规划器无法自主换瓣（真值是右瓣 2 圈 + 左瓣 2 圈）。已报 Issue，等 Planner 定优先级。

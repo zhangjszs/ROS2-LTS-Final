@@ -49,6 +49,12 @@ if(BUILD_TESTING)
   ament_add_gtest(test_centerline_core test/test_centerline_core.cpp)
 
   ament_add_gtest(test_circle_centerline_core test/test_circle_centerline_core.cpp)
+
+  # #95：走廊中线几何核（相位感知单圆 / 点序单调 / 路径锚自车）——纯 std
+  ament_add_gtest(test_corridor_core test/test_corridor_core.cpp)
+
+  # #95：走廊瓣模型核（同心双壁 / 相位感知消歧 / 弧切向一致）——纯 std
+  ament_add_gtest(test_corridor_model test/test_corridor_model.cpp)
 endif()
 
 ament_package()

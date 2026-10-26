@@ -211,6 +211,14 @@ add_core_test(test_circle_centerline_core
     SOURCES
         "${REPO_ROOT}/src/planning/skidpad_planner/test/test_circle_centerline_core.cpp")
 
+# #95：skidpad 走廊中线几何核（纯 std，header-only）——相位感知单圆 / 点序单调 / 路径锚自车
+add_core_test(test_corridor_core
+    SOURCES "${REPO_ROOT}/src/planning/skidpad_planner/test/test_corridor_core.cpp")
+
+# #95：skidpad 走廊瓣模型核（纯 std，header-only）——同心双壁 / 相位感知消歧 / 弧切向一致
+add_core_test(test_corridor_model
+    SOURCES "${REPO_ROOT}/src/planning/skidpad_planner/test/test_corridor_model.cpp")
+
 # #62：straight_line_planner 直线拟合核（纯 std，header-only）——Hough / RANSAC / LSQ / 时序滤波
 add_core_test(test_line_fit_core
     SOURCES

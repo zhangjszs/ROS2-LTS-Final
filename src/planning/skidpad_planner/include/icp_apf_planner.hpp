@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "centerline_core.hpp"
+#include "corridor_model_core.hpp"
 
 namespace skidpad {
 
@@ -34,16 +35,6 @@ class IcpApfPlanner {
     std::vector<Point2D> TransformPoints(const std::vector<Point2D>& points, double rotation, double tx, double ty);
 
    private:
-    std::vector<Point2D> ComputeCenterline(const std::vector<common_msgs::msg::HuatCone>& left,
-                                           const std::vector<common_msgs::msg::HuatCone>& right);
-
-    // Taubin 圆拟合：从锥桶点集估计圆心和半径
-    static Circle2D FitCircleTaubin(const std::vector<common_msgs::msg::HuatCone>& cones);
-
-    // 基于圆拟合的中心线生成（skidpad 场景优化）
-    std::vector<Point2D> ComputeCircleCenterline(const std::vector<common_msgs::msg::HuatCone>& left,
-                                                 const std::vector<common_msgs::msg::HuatCone>& right);
-
     // ICP：将源点云 src 对齐到目标点云 tgt
     IcpResult IcpAlign(const std::vector<Point2D>& src, const std::vector<Point2D>& tgt);
 
@@ -60,6 +51,12 @@ class IcpApfPlanner {
     std::vector<Point2D> ApplyApfCorrection(const std::vector<Point2D>& path, const std::vector<Point2D>& centerline,
                                             const std::vector<common_msgs::msg::HuatCone>& left,
                                             const std::vector<common_msgs::msg::HuatCone>& right);
+
+    // #95：走廊中线路径生成（相位感知单圆 → 中点法回退 → 锚到自车并等距重采样）。
+    // 自车在 base_link 系的原点。
+    CorridorPathResult ComputeCorridorPath(const std::vector<common_msgs::msg::HuatCone>& left,
+                                           const std::vector<common_msgs::msg::HuatCone>& right,
+                                           const std::vector<Point2D>& prev_path);
 
     double center_margin_;
     int icp_max_iter_;
