@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "centerline_core.hpp"
+#include "corridor_model_core.hpp"
 
 namespace skidpad {
 

@@ -1,11 +1,13 @@
 # TASKS.md — Issue 本地镜像（权威：GitHub Issue；本文件由 Planner 每轮整体重写）
 
-> 维护者：Planning Agent｜最后更新：2026-10-26T21:50+08:00（`plan-20261026`：#92 部分通过验收、main 变红入账、今日队列 #69→#96→#95）
+> 维护者：Planning Agent（Executor 同步状态：2026-10-26T23:55+08:00 `exec-20261026`）｜最后更新：2026-10-26T21:50+08:00（`plan-20261026`：#92 部分通过验收、main 变红入账、今日队列 #69→#96→#95）
 > 规则：本文件为只读镜像，Executor 改状态时先改 Issue 再同步对应行；冲突以 Issue 为准。
 > 权威来源状态：`gh issue list --state open` 实测 **28 open**（ready 3 · in-review 0 · in-progress 0 · 仓库外阻塞 7 · needs-info 4 · ready-for-human 14 · 路线图伞形 1 —— 3+4+7+14+1 = 29 含 #92 双标签计数去重后 28）。
 > 标签口径：仓库用 `ready-for-agent` 表示契约 §1.3 的 `ready`（仓库无 `ready` 标签）。
 
 ## 今日队列（2026-10-26 起有效，给 Executor 的建议顺序）
+
+> **Executor 进展（exec-20261026）**：#96 **完成**（PR #97 已合入 `main` = `7733cbb`，CI 绿）；#69 **代码完成**（PR #98，CI 运行中）；#95 **部分完成**（PR #99，CI 运行中，判据 8 = 4/5，判据 1 待 Planner 重新表述）。详见各自 Issue 的执行报告与 `.agent/DIARY/2026-10-26.md`。
 
 > **顺序理由**：#69 先行是因为 `main` 当前**是红的**（run `40205834746`），合并路径不通则后两单无从谈起；#96 半小时内可落地，为 #95 提供端到端复验工具；#95 是 S2b 收口主线，需要剩下的整段时间。
 > **开工前必读**：#69 的「就绪探测单点失效」实测证据 + #95 的 D-011 实测数字（两单正文都已写全，不必再问 Planner）。
@@ -18,21 +20,22 @@
 3. **#95** `[S2b] skidpad_planner 路径生成无法支撑八字闭环：部分弧圆拟合失稳 + 跨圆平均 + 点序非单调`（P1，**ready**）
    - S2b 收口主线：修规划器路径生成的三处缺陷（部分弧当整圆拟合 / 左右圆被平均成单圆 / 点序非单调）。验收标准 9 条已逐条写成可判定形式，含 D-011 同款实测留痕要求。
 
-## ready（3）
+## ready（0）
 
-| Issue | 标题 | 级别 | 一句话范围 |
+无（今日队列三单已全部领取；新的 ready 队列待 Planner 补充）。
+
+## in-review（2）
+
+| Issue | 标题 | 级别 | 结论与待办 |
 |---|---|---|---|
-| #69 | DDS 门禁区分环境性失败与真失败 | P1 | 就绪探测去单点依赖 daemon；真失败仍判红 |
-| #95 | skidpad_planner 路径生成无法支撑八字闭环 | P1 | 部分弧拟合 / 跨圆平均 / 点序单调 三处几何缺陷 |
-| #96 | 把 skidpad_closed_loop_smoke.sh 合入 main | P2 | 合入但不挂 CI，保留验收工具 |
+| #96 | 把 skidpad_closed_loop_smoke.sh 合入 main | P2 | **完成**：PR #97 已 squash merge 进 `main`（`7733cbb`），未挂载，CI run `40336692425` attempt 2 = success；7 条验收判据逐条 `[x]` |
+| #95 | skidpad_planner 路径生成无法支撑八字闭环 | P1 | **部分完成**：Core 层三处几何缺陷已修 + 11 例纯 std 单测（626 tests 全绿、core_standalone 34/34）；端到端 0.409 → **1.313 rad**、`refusing goal` 归零、`max_lateral_dev 0.25`；**判据 8 = 4/5**（`Approaching path end` 仍 50 次：切点处两瓣交错 → 可见中线仅 ~4.5 m）、**判据 1 待 Planner 重新表述**（字面条件与 #90 真值互斥） |
 
-## in-review（0）
+## in-progress（1）
 
-无。
-
-## in-progress（0）
-
-无。
+| Issue | 标题 | 级别 | 下一步 |
+|---|---|---|---|
+| #69 | DDS 门禁区分环境性失败与真失败 | P1 | 等 PR #98 CI 绿 → squash merge → 删临时分支 → 转 `in-review`（执行报告已备好） |
 
 ## 仓库外阻塞（7，均为外部输入缺失，非代码可推进；本轮零成本复查无变化）
 

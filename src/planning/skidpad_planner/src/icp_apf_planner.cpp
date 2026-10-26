@@ -332,7 +332,8 @@ std::vector<Point2D> IcpApfPlanner::GeneratePath(const std::vector<common_msgs::
 
     RCLCPP_INFO(rclcpp::get_logger("skidpad_planner"),
                 "[skidpad_planner] Cones: total=%zu, left=%zu, right=%zu, centerline_pts=%zu (method=%s)", cones.size(),
-                left.size(), right.size(), centerline.size(), corridor.used_circle ? "circle" : "midpoint");
+                left.size(), right.size(), centerline.size(),
+                corridor.used_model ? "model" : (corridor.used_circle ? "circle" : "midpoint"));
 
     return ApplyApfCorrection(AlignPath(centerline, prev_path, icp_rmse_limit), centerline, left, right);
 }

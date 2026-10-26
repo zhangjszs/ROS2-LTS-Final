@@ -43,6 +43,20 @@ struct CenterlineParams {
     double concentric_tol{1.0};
     // #95：圆拟合残差上限（RMS，米）——超过即判「拟合出来的不是圆」，不得用。
     double max_fit_rms{0.5};
+    // #95：瓣模型（同心双壁）搜索参数。走廊 = 两条同心壁 + 夹在中间的中线圆；
+    // 这些参数约束「什么样的壁才算一条走廊的壁」。
+    double max_half_width{3.0};           // 走廊半宽上限（壁到中线的距离，米）
+    double max_wall_rms{0.4};             // 壁半径残差上限（RMS，米）——壁必须是圆弧
+    double min_wall_arc_rad{0.26};        // 两壁张成的最小弧角（≈40°）——壁必须被看到足够长的弧，
+                                          // 才能与「直走廊被拟合成大半径伪弧」（实测 26°）区分开
+    double max_wall_arc_rad{3.0};         // 两壁张成的最大弧角（≈172°）——瓣心必须在走廊一侧，
+                                          // 直走廊伪模型会把瓣心包在锥桶环里（实测 306.9°）
+    double min_model_radius{3.0};         // 中线半径下限
+    double max_model_radius{25.0};        // 中线半径上限
+    double max_arc_turn_rad{1.5708};      // 弧的最大转向角（90°）——超过则路径 x 必然回退
+    double max_radius_width_ratio{10.0};  // 走廊「半径 / 半宽」上限 ——比这更接近直线就不可能是走廊。
+                                          // 直走廊被拟合成的大半径伪弧实测比值 15.4（真走廊 5.6~7.6）
+    int min_wall_support{4};              // 两壁合计的最少支持锥桶数
 };
 
 struct IcpApfConfig {
@@ -670,47 +684,7 @@ inline std::vector<Point2D> ExtendWithPrevPathCore(std::span<const Point2D> path
     return out;
 }
 
-// #95：走廊中线路径的产出结果（供节点层与单测读取判据来源）。
-struct CorridorPathResult {
-    std::vector<Point2D> path;  // base_link 系，含自车、点序单调、等间距
-    bool used_circle{false};    // true = 走圆法（相位感知单圆），false = 中点法
-    Circle2D midline;           // 选中的中线圆（base_link 系）；未选中时 valid=false
-};
-
-// #95：走廊中线的**生产入口**（节点层只调这一个）。
-//
-// 顺序：相位感知圆法 →（圆法不成立时）中点法 → 锚到自车并等距重采样。
-// 圆法不成立 = 没有「自车在其上」的候选圆（含左右落在不同瓣却都不可信的情况），
-// 此时**不再用左右平均圆兜底**（那正是 #92 实测的虚假同心圆），而是交中点法。
-inline CorridorPathResult ComputeCorridorPathCore(std::span<const Point2D> left, std::span<const Point2D> right,
-                                                  const CenterlineParams& p, Point2D ego = Point2D{0.0, 0.0},
-                                                  std::span<const Point2D> prev_path = {}) {
-    CorridorPathResult out;
-    std::vector<Point2D> path = ComputeCircleCenterlineCore(left, right, p, ego);
-    if (!path.empty()) {
-        out.used_circle = true;
-        out.path = std::move(path);
-        return out;
-    }
-    path = ComputeCenterlineCore(left, right, p);
-    if (path.empty()) {
-        return out;
-    }
-    // #95：点序单调连续 —— 先用「互为最近邻」过滤掉单向配对产生的伪中点，
-    // 再做方向感知重排（不丢点：遗留输出是中点集合的一个排列），
-    // 最后锚到自车并等距重采样。
-    std::vector<Point2D> mutual = AppendMutualMidpointsCore(left, right, p.max_pair_dist);
-    if (!mutual.empty()) {
-        path = std::move(mutual);
-    }
-    std::vector<Point2D> ordered = OrderAlongCorridorCore(path, ego, p.max_pair_dist);
-    if (ordered.empty()) {
-        return out;
-    }
-    out.path = AnchorPathAtEgoCore(ordered, ego, p);
-    // #95：用上一帧路径补齐前视长度（紧弯上传感器只看得到 ~5 m 走廊）。
-    out.path = ExtendWithPrevPathCore(out.path, prev_path, ego, p);
-    return out;
-}
+// #95：走廊中线的**生产入口**（节点层只调这一个）已迁至 corridor_model_core.hpp
+// （瓣模型 + 圆法 + 中点法三段回退；本文件只保留几何基元与遗留差分夹具）。
 
 }  // namespace skidpad
