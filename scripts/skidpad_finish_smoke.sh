@@ -55,6 +55,12 @@
 # ==============================================================================
 set -uo pipefail
 export ROS_LOCALHOST_ONLY=1
+
+# #69：就绪探测共用件（进程存活为准，daemon 视图降为辅助确认）。
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=scripts/lib/node_readiness.sh
+source "${SCRIPT_DIR}/lib/node_readiness.sh"
+
 : "${ROS_HOME:=$PWD/build/.ros}"
 export ROS_HOME
 mkdir -p "$ROS_HOME"
@@ -144,32 +150,34 @@ cleanup() {
 trap cleanup EXIT
 
 start() {
-    local log="$1"
-    shift
-    "$@" >"$log" 2>&1 & PIDS+=($!)
+    local node="$1" log="$2"
+    shift 2
+    "$@" >"$log" 2>&1 & local pid=$!
+    PIDS+=($pid)
+    probe_register "$node" "$pid"
 }
 
 # ── 2) 拉起闭环 ──────────────────────────────────────────────────────────────
 echo "=== 拉起仲裁器闭环（墙钟预算 ${BUDGET_SEC}s，max_velocity=${MAX_V} m/s，ENABLE_FINISH_EVENT=$ENABLE_FINISH_EVENT） ==="
 # 车置于参考线起点（进场通道 -15m）：首次全局锚定唯一正确，之后的单调推进是
 # 八字（x 轴段几何重叠）能被跟踪的前提——见头部「数据面设计」。
-start "$OUT_DIR/sim.log" ros2 run vehicle_simulator vehicle_simulator_node --ros-args \
+start vehicle_simulator "$OUT_DIR/sim.log" ros2 run vehicle_simulator vehicle_simulator_node --ros-args \
     -p use_sim_time:=true -p publish_clock:=true -p seed:=42 -p track_file:="$TRACK_CSV" \
     -p init_x:=-15.0 -p init_y:=0.0 -p init_theta:=0.0
-start "$OUT_DIR/safety.log" ros2 run safety_monitor safety_monitor --ros-args \
+start safety_monitor "$OUT_DIR/safety.log" ros2 run safety_monitor safety_monitor --ros-args \
     -p use_sim_time:=true -p planner_timeout:=600.0
-start "$OUT_DIR/profiler.log" ros2 run velocity_profiler velocity_profiler_node --ros-args \
+start velocity_profiler "$OUT_DIR/profiler.log" ros2 run velocity_profiler velocity_profiler_node --ros-args \
     -p use_sim_time:=true -p limits.max_velocity:="$MAX_V"
 # 一次性参考线模式的两处参数覆盖（头部「数据面设计」第 2 条）。
-start "$OUT_DIR/pp.log" ros2 run pure_pursuit pure_pursuit_controller --ros-args \
+start pure_pursuit "$OUT_DIR/pp.log" ros2 run pure_pursuit pure_pursuit_controller --ros-args \
     -p use_sim_time:=true -p topics.vehicle_command:=/control/vehicle_command \
     -p safety.path_timeout:=600.0 -p algorithm.throttle.speed_high_threshold:=10.0
-start "$OUT_DIR/arbiter.log" ros2 run safety_monitor command_arbiter_node --ros-args \
+start command_arbiter_node "$OUT_DIR/arbiter.log" ros2 run safety_monitor command_arbiter_node --ros-args \
     -p use_sim_time:=true -p task.autostart:=true -p arbitration.source_timeout_sec:=0.5
 
 EXPECT_NODES="vehicle_simulator safety_monitor velocity_profiler pure_pursuit command_arbiter_node"
 if [ "$ENABLE_FINISH_EVENT" = "1" ]; then
-    start "$OUT_DIR/finish.log" ros2 run track_benchmark finish_event_node --ros-args \
+    start finish_event_node "$OUT_DIR/finish.log" ros2 run track_benchmark finish_event_node --ros-args \
         -p use_sim_time:=true -p finish.mode:=skidpad -p finish.enabled:=true \
         -p skidpad.right_center_x:="$RCX" -p skidpad.right_center_y:="$RCY" \
         -p skidpad.left_center_x:="$LCX" -p skidpad.left_center_y:="$LCY" \
@@ -178,28 +186,35 @@ if [ "$ENABLE_FINISH_EVENT" = "1" ]; then
     EXPECT_NODES="$EXPECT_NODES finish_event_node"
 fi
 
-ready=0
-nodes=""
-for _ in $(seq 1 12); do
-    nodes="$(timeout 12 ros2 node list 2>/dev/null)"
-    missing=0
-    for n in $EXPECT_NODES; do
-        grep -q "$n" <<<"$nodes" || missing=1
-    done
-    [ "$missing" -eq 0 ] && { ready=1; break; }
-    sleep 2
-done
-if [ "$ready" -ne 1 ]; then
-    echo "FAIL: 闭环节点未全部注册；最后一次 ros2 node list 输出："
-    printf '%s\n' "$nodes" | sed 's/^/  /'
-    echo "缺失判据节点：$EXPECT_NODES"
-    tail -n 3 "$OUT_DIR"/*.log
-    exit 1
-fi
+# ── 就绪探测（#69：进程存活为准，daemon 视图降为辅助确认）────────────────────
+# 旧实现只看 `ros2 node list` 的 daemon 视图 —— 那是**就绪探测的单点失效**：
+# main 的 run 40205834746 里 6 个节点进程日志全部正常，daemon 视图却是空表，
+# 于是门禁把"环境发现退化"误判成"节点没起来"而判红。
+# 现在：进程存活是主判据（进程退出 = 真失败，立即判红并点名）；daemon 视图
+# 只作辅助确认，视图空不判红，改由数据面断言决定成败。
+probe_wait_ready "$EXPECT_NODES" 12 2
+probe_rc=$?
+case "$probe_rc" in
+    0)
+        : # daemon 视图确认就绪
+        ;;
+    1)
+        echo "FAIL: 闭环节点未全部起来（节点进程已退出 = 真失败，不是环境问题）："
+        printf '%s\n' "$PROBE_DEAD_NODES" | sed 's/^/  节点没起来: /'
+        tail -n 3 "$OUT_DIR"/*.log
+        exit 1
+        ;;
+    2)
+        PROBE_ENV_SUSPECT=1
+        probe_env_hint
+        echo "  最后一次 ros2 node list 输出："
+        printf '%s\n' "$PROBE_LAST_NODE_VIEW" | sed 's/^/    /'
+        ;;
+esac
 for p in "${PIDS[@]}"; do
     while read -r c; do NODE_PIDS+=("$c"); done < <(pgrep -P "$p" 2>/dev/null || true)
 done
-echo "OK   $(echo "$EXPECT_NODES" | wc -w) 个节点已注册，开始数据面断言"
+echo "OK   $(echo "$EXPECT_NODES" | wc -w) 个节点进程已就绪，开始数据面断言"
 
 # ── 3) 数据面：内联 rclpy 单次发布参考线 + 观测并落盘判据 JSON ───────────────────
 python3 - "$EXPORT_DIR/skidpad_centerline.csv" "$OUT_DIR" "$LAPS" "$MAX_V" "$BUDGET_SEC" \
@@ -418,6 +433,10 @@ print("数据面断言通过")
 PY
 rc=$?
 if [ "$rc" -ne 0 ]; then
+    # #69：环境性失败与真失败必须可区分 —— 首行提示语。
+    if [ "${PROBE_ENV_SUSPECT:-0}" = "1" ]; then
+        echo "疑环境性失败（DDS 发现未收敛）——请核对 CI 同 commit 结论后再改代码"
+    fi
     echo "FAIL: 数据面断言未通过（rc=$rc）；节点日志尾部："
     tail -n 3 "$OUT_DIR"/*.log
     exit 1
