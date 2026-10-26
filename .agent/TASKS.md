@@ -2,12 +2,12 @@
 
 > 维护者：Planning Agent（Executor 同步状态：2026-10-26T23:55+08:00 `exec-20261026`）｜最后更新：2026-10-26T21:50+08:00（`plan-20261026`：#92 部分通过验收、main 变红入账、今日队列 #69→#96→#95）
 > 规则：本文件为只读镜像，Executor 改状态时先改 Issue 再同步对应行；冲突以 Issue 为准。
-> 权威来源状态：`gh issue list --state open` 实测 **28 open**（ready 3 · in-review 0 · in-progress 0 · 仓库外阻塞 7 · needs-info 4 · ready-for-human 14 · 路线图伞形 1 —— 3+4+7+14+1 = 29 含 #92 双标签计数去重后 28）。
+> 权威来源状态：`gh issue list --state open` 实测 **29 open**（本轮新建 auto-discovered #100）（ready 3 · in-review 0 · in-progress 0 · 仓库外阻塞 7 · needs-info 4 · ready-for-human 14 · 路线图伞形 1 —— 3+4+7+14+1 = 29 含 #92 双标签计数去重后 28）。
 > 标签口径：仓库用 `ready-for-agent` 表示契约 §1.3 的 `ready`（仓库无 `ready` 标签）。
 
 ## 今日队列（2026-10-26 起有效，给 Executor 的建议顺序）
 
-> **Executor 进展（exec-20261026 会话2）**：#96 **完成**（PR #97 已合入 `main` = `7733cbb`，CI 绿）；#69 **代码完成**（PR #98，CI attempt 2 运行中）；#95 **完成**（PR #99，CI 重跑中）——新增「同心双壁瓣模型」后，端到端闭环**首次全绿**（rc=0，`cum_right_angle_rad` 1.3134 → **6.2864**，`max_lateral_dev_m` 0.433，PP 日志 `Approaching path end`/`refusing goal` 计数**全 0**），判据 8 = 5/5；**判据 1 待 Planner 重新表述**（字面条件与 #90 真值互斥）。详见各自 Issue 的执行报告与 `.agent/DIARY/2026-10-26.md`。
+> **Executor 进展（exec-20261026 会话2）**：#96 **完成**（PR #97 已合入 `main` = `7733cbb`，CI 绿）；#69 **完成**（PR #98 已合入 `main` = `cc616e4`，CI success）；#95 **完成**（PR #99 已合入 `main` = `b4d2d1a`，CI success）——新增「同心双壁瓣模型」后，端到端闭环**首次全绿**（rc=0，`cum_right_angle_rad` 1.3134 → **6.2864**，`max_lateral_dev_m` 0.433，PP 日志 `Approaching path end`/`refusing goal` 计数**全 0**），判据 8 = 5/5；**判据 1 待 Planner 重新表述**（字面条件与 #90 真值互斥）。详见各自 Issue 的执行报告与 `.agent/DIARY/2026-10-26.md`。
 
 > **顺序理由**：#69 先行是因为 `main` 当前**是红的**（run `40205834746`），合并路径不通则后两单无从谈起；#96 半小时内可落地，为 #95 提供端到端复验工具；#95 是 S2b 收口主线，需要剩下的整段时间。
 > **开工前必读**：#69 的「就绪探测单点失效」实测证据 + #95 的 D-011 实测数字（两单正文都已写全，不必再问 Planner）。
@@ -24,12 +24,13 @@
 
 无（今日队列三单已全部领取；新的 ready 队列待 Planner 补充）。
 
-## in-review（2）
+## in-review（3）
 
 | Issue | 标题 | 级别 | 结论与待办 |
 |---|---|---|---|
 | #96 | 把 skidpad_closed_loop_smoke.sh 合入 main | P2 | **完成**：PR #97 已 squash merge 进 `main`（`7733cbb`），未挂载，CI run `40336692425` attempt 2 = success；7 条验收判据逐条 `[x]` |
-| #95 | skidpad_planner 路径生成无法支撑八字闭环 | P1 | **完成**（待 CI 绿后合并）：Core 层三处几何缺陷 + **新增同心双壁瓣模型**（切点处左右两组各混两个瓣的锥桶 → 跨左右配对配错，实测中点半径 11.85 vs 真中线 9.125）；12 例纯 std 单测（**639 tests 全绿**、core_standalone **35/35** ASan+UBSan clean）；端到端 **rc=0 首次全绿**：`cum_right_angle_rad` 0.409 → **6.2864**、`max_lateral_dev_m` 0.433、`Approaching path end`/`refusing goal` 计数**全 0**、**判据 8 = 5/5**；**判据 1 待 Planner 重新表述**（字面条件与 #90 真值互斥：真值到瓣心恒为 9.125 m） |
+| #69 | DDS 门禁区分环境性失败与真失败 | P1 | **完成**：PR #98 已 squash merge 进 `main`（`cc616e4`），CI run `40355980015` attempt 3 = success，临时分支已删；就绪探测改为**进程存活优先**（`ps -o stat=` 排僵尸态）+ daemon 视图降为辅助；真失败仍判红并点名；新增 `scripts/node_readiness_selftest.sh` 挂进 `lint_shell.sh` 的 `[3/4]` 段（drive_gates 门清单不变） |
+| #95 | skidpad_planner 路径生成无法支撑八字闭环 | P1 | **完成**（PR #99 已 squash merge 进 `main` = `b4d2d1a`，CI run `40368098627` = success，临时分支已删）：Core 层三处几何缺陷 + **新增同心双壁瓣模型**（切点处左右两组各混两个瓣的锥桶 → 跨左右配对配错，实测中点半径 11.85 vs 真中线 9.125）；12 例纯 std 单测（**639 tests 全绿**、core_standalone **35/35** ASan+UBSan clean）；端到端 **rc=0 首次全绿**：`cum_right_angle_rad` 0.409 → **6.2864**、`max_lateral_dev_m` 0.433、`Approaching path end`/`refusing goal` 计数**全 0**、**判据 8 = 5/5**；**判据 1 待 Planner 重新表述**（字面条件与 #90 真值互斥：真值到瓣心恒为 9.125 m） |
 
 ## auto-discovered（1，Executor 发现，Planner 定级）
 
@@ -37,11 +38,11 @@
 |---|---|---|---|
 | （待 Planner 建单） | 切点处左右两瓣的锥桶集合**镜像对称**、几何上不可区分 → 规划器靠上一帧路径连续性保持单瓣，**不会自主换瓣**（真值中心线是「右瓣 2 圈 + 左瓣 2 圈」） | 端到端脚本目标（2π 单圈）已达成，但**整条赛道（4π + 换瓣）跑不完** | 需赛道特征/标记或产品决策，**单独立项**，不并入 #95 |
 
-## in-progress（1）
+## in-progress（0）
 
 | Issue | 标题 | 级别 | 下一步 |
 |---|---|---|---|
-| #69 | DDS 门禁区分环境性失败与真失败 | P1 | 等 PR #98 CI 绿（run `40355980015` attempt 2；attempt 1 被 cancelled 已 re-run）→ squash merge → 删临时分支 → 转 `in-review`（执行报告已备好） |
+| — | （空） | — | 今日队列三单全部领取完毕并合入 main；无 in-progress 任务 |
 
 ## 仓库外阻塞（7，均为外部输入缺失，非代码可推进；本轮零成本复查无变化）
 
