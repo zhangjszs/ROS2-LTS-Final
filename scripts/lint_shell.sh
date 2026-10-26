@@ -6,14 +6,17 @@
 # qos_contract / headless_smoke …），它们一旦被改出语法错误，最坏结果不是"报错"而是
 # 判据根本不再执行 → 门禁假绿。C++ 有 lint_cpp.sh，shell 此前没有任何机检。
 #
-# 三段：
-#   [1/3] bash -n 语法检查 —— **必查**，无文件可查也算失败（防止 glob 失配后空转变绿）。
-#   [2/3] 断言型查询不得走 `--no-daemon` —— **必查**（#49）。
+# 四段：
+#   [1/4] bash -n 语法检查 —— **必查**，无文件可查也算失败（防止 glob 失配后空转变绿）。
+#   [2/4] 断言型查询不得走 `--no-daemon` —— **必查**（#49）。
 #         `ros2 node list --no-daemon` / `ros2 topic info --no-daemon` 在新进程里从零做
 #         DDS 发现并**立即**查图，常常在收到周期性 SPDP 公告前就返回空表 → 门禁假失败。
 #         本仓已因此判红过主干（push 36582919764、nightly 36494908622）；契约写在
 #         drive_gates.sh 注释里但只落了文档，这一节把它变成机检。
-#   [3/3] shellcheck —— **建议性**：存在则报告告警数，缺失则明确打印跳过原因；
+#   [3/4] 就绪探测自测（#69）—— **必查**：确定性地构造"进程全活但 daemon 视图空"
+#         （环境性失败，不得判红）与"某节点进程已退出"（真失败，必须判红并点名），
+#         两类失败的判红语义不同，共用件回归会同时误判两个门禁。
+#   [4/4] shellcheck —— **建议性**：存在则报告告警数，缺失则明确打印跳过原因；
 #         只有传 --strict 时才因告警改变退出码（默认不因版本/规则差异卡门禁）。
 #
 # 用法： bash scripts/lint_shell.sh [--strict]
@@ -45,7 +48,7 @@ done < <(
     } | sort
 )
 
-echo "=== [1/3] bash -n syntax check (mandatory) ==="
+echo "=== [1/4] bash -n syntax check (mandatory) ==="
 if [ "${#files[@]}" -eq 0 ]; then
     # 取不到待查文件 = 本门失去意义，必须红，不能绿
     echo "✘ FAIL: scripts/ 下找不到任何 .sh 或 git-hook 脚本（目录结构变了就同步改本脚本）" >&2
@@ -66,7 +69,7 @@ if [ "${syntax_bad}" -ne 0 ]; then
 fi
 echo "✔ bash -n passed: ${#files[@]} shell scripts clean"
 
-echo "=== [2/3] 断言型 ros2 查询必须走 daemon（#49，mandatory） ==="
+echo "=== [2/4] 断言型 ros2 查询必须走 daemon（#49，mandatory） ==="
 # 只看真实执行行：排除注释行与纯 echo/printf 行（写文档/报错文案时可以提到这个选项）。
 no_daemon_bad=0
 for f in "${files[@]}"; do
@@ -86,7 +89,19 @@ if [ "${no_daemon_bad}" -ne 0 ]; then
 fi
 echo "✔ 未发现 --no-daemon 断言型查询（${#files[@]} 个脚本）"
 
-echo "=== [3/3] shellcheck (advisory) ==="
+echo "=== [3/4] node readiness selftest (#69, mandatory) ==="
+# #69 的就绪探测是门禁脚本的**行为逻辑**（不是样式）：它必须能区分
+# "进程死了=真失败" 与 "进程活着但 daemon 视图空=环境性失败"，两者判红语义
+# 完全不同。该逻辑由 scripts/lib/node_readiness.sh 提供，被
+# skidpad_finish_smoke.sh / skidpad_closed_loop_smoke.sh 共用——共用件一旦回归，
+# 两个门禁会同时误判，所以在这里确定性构造这两个情形并机检。
+if ! bash "${WORKSPACE_ROOT}/scripts/node_readiness_selftest.sh"; then
+    echo "✘ #69 就绪探测自测失败（真失败/环境性失败的可区分性被破坏）" >&2
+    exit 1
+fi
+echo "✔ node readiness selftest passed"
+
+echo "=== [4/4] shellcheck (advisory) ==="
 if ! command -v shellcheck >/dev/null 2>&1; then
     echo "⚠ shellcheck 未安装，跳过建议性检查（CI 的 apt 步骤已安装它；本地装法：apt-get install shellcheck）"
     exit 0
