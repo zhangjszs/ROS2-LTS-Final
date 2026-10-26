@@ -156,7 +156,12 @@ TEST(IcpApfPlanner, OppositeSidesProduceForwardPath) {
     }
     auto path = planner.GeneratePath(cones, {});
     ASSERT_FALSE(path.empty());
-    EXPECT_GT(path.front().x, 0.0);
+    // #95：路径现在**锚在自车**（base_link 原点）并沿走廊向前延伸。
+    // 旧断言「首点 x > 0」钉的是"路径整体在车前方"的旧语义 —— 那正是 #95 要改掉的
+    // 缺陷（路径不含自车 → Pure Pursuit 的横偏判据拿远处点比 → refusing goal 硬刹车）。
+    // 新语义更强：首点必须落在自车附近，且路径必须明显向前的走廊延伸。
+    EXPECT_LT(std::hypot(path.front().x, path.front().y), 0.5);
+    EXPECT_GT(path.back().x, 2.0);
 }
 
 TEST(IcpApfPlanner, ClusterConesRangesPartitioning) {
