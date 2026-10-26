@@ -45,18 +45,25 @@ struct CenterlineParams {
     double max_fit_rms{0.5};
     // #95：瓣模型（同心双壁）搜索参数。走廊 = 两条同心壁 + 夹在中间的中线圆；
     // 这些参数约束「什么样的壁才算一条走廊的壁」。
-    double max_half_width{3.0};           // 走廊半宽上限（壁到中线的距离，米）
-    double max_wall_rms{0.4};             // 壁半径残差上限（RMS，米）——壁必须是圆弧
-    double min_wall_arc_rad{0.26};        // 两壁张成的最小弧角（≈40°）——壁必须被看到足够长的弧，
-                                          // 才能与「直走廊被拟合成大半径伪弧」（实测 26°）区分开
-    double max_wall_arc_rad{3.0};         // 两壁张成的最大弧角（≈172°）——瓣心必须在走廊一侧，
-                                          // 直走廊伪模型会把瓣心包在锥桶环里（实测 306.9°）
-    double min_model_radius{3.0};         // 中线半径下限
-    double max_model_radius{25.0};        // 中线半径上限
-    double max_arc_turn_rad{1.5708};      // 弧的最大转向角（90°）——超过则路径 x 必然回退
-    double max_radius_width_ratio{10.0};  // 走廊「半径 / 半宽」上限 ——比这更接近直线就不可能是走廊。
-                                          // 直走廊被拟合成的大半径伪弧实测比值 15.4（真走廊 5.6~7.6）
-    int min_wall_support{4};              // 两壁合计的最少支持锥桶数
+    // （注释一律独占行：尾注释对齐在 clang-format 各版本间不一致，会导致 CI 与本地互相打架）
+    // 走廊半宽上限（壁到中线的距离，米）
+    double max_half_width{3.0};
+    // 壁半径残差上限（RMS，米）——壁必须是圆弧
+    double max_wall_rms{0.4};
+    // 两壁张成的最小弧角——壁必须被看到足够长的弧才算一条走廊的壁
+    double min_wall_arc_rad{0.26};
+    // 两壁张成的最大弧角——瓣心必须在走廊一侧（直走廊伪模型会把瓣心包在锥桶环里）
+    double max_wall_arc_rad{3.0};
+    // 中线半径下限 / 上限
+    double min_model_radius{3.0};
+    double max_model_radius{25.0};
+    // 弧的最大转向角（90°）——超过则路径的 x 必然回退
+    double max_arc_turn_rad{1.5708};
+    // 走廊「半径 / 半宽」上限——比这更接近直线就不可能是走廊
+    // （直走廊被拟合成的大半径伪弧实测比值 15.4，真走廊 5.6~7.6）
+    double max_radius_width_ratio{10.0};
+    // 两壁合计的最少支持锥桶数
+    int min_wall_support{4};
 };
 
 struct IcpApfConfig {
