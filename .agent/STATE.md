@@ -15,7 +15,7 @@
   - PR #97（#96）run `40336692425` attempt 2 = **success**；attempt 1 曾因 ros-apt-source 的 GitHub API 404 判红（基础设施抖动，re-run 绿）。
   - PR #98（#69）run `40355980015` attempt 3 = **success**；attempt 1/2 均为 **cancelled**（并发组 cancel-in-progress，非失败）。
   - PR #99（#95）run `40368098627` = **success**（对应 `8444ca0`）；`40367022848` = failure（clang-format 版本差异，已由 `f99951b` 修掉），`40367937681` = cancelled（被新 push 取消）。
-  - `main` push run `40418013066`（`b4d2d1a`）与 #98 合入后的 push run 需在下一轮复核是否绿（CI 有时因并发被新 push 取消）。
+  - `main` push run：`40420437594`（`ccad4d9`，最终 HEAD）= **success**；`40420320368`（`cc616e4`）= **success**；`40418013066`（`b4d2d1a`）在收尾时被更新 push 取代。三次 PR 级 CI（#97 / #98 / #99）全部 **success**。
 - 已知环境限制：
   1. **多节点 runtime 门禁必须 `export FASTDDS_BUILTIN_TRANSPORTS=SHM`**（漏设 → DDS 发现不收敛假 FAIL）。
   2. **单包构建跑测试必须显式 `-DBUILD_TESTING=ON`**。
