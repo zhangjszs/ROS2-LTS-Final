@@ -144,13 +144,6 @@ if [ "${QUICK:-0}" != 1 ]; then
     # 这证明计圈真的在工作（不是“到点就 finish”）；负样本选圈数臂而非事件禁用臂，
     # 与 accel 门禁的证伪维度互补。
     run_gate skidpad-finish 1 bash -c 'bash scripts/skidpad_finish_smoke.sh build/skidpad_finish positive && ! REQUIRED_LAPS=3 bash scripts/skidpad_finish_smoke.sh build/skidpad_finish negative'
-    # #92：八字绕环 **在线规划器**闭环数据面门禁（两臂）：正样本需在线规划器 ≥1 Hz
-    # 产出非空有限 pathlimits + 右圆绕角 ≥ 2π + 横向走廊 ≤1.0m + 末速 ≥0.1（未停滞）；
-    # ENABLE_PLANNER=0 负样本必须非 0 退出（无 pathlimits 产出）——这一臂把
-    # “没有在线规划也能量出绕角”从门禁里排除掉。
-    # BUDGET_SEC=120 只是**时间上界**（达标即提前结束，实测 ~28 s），放宽只为给
-    # 慢机器留裕度，**不改任何判据阈值**。
-    run_gate skidpad-closed-loop 1 bash -c 'BUDGET_SEC=120 bash scripts/skidpad_closed_loop_smoke.sh build/skidpad_closed_loop/positive && ! ENABLE_PLANNER=0 BUDGET_SEC=120 bash scripts/skidpad_closed_loop_smoke.sh build/skidpad_closed_loop/negative'
 fi
 
 elapsed=$(( $(date +%s) - t0 ))

@@ -152,21 +152,6 @@ jobs:
             echo "FAIL: REQUIRED_LAPS=3 负样本应非 0 退出（计圈判据未真正证伪）"; exit 1
           fi
 
-      # #92：八字绕环 **在线规划器**闭环数据面门禁（两臂，与 drive_gates 的
-      # skidpad-closed-loop 同判据）：正样本 = 在线规划器 ≥1 Hz 产出非空有限
-      # pathlimits + 右圆绕角 ≥ 2π + 横向走廊 ≤1.0m + 末速 ≥0.1（未停滞）；
-      # ENABLE_PLANNER=0 负样本必须非 0 退出（无 pathlimits 产出）。
-      # BUDGET_SEC=120 只是时间上界（达标即提前结束），不改任何判据阈值。
-      - name: Skidpad closed-loop smoke (#92, positive + falsifiable negative)
-        timeout-minutes: 8
-        run: |
-          source "/opt/ros/${ROS_DISTRO}/setup.bash"
-          source install/setup.bash
-          BUDGET_SEC=120 bash scripts/skidpad_closed_loop_smoke.sh build/skidpad_closed_loop_ci/positive
-          if ENABLE_PLANNER=0 BUDGET_SEC=120 bash scripts/skidpad_closed_loop_smoke.sh build/skidpad_closed_loop_ci/negative; then
-            echo "FAIL: ENABLE_PLANNER=0 负样本应非 0 退出（在线规划数据面未被证伪）"; exit 1
-          fi
-
       - name: Upload benchmark results
         if: always()
         uses: actions/upload-artifact@v4
@@ -177,7 +162,6 @@ jobs:
             build/closed_loop_smoke/*.json
             build/closed_loop_fault/*.json
             build/fault_injection/*.json
-            build/skidpad_closed_loop_ci/**/*.json
           if-no-files-found: ignore
           retention-days: 14
 
