@@ -29,17 +29,31 @@
 #   ENABLE_PLANNER=0：不拉起 skidpad_planner → 无 pathlimits 产出 → 门禁必须退出非 0
 #   且原因明确指向无 pathlimits。
 #
-# ── 挂载状态：当前**未挂载**（#96 合入时状态）────────────────────────────────
+# ── 挂载状态：**仍未挂载**（#92 收口时 Planner 裁定 2026-10-27）──────────────────
 #   本脚本**不在** scripts/drive_gates.sh 与 .github/workflows/ci.yml 的执行路径里，
-#   只能手工运行。原因是 skidpad_planner 的路径生成存在几何缺陷（Issue #95：
-#   部分弧被当整圆拟合 / 左右两圆被平均成单圆 / 点序非单调），正样本当前必然
-#   以非 0 退出——一旦挂载，主干与 CI 必红。
+#   只能手工运行。
 #
-#   挂载条件（全部满足才允许挂载，由 #92 收口时执行）：
-#     1) Issue #95 验收通过（几何缺陷修复，正样本绕角 ≥ 2π）；
-#     2) 本脚本正样本臂在 CI（Jazzy）上跑绿（不是仅本机跑绿）；
+#   挂载为什么被暂缓（#92 收口时的实测结论）：
+#     1) #95 的几何缺陷已修复并合入 main（b4d2d1a，同心双壁瓣模型）；
+#     2) 单次正样本实测达标（绕角 6.2864 rad ≥ 2π、横偏 0.433 m ≤ 1.0 m、
+#        pathlimits 20.04 Hz 且全有限、出口 1399 帧 0 违例、退出码 0）——
+#        但**连续复测不稳定**：同机 8 次只绿 3 次（**通过率 37.5%**）；
+#     3) 失败指纹：红跑 `pp.log` 的 `Approaching path end` 计数 1~2，绿跑恒 0
+#        ——走廊模型偶发输出**退化短弧（9–14 点）**，路径剩余点数 ≤ Pure Pursuit 的
+#        `end_decel_points=10` → PP 判「接近路径末端」而刹车 → 车辆停滞
+#        （根因见 auto-discovered **#101**：`corridor_model_core.hpp`
+#        `GenerateCorridorArcCore` 的弧长退化 + 模型选择缺相位硬否决）。
+#     4) 挂上去主干会有约六成概率变红 → Planner 裁定「**先修 #101 再挂载**」。
+#
+#   新的挂载条件（全部满足才允许挂载）：
+#     1) #101 修复并合入 main；
+#     2) 本脚本正样本臂在**同一台机器上连续 10 次全绿**（#101 的验收硬指标）；
 #     3) 挂载 PR 显式说明挂载动作，且不改动本脚本任何判据阈值。
-#   在此之前，任何人不得把本脚本加进 drive_gates.sh / ci.yml。
+#
+#   「末速」口径（#92 收口时 Planner 裁定）：Issue 正文原写的「末速 < 0.1 m/s」
+#   与本单「完赛/停 非目标」自相矛盾（首轮失败报告里的「末速 0.0」恰恰是**停滞**
+#   症状），裁定按「笔误，实为断言**未停滞**」处理 → 脚本断言改为 **末速 ≥ 0.1 m/s**
+#   （仅正样本臂；负样本臂不拉规划器，车本就静止，不适用该断言）。
 #
 #   手工用法：
 #     bash scripts/skidpad_closed_loop_smoke.sh build/skidpad_closed_loop_smoke
@@ -198,11 +212,18 @@ esac
 for p in "${PIDS[@]}"; do
     while read -r c; do NODE_PIDS+=("$c"); done < <(pgrep -P "$p" 2>/dev/null || true)
 done
+
+# 节点注册表（#92 验收第 1 条要求 JSON 留痕含节点注册表）：形如
+# "vehicle_simulator:1234 safety_monitor:1235 …"，随快照一起落盘。
+NODE_REGISTRY=""
+for i in "${!PROBE_NODE_NAMES[@]}"; do
+    NODE_REGISTRY+="${PROBE_NODE_NAMES[$i]}:${PROBE_NODE_PIDS[$i]} "
+done
 echo "OK   $(echo "$EXPECT_NODES" | wc -w) 个节点进程已就绪，开始数据面断言"
 
 # ── 3) 数据面观测与判据落盘 ─────────────────────────────────────────────────────
 python3 - "$EXPORT_DIR/skidpad_centerline.csv" "$OUT_DIR" "$RCX" "$RCY" "$BUDGET_SEC" \
-    "$LATERAL_MAX" "$TARGET_ANGLE_RAD" "$ENABLE_PLANNER" <<'PY'
+    "$LATERAL_MAX" "$TARGET_ANGLE_RAD" "$ENABLE_PLANNER" "$NODE_REGISTRY" <<'PY'
 import json
 import math
 import sys
@@ -221,6 +242,8 @@ budget = float(sys.argv[5])
 lateral_max = float(sys.argv[6])
 target_angle = float(sys.argv[7])
 expect_planner = sys.argv[8] == "1"
+# 节点注册表（#92 验收第 1 条）：形如 "vehicle_simulator:1234 …"
+node_registry = sys.argv[9].split() if len(sys.argv) > 9 else []
 
 # 参考中心线（#90 导出，349 点）
 ref_pts = []
@@ -350,6 +373,7 @@ path_rate_hz = round(watch.raw_path_n / path_duration, 2) if path_duration > 0.5
 snap = {
     "schema": "fsac.skidpad_closed_loop_smoke/v1",
     "enable_planner": expect_planner,
+    "nodes": node_registry,
     "wall_used_s": wall_used,
     "budget_s": budget,
     "state_msgs": watch.state_n,
@@ -411,6 +435,16 @@ if expect_planner:
     # 4. 横向走廊 ≤ 1.0m
     if watch.max_dev > lateral_max:
         fails.append(f"横向走廊超限：max_lateral_dev={watch.max_dev:.3f} m > 阈值 {lateral_max} m（在 {watch.max_dev_at}）")
+
+    # 5. 未停滞：末速 ≥ 0.1 m/s
+    #    Issue #92 正文原写的「末速 < 0.1 m/s」与本单「完赛/停 非目标」自相矛盾
+    #    （首轮失败报告里的「末速 0.0」恰恰是**停滞**症状），#92 收口时 Planner 裁定
+    #    按「笔误，实为断言未停滞」处理 → 此处断言车仍在走（≥0.1 m/s），
+    #    否则「绕角达标」可能只是原地打转凑出来的。
+    #    仅正样本臂适用：负样本臂不拉规划器，车本就静止。
+    if watch.v_last < 0.1:
+        fails.append(f"车辆停滞：末速 {watch.v_last:.3f} m/s < 0.1 m/s"
+                     f"（绕角 {watch.cum_right_angle:.3f} rad / 末位姿 {snap['final_pos']}）")
 else:
     # 负样本断言（ENABLE_PLANNER=0）：必须无 pathlimits 产出且门禁失败
     if watch.raw_path_n > 0:
