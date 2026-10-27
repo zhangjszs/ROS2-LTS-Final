@@ -49,6 +49,15 @@ struct CorridorModel {
     double arc_span_rad{0.0};  // 两壁在 C 处张成的弧角
     double phase_error{0.0};   // |‖ego − C‖ − R_mid|
     int gap_count{0};          // 两壁之间的锥桶数（真走廊应为 0）
+    // #101：候选与**上一帧路径**的连续性误差（上一帧路径各点到本候选中线圆
+    // 的平均距离差，米）。走廊不会突然改变：该值过大说明这条候选描述的不是
+    // 自车所在的那条走廊（切点处混瓣时会拟合出半径 3~5 m 的伪圆）。
+    double continuity_error{0.0};
+    // #101：候选是否通过**质量门槛**（相位误差 ≤ max_model_phase_error、
+    // 支持度 ≥ min_model_support、连续性误差 ≤ max_model_continuity_error）。
+    // false = 「有走廊候选但都不可信」——此时应沿用上一帧已验证路径，而不是
+    // 退到会在切点跨瓣配对的中点法。
+    bool quality_ok{true};
 };
 
 // #95：给定瓣圆心时，两条同心壁的拟合结果。
@@ -251,6 +260,30 @@ inline WallFit FitConcentricWallsCore(std::span<const Point2D> cones, Point2D ce
 //
 // 切点处左右两瓣的锥桶集合是**镜像对称**的（几何上无法区分），因此必须有
 // 相位/连续性依据：上一帧路径本身就是中线采样，其圆拟合给出上一拍的瓣圆心，
+// #101：走廊模型的**质量体检**（对最终选中的候选做否决式判定）。
+//
+// 三条判据（全部可证伪；阈值见 CenterlineParams）：
+//   1) 支持度：两壁上的锥桶数 ≥ min_model_support——锥桶太少时「双壁」只是噪声；
+//   2) 相位误差：|‖ego − C‖ − R_mid| ≤ max_model_phase_error——自车必须在这条
+//      走廊的中线上（文件头注释早已把它写成接受判据，实现里此前只当软惩罚）；
+//   3) 连续性误差：候选中线圆与**上一帧路径**的平均距离差 ≤
+//      max_model_continuity_error——走廊不会突然改变（切点误换瓣实测差 4~5 m）。
+inline bool PassesQualityGate(const CorridorModel& m, const CenterlineParams& p) {
+    if (!m.valid) {
+        return false;
+    }
+    if (m.support < p.min_model_support) {
+        return false;
+    }
+    if (m.phase_error > p.max_model_phase_error) {
+        return false;
+    }
+    if (m.continuity_error > p.max_model_continuity_error) {
+        return false;
+    }
+    return true;
+}
+
 // 用它做同支持度候选之间的消歧。
 inline CorridorModel FitCorridorModelCore(std::span<const Point2D> cones, Point2D ego, const CenterlineParams& p,
                                           std::span<const Point2D> prev_path) {
@@ -362,6 +395,18 @@ inline CorridorModel FitCorridorModelCore(std::span<const Point2D> cones, Point2
         all.push_back(&m);
     }
 
+    // #101：质量门槛采用**否决**语义（不是候选过滤器）——先按原评分选出最佳解，
+    // 再对它做质量体检；不达标就整条候选作废（调用方改走上一帧已验证路径）。
+    //
+    // 为什么不用「过滤器」：相位误差几乎恒等于 0（候选的圆心是以自车为中心
+    // 参数化的，半径取自壁拟合），把它当过滤条件会在自车已偏离中线时**反向
+    // 选出更差的伪候选**（实测：真候选因相位 2.1 m 被否 → 退到一个支持度更高
+    // 但几何无关的圆）。否决语义不会制造这种降级。
+    //
+    // 背景：切点处两瓣锥桶混入 → 壁证据被稀释 → 支持度只剩 4~10 的伪模型也能
+    // 胜出（实测半径在 3~16 m 之间乱跳、相位误差 1.4~2.7 m）→ 路径缩到 9~15
+    // 点 → Pure Pursuit 刹车 → 车停滞漂移（在线闭环门禁通过率仅 37.5%）。
+
     // ── 择优 ────────────────────────────────────────────────────────────────
     // 评分 = 支持度 − 相位惩罚。自车必在中线上 → 相位误差应当≈0；真模型的
     // 相位误差实测 0.01~0.42 m，而「左右混瓣」的伪模型相位误差往往更大。
@@ -392,9 +437,13 @@ inline CorridorModel FitCorridorModelCore(std::span<const Point2D> cones, Point2
         }
     }
     if (chosen == nullptr) {
+        best.continuity_error = continuity_error(best);
+        best.quality_ok = PassesQualityGate(best, p);
         return best;
     }
     best = *chosen;
+    best.continuity_error = continuity_error(best);
+    best.quality_ok = PassesQualityGate(best, p);
     return best;
 }
 
@@ -443,20 +492,52 @@ inline std::vector<Point2D> GenerateCorridorArcCore(const CorridorModel& m, Poin
 
 // #95：走廊中线路径的产出结果（供节点层与单测读取判据来源）。
 struct CorridorPathResult {
-    std::vector<Point2D> path;  // base_link 系，含自车、点序单调、等间距
-    bool used_model{false};     // true = 走瓣模型（相位感知同心双壁）
-    bool used_circle{false};    // true = 走圆法（相位感知单圆）
-    CorridorModel model;        // 选中的走廊模型（未选中时 valid=false）
+    // base_link 系，含自车、点序单调、等间距
+    std::vector<Point2D> path;
+    // true = 走瓣模型（相位感知同心双壁）
+    bool used_model{false};
+    // true = 走圆法（相位感知单圆）
+    bool used_circle{false};
+    // #101：true = 路径**用到**了上一帧路径（整条沿用，或用它补齐前视）
+    bool used_prev_path{false};
+    // #101：true = 本帧走廊模型不可信，改用**上一帧已验证的走廊模型**
+    // （持久走廊状态）从当前位姿重新生成了弧。
+    bool used_trusted_model{false};
+    // 选中的走廊模型（未选中时 valid=false）
+    CorridorModel model;
 };
+
+// #101：**持久走廊模型**的可用性校验。
+//
+// 「上一帧已验证的走廊模型」能不能继续用，看的是**自车是否还在这条走廊的
+// 中线上**：|‖ego − C‖ − R_mid| ≤ max_trusted_phase_error。
+//
+// 为什么用相位而不是「模型是否还拟合得上」：模型是上一帧的，壁证据本帧已经
+// 变差（这正是要持久化的原因）；而自车始终在走廊中线上——只要车还在走廊里，
+// 这条模型就是对的（走廊不会突然改变）。反过来，若车已经偏离中线超过容差，
+// 说明要么车跑偏了、要么走廊已经切换（如八字切点），此时必须作废，不能拿
+// 旧模型把车拽回旧走廊。
+inline bool TrustedModelUsableCore(const CorridorModel& m, Point2D ego, const CenterlineParams& p) {
+    if (!m.valid || !(m.radius > 0.0) || !std::isfinite(m.center.x) || !std::isfinite(m.center.y)) {
+        return false;
+    }
+    const double phase = std::abs(std::hypot(ego.x - m.center.x, ego.y - m.center.y) - m.radius);
+    return phase <= p.max_trusted_phase_error;
+}
 
 // #95：走廊中线的**生产入口**（节点层只调这一个）。
 //
-// 顺序：瓣模型法（相位感知同心双壁）→ 圆法（相位感知单圆）→ 中点法回退。
-// 三条路径都保证「含自车 + 点序单调 + 等间距」，避免 Pure Pursuit 拒解 /
-// 「Approaching path end」末端刹车。
+// 顺序：瓣模型法（相位感知同心双壁）→ **上一帧可信模型**（#101 持久走廊状态）
+// → 中点法回退。三条路径都保证「含自车 + 点序单调 + 等间距」，避免
+// Pure Pursuit 拒解 / 「Approaching path end」末端刹车。
+//
+// #101：trusted_model 是**上一帧已验证**的走廊模型（调用方持有，坐标为
+// base_link；模型不可信时用它从当前位姿重新生成弧）。为 nullptr 时行为与
+// #95 一致（不含持久化分支）。
 inline CorridorPathResult ComputeCorridorPathCore(std::span<const Point2D> left, std::span<const Point2D> right,
                                                   const CenterlineParams& p, Point2D ego = Point2D{0.0, 0.0},
-                                                  std::span<const Point2D> prev_path = {}) {
+                                                  std::span<const Point2D> prev_path = {},
+                                                  const CorridorModel* trusted_model = nullptr) {
     CorridorPathResult out;
 
     // ── 1) 瓣模型法 ──────────────────────────────────────────────────────────
@@ -468,17 +549,75 @@ inline CorridorPathResult ComputeCorridorPathCore(std::span<const Point2D> left,
     all.insert(all.end(), right.begin(), right.end());
 
     const CorridorModel model = FitCorridorModelCore(all, ego, p, prev_path);
-    if (model.valid) {
+    const bool prev_path_usable = !prev_path.empty() && static_cast<int>(prev_path.size()) >= p.min_publish_points;
+
+    // ── 1a) 模型**可信**（相位误差与支持度都达标）→ 走瓣模型 ──────────────────
+    std::vector<Point2D> fresh_path;
+    bool fresh_extended = false;
+    if (model.valid && model.quality_ok) {
         const std::vector<Point2D> arc = GenerateCorridorArcCore(model, ego, p);
         if (!arc.empty()) {
             std::vector<Point2D> anchored = AnchorPathAtEgoCore(arc, ego, p);
             if (!anchored.empty()) {
-                out.used_model = true;
-                out.model = model;
-                out.path = std::move(anchored);
-                return out;
+                // #101：模型弧太短时用**上一帧路径**补齐前视（与中点法同一机制）。
+                // 切点处两瓣锥桶混入 → 壁证据被稀释 → 弧退化（实测 9~15 点）→
+                // Pure Pursuit 判「接近路径末端」直接刹车 → 车停滞。
+                fresh_path = ExtendWithPrevPathCore(anchored, prev_path, ego, p);
+                fresh_extended = (fresh_path.size() != anchored.size());
             }
         }
+    }
+    // 点数不足 min_publish_points 的短路径会让 Pure Pursuit 判「接近路径末端」
+    // 而刹车（实测退化帧 9~19 点、健康帧 19~43 点）→ 先看有没有更稳的替代。
+    const bool fresh_ok = !fresh_path.empty() && static_cast<int>(fresh_path.size()) >= p.min_publish_points;
+    if (fresh_ok) {
+        out.used_model = true;
+        out.used_prev_path = fresh_extended;
+        out.model = model;
+        out.path = std::move(fresh_path);
+        return out;
+    }
+
+    // ── 1b) 本帧模型不可信 → 用**上一帧已验证的走廊模型**（持久走廊状态）─────
+    //
+    // 从**当前自车位姿**重新生成弧：弧长只由模型（瓣心 + 中线半径）决定，
+    // 不受本帧壁证据好坏影响（实测退化帧半径会塌到 3~5 m → 弧只剩 9~15 点），
+    // 且每帧都是新路径（不会像「沿用上一帧路径」那样被车走完后触发末端刹车）。
+    if (trusted_model != nullptr && TrustedModelUsableCore(*trusted_model, ego, p)) {
+        const std::vector<Point2D> arc = GenerateCorridorArcCore(*trusted_model, ego, p);
+        if (!arc.empty()) {
+            std::vector<Point2D> anchored = AnchorPathAtEgoCore(arc, ego, p);
+            if (!anchored.empty()) {
+                std::vector<Point2D> extended = ExtendWithPrevPathCore(anchored, prev_path, ego, p);
+                if (!extended.empty() && static_cast<int>(extended.size()) >= p.min_publish_points) {
+                    out.used_model = true;
+                    out.used_trusted_model = true;
+                    out.used_prev_path = (extended.size() != anchored.size());
+                    out.model = *trusted_model;
+                    out.path = std::move(extended);
+                    return out;
+                }
+            }
+        }
+    }
+
+    // ── 1c) 有走廊候选但**质量不达标**（切点处壁证据不足 → 伪模型）──────────
+    // 沿用上一帧已验证的路径；不要退到中点法——切点处左右两组锥桶分属不同瓣，
+    // 中点法会跨瓣配对（这正是 #95 的原始根因），会把车带离中线。
+    if (model.valid && !model.quality_ok && prev_path_usable) {
+        out.path.assign(prev_path.begin(), prev_path.end());
+        out.used_prev_path = true;
+        return out;
+    }
+
+    // ── 1d) 本帧模型可信但弧太短，且没有可用的持久模型 ──────────────────────
+    // 仍然发布这条几何正确的短路径（而不是退到切点处会跨瓣配对的中点法）——
+    // 短路径只会让 PP 减速，几何错误的路径会让车冲出中线。
+    if (!fresh_path.empty()) {
+        out.used_model = true;
+        out.model = model;
+        out.path = std::move(fresh_path);
+        return out;
     }
 
     // ── 2) 圆法（相位感知单圆）────────────────────────────────────────────────
