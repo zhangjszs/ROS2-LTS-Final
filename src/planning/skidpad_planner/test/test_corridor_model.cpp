@@ -537,4 +537,104 @@ TEST(SkidpadCorridorModel, TrustedModelPathReachesPurePursuitLookahead) {
     EXPECT_GT(reach, 10.0) << "持久模型的路径前视不足（" << reach << " m）";
 }
 
+// ── #101（Planner 2026-10-28 裁定 A）：首瓣先验 ────────────────────────────────
+//
+// 入口处两瓣锥桶镜像对称（每个锥桶都能在 0.0001 m 内找到 y 取反的镜像点），
+// 自车沿两圆公切线进入 → 只靠几何无法判定「先绕哪一瓣」（实测 5 连跑 3 右 2 左）。
+// 以下用例锁定「任务层给出首瓣后，规划器必须按它选瓣」这一行为。
+
+// 切点处镜像对称的两瓣（自车在原点、航向 +x）。
+std::vector<Point2D> SymmetricEntryCones() {
+    const std::vector<Point2D> left = LobeWalls(kLeftLobeY, -75.0, 90.0, 7);
+    const std::vector<Point2D> right = LobeWalls(kRightLobeY, -75.0, 90.0, 7);
+    std::vector<Point2D> all = left;
+    all.insert(all.end(), right.begin(), right.end());
+    return all;
+}
+
+skidpad::LobePrior MakePrior(int side) {
+    skidpad::LobePrior prior;
+    prior.active = true;
+    prior.origin = Point2D{0.0, 0.0};
+    prior.dir = Point2D{1.0, 0.0};
+    prior.side = side;
+    return prior;
+}
+
+TEST(SkidpadCorridorModel, LobePriorForcesTheRequestedSideAtTheSymmetricEntry) {
+    const std::vector<Point2D> all = SymmetricEntryCones();
+
+    const skidpad::LobePrior prior_left = MakePrior(1);
+    const CorridorModel left_pick = FitCorridorModelCore(all, Point2D{0.0, 0.0}, kParams, {}, &prior_left);
+    ASSERT_TRUE(left_pick.valid) << "先验=左 时仍应给出模型（另一侧被否决，不是全体作废）";
+    EXPECT_GT(left_pick.center.y, 0.0) << "先验=左 却选了 −y 瓣";
+
+    const skidpad::LobePrior prior_right = MakePrior(-1);
+    const CorridorModel right_pick = FitCorridorModelCore(all, Point2D{0.0, 0.0}, kParams, {}, &prior_right);
+    ASSERT_TRUE(right_pick.valid);
+    EXPECT_LT(right_pick.center.y, 0.0) << "先验=右 却选了 +y 瓣";
+
+    // 两次选中的必须是**不同**的瓣（否则先验没有生效）。
+    EXPECT_GT(left_pick.center.y - right_pick.center.y, 10.0);
+}
+
+TEST(SkidpadCorridorModel, InactiveLobePriorKeepsDefaultSelection) {
+    // 未配置先验（active=false / side=0）时，行为必须与不传先验完全一致——
+    // 这是「默认行为不变」的守卫：任何用到先验的分支都不得在未启用时生效。
+    const std::vector<Point2D> all = SymmetricEntryCones();
+    const CorridorModel baseline = FitCorridorModelCore(all, Point2D{0.0, 0.0}, kParams, {});
+
+    skidpad::LobePrior inactive;
+    const CorridorModel with_inactive = FitCorridorModelCore(all, Point2D{0.0, 0.0}, kParams, {}, &inactive);
+    ASSERT_EQ(baseline.valid, with_inactive.valid);
+    if (baseline.valid) {
+        EXPECT_DOUBLE_EQ(baseline.center.x, with_inactive.center.x);
+        EXPECT_DOUBLE_EQ(baseline.center.y, with_inactive.center.y);
+        EXPECT_DOUBLE_EQ(baseline.radius, with_inactive.radius);
+    }
+
+    // side=0（只 active 不算数）同样不得否决任何候选。
+    skidpad::LobePrior no_side = MakePrior(0);
+    const CorridorModel with_no_side = FitCorridorModelCore(all, Point2D{0.0, 0.0}, kParams, {}, &no_side);
+    ASSERT_EQ(baseline.valid, with_no_side.valid);
+    if (baseline.valid) {
+        EXPECT_DOUBLE_EQ(baseline.center.y, with_no_side.center.y);
+    }
+}
+
+TEST(SkidpadCorridorModel, LobePriorRejectsCandidatesOnTheOppositeSide) {
+    // 只有 −y 瓣的锥桶 + 先验=左 → 不得产出「对侧」模型（宁可作废，让调用方
+    // 回退到既有路径，也不能按错误航线把车开进另一瓣）。
+    const std::vector<Point2D> only_left_lobe = LobeWalls(kLeftLobeY, -75.0, 90.0, 7);
+    const skidpad::LobePrior prior_left = MakePrior(1);
+    const CorridorModel model = FitCorridorModelCore(only_left_lobe, Point2D{0.0, 0.0}, kParams, {}, &prior_left);
+    EXPECT_FALSE(model.valid) << "先验=左 却接受了 −y 瓣候选";
+
+    // 反过来：先验=右 时同一批锥桶必须被接受（证明否决只针对对侧，不是「先验一律作废」）。
+    const skidpad::LobePrior prior_right = MakePrior(-1);
+    const CorridorModel accepted = FitCorridorModelCore(only_left_lobe, Point2D{0.0, 0.0}, kParams, {}, &prior_right);
+    ASSERT_TRUE(accepted.valid);
+    EXPECT_LT(accepted.center.y, 0.0);
+}
+
+TEST(SkidpadCorridorModel, LobePriorSteersThePublishedPathIntoTheRequestedSide) {
+    // 生产入口（ComputeCorridorPathCore）也要吃到先验：先验=左 → 发布路径必须弯向 +y。
+    const std::vector<Point2D> all = SymmetricEntryCones();
+    std::vector<Point2D> left;
+    std::vector<Point2D> right;
+    SplitWalls(all, left, right);
+
+    const skidpad::LobePrior prior_left = MakePrior(1);
+    const auto corridor = ComputeCorridorPathCore(left, right, kParams, Point2D{0.0, 0.0}, {}, nullptr, &prior_left);
+    ASSERT_FALSE(corridor.path.empty());
+    ASSERT_TRUE(corridor.used_model);
+    ASSERT_GE(corridor.path.size(), 4U);
+    EXPECT_GT(corridor.path.back().y, 0.5) << "先验=左 的路径没有弯向 +y 瓣";
+
+    const skidpad::LobePrior prior_right = MakePrior(-1);
+    const auto corridor_r = ComputeCorridorPathCore(left, right, kParams, Point2D{0.0, 0.0}, {}, nullptr, &prior_right);
+    ASSERT_FALSE(corridor_r.path.empty());
+    EXPECT_LT(corridor_r.path.back().y, -0.5) << "先验=右 的路径没有弯向 −y 瓣";
+}
+
 }  // namespace
