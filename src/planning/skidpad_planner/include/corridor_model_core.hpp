@@ -38,6 +38,37 @@
 
 namespace skidpad {
 
+// #101（Planner 2026-10-28 裁定 A）：**首瓣先验**——mission 级航线输入。
+//
+// 八字入口处两瓣锥桶**镜像对称**（实测每个锥桶都能在 0.0001 m 内找到 y 取反的
+// 镜像点），自车又沿两圆的公切线进入 → 只靠锥桶几何**无法**判定「先绕哪一瓣」
+// （实测同机 5 连跑 3 右 2 左，左瓣跑 59.2 s / rate 0.106；调相位门限只换硬币，
+// 见 #101 执行报告 5.4）。故由任务层给出「首瓣中心在起始方向的哪一侧」，
+// 规划器只在**尚未锁定瓣**（没有可信持久模型）时据此否决对侧候选。
+//
+// 坐标系：`origin` / `dir` 由调用方换算到**当前 base_link**（节点层每帧用位姿
+// 旋回），本核因此仍是纯 std、不做位姿变换。
+struct LobePrior {
+    bool active{false};
+    Point2D origin{};       // 起始位姿（base_link）
+    Point2D dir{1.0, 0.0};  // 起始航向单位向量（base_link）
+    int side{0};            // +1 = 首瓣中心在 dir 左侧；−1 = 右侧；0 = 不约束
+};
+
+// 候选瓣心相对「起始方向」的侧别：cross(dir, c − origin) > 0 → 左。
+inline int LobeSideOf(Point2D center, const LobePrior& prior) {
+    const double dx = center.x - prior.origin.x;
+    const double dy = center.y - prior.origin.y;
+    const double cross = (prior.dir.x * dy) - (prior.dir.y * dx);
+    if (cross > 0.0) {
+        return 1;
+    }
+    if (cross < 0.0) {
+        return -1;
+    }
+    return 0;
+}
+
 // #95：一条走廊的模型（瓣圆心 + 中线半径 + 壁几何）。
 struct CorridorModel {
     bool valid{false};
@@ -286,7 +317,7 @@ inline bool PassesQualityGate(const CorridorModel& m, const CenterlineParams& p)
 
 // 用它做同支持度候选之间的消歧。
 inline CorridorModel FitCorridorModelCore(std::span<const Point2D> cones, Point2D ego, const CenterlineParams& p,
-                                          std::span<const Point2D> prev_path) {
+                                          std::span<const Point2D> prev_path, const LobePrior* prior = nullptr) {
     CorridorModel best;
     if (cones.size() < 4) {
         return best;
@@ -352,6 +383,12 @@ inline CorridorModel FitCorridorModelCore(std::span<const Point2D> cones, Point2
         // 瓣心必须在自车的前方一侧（切向与航向同向）——瓣心落在自车正后方时
         // 弧会立刻往回弯（x 立刻回退），该模型不可用。
         if (!ArcHeadingAtEgo(c, ego).valid) {
+            return;
+        }
+        // #101（裁定 A）：首瓣先验否决对侧候选。只在「尚未锁定瓣」时生效
+        // （调用方在已有可信持久模型时不传 prior）——已锁定后的换瓣由持久模型
+        // 与连续性判据负责，先验不得阻止八字切点处的**合法**换瓣。
+        if (prior != nullptr && prior->active && prior->side != 0 && LobeSideOf(c, *prior) != prior->side) {
             return;
         }
         m.valid = true;
@@ -537,7 +574,8 @@ inline bool TrustedModelUsableCore(const CorridorModel& m, Point2D ego, const Ce
 inline CorridorPathResult ComputeCorridorPathCore(std::span<const Point2D> left, std::span<const Point2D> right,
                                                   const CenterlineParams& p, Point2D ego = Point2D{0.0, 0.0},
                                                   std::span<const Point2D> prev_path = {},
-                                                  const CorridorModel* trusted_model = nullptr) {
+                                                  const CorridorModel* trusted_model = nullptr,
+                                                  const LobePrior* prior = nullptr) {
     CorridorPathResult out;
 
     // ── 1) 瓣模型法 ──────────────────────────────────────────────────────────
@@ -548,7 +586,7 @@ inline CorridorPathResult ComputeCorridorPathCore(std::span<const Point2D> left,
     all.insert(all.end(), left.begin(), left.end());
     all.insert(all.end(), right.begin(), right.end());
 
-    const CorridorModel model = FitCorridorModelCore(all, ego, p, prev_path);
+    const CorridorModel model = FitCorridorModelCore(all, ego, p, prev_path, prior);
     const bool prev_path_usable = !prev_path.empty() && static_cast<int>(prev_path.size()) >= p.min_publish_points;
 
     // ── 1a) 模型**可信**（相位误差与支持度都达标）→ 走瓣模型 ──────────────────

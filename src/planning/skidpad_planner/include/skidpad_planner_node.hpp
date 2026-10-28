@@ -49,6 +49,16 @@ class SkidpadPlannerNode {
     CorridorModel trusted_model_global_;
     bool has_trusted_model_;
 
+    // #101（Planner 2026-10-28 裁定 A）：**首瓣先验**——任务层给的「先绕哪一瓣」。
+    // 入口处两瓣锥桶镜面对称（几何上不可区分），必须由航线回答。存**起始位姿**
+    // （全局坐标，第一帧 vehicle_state 记下），每帧换算到 base_link 后交给 Core；
+    // 只在**尚未锁定瓣**（has_trusted_model_ == false）时生效。
+    int initial_lobe_side_;  // +1 = 左，−1 = 右，0 = 无先验
+    double start_x_;
+    double start_y_;
+    double start_theta_;
+    bool has_start_pose_;
+
     int road_type_;
     std::string input_topic_;
     std::string output_topic_;
