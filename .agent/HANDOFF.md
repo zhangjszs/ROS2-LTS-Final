@@ -2,109 +2,68 @@
 
 ## 本轮概要
 
-exec-20261026 **会话3**（接会话2）： Planner 就 #92 的挂载收口给出**四项裁定**（① 现在挂载 ②「末速」按笔误=断言未停滞 ③ #95 判据 1 改写 ④ #100 定 P2 进下个队列）。Executor 逐项执行——**②③④ 已落地**，**① 被实测阻断**：挂载前连续 8 次跑发现 `#92` 在线闭环门禁正样本臂**通过率仅 37.5%**，挂上去主干会有约六成概率变红。已立 auto-discovered **#101**（P1）承接根因，分支 `agent/issue-92-skidpad-closed-loop-mount` 已推送、**PR 未开**，等 Planner 二次裁定。
+exec-20261028（接 plan-20261028 队列：#101 → #100）。**队列已清空**：#101 剩余范围执行到「② 合 PR #103」完成后，**实测推翻了 Planner 的剩余范围前提**（跨瓣回退一次都没发生），改为**入口选瓣歧义**并转 `needs-info`；#100 第一阶段调研完成、交 `in-review`。**无新增算法代码**，`main` 前进一格（`4973311` → `079f58f`）。
 
 | 事项 | 结论 |
 | --- | --- |
-| 裁定 ②「末速」按笔误处理 | **已落地**：脚本正样本臂断言 **末速 ≥ 0.1 m/s**（负样本臂不适用）；提交 `aaf8eb2` |
-| 裁定 ③ #95 判据 1 改写 | **已落地**：单内回写措辞「路径非单圆，且落在某个真实瓣的中线上（误差 ≤ 0.3 m）」 |
-| 裁定 ④ #100 定 P2 进下个队列 | **已落地**：`priority:P2` + `ready-for-agent` 标签 + 单内范围说明 |
-| 裁定 ① 挂载 | **被阻断**：正样本臂 8 次只绿 3 次（37.5%）→ 已立 #101；分支就绪待裁定（选 A 只合 `aaf8eb2`，选 B/C 两提交一起走 PR） |
-
-### 会话2 概要（保留）
-
-exec-20261026 **会话2**（接会话1）：清空今日队列的**全部三单**——#96 合入 main、#69 修就绪探测单点失效、#95 修规划器几何缺陷（**从「部分完成」推进到「完成」**，端到端闭环首次全绿）。**收尾状态：三单全部 squash merge 进 `main`、两条临时分支已删、三个 Issue 均已转 `in-review` 并贴执行报告。**
-
-| 事项 | 结论 |
-| --- | --- |
-| #96 合入 skidpad_closed_loop_smoke.sh | **完成**：PR #97 已 squash merge 进 `main`（`7733cbb`），未挂载，CI 绿（attempt 2） |
-| #69 DDS 门禁区分环境性/真失败 | **完成**：PR #98 已 squash merge 进 `main`（`cc616e4`），CI run `40355980015` attempt 3 = success，临时分支已删，Issue #69 转 `in-review` + 执行报告已贴 |
-| #95 skidpad_planner 路径生成三处几何缺陷 | **完成**：PR #99 已 squash merge 进 `main`（`b4d2d1a`），CI run `40368098627` = success，临时分支已删，Issue #95 转 `in-review` + 更新后的执行报告已贴；判据 1 已于会话3 按裁定改写 |
+| #101 ② 合 PR #103 | **完成**：squash 合入 `main` = `079f58f`，分支已删，CI run `40700768939` = success |
+| #101 ① 消除跨瓣回退 | **未实施**（前提不成立）：5 次仪表连跑中后段回退 **0 次**，见下 |
+| #101 ③ 10 连跑 rate ≥ 0.15 | **未达成，判定不可由本单代码达成**：赛道左右镜面对称 → 切点选瓣是硬币（2/5 跑进左瓣，rate 0.106） |
+| #100 调研 | **完成**：带符号绕角可区分瓣（左瓣 0.80 / 右瓣 6.42 rad）；推荐 A = mission 级航线输入 + 每瓣 signed 计圈 |
 
 ## 已完成
 
-- **#96**：`scripts/skidpad_closed_loop_smoke.sh` 经 PR #97 合入 `main`（`7733cbb`），**保持未挂载**（`drive_gates.sh`/`ci.yml` grep 无命中）。改动仅 `scripts/`（422 行）。负样本臂 rc=1 且原因指向「无 pathlimits 产出」。CI run `40336692425` attempt 2 = success。→ Issue #96 已 `in-review` + 执行报告已贴。
-- **#69**：
-  - 新增 `scripts/lib/node_readiness.sh`（共用件）：**进程存活为主判据**（`ps -o stat=` 排僵尸态 —— `kill -0` 对僵尸仍返回成功）、`ros2 node list` 降为辅助确认、真失败立即判红并点名、环境性失败提示后由数据面定成败、节点视图查询可注入（`PROBE_NODE_LIST_CMD`）。
-  - `skidpad_finish_smoke.sh` / `skidpad_closed_loop_smoke.sh`：`start()` 登记「节点名 + PID」；就绪探测换两段式；数据面失败首行补「疑环境性失败（DDS 发现未收敛）」。
-  - 新增 `scripts/node_readiness_selftest.sh`（确定性构造三种情形），挂进 `lint_shell.sh` 的 `[3/4]` 段（**drive_gates 门清单不变**）。
-  - 验证：正样本 A/B 对照 —— `main`（无本改动）默认预算下同样红（index 346/349），本分支 `BUDGET_SEC=420` 绿（`finish_event_count: 1`）；负样本 `REQUIRED_LAPS=3` 仍 rc=1。
-- **#95**（Core 层，`src/planning/skidpad_planner/`）：
-  - **会话1 的成果（`bc6b0b5`）**：跨圆不再平均（同心→仍取平均；不同心→相位感知单选）；`Circle2D::rms_residual` + `max_fit_rms` 质量护栏；`OrderAlongCorridorCore` / `AppendMutualMidpointsCore` / `AnchorPathAtEgoCore` / `ExtendWithPrevPathCore`；`ComputeCenterlineCore` 排序语义逐位不变（#24 差分夹具的事实来源）。
-  - **会话2 的成果（`5da9fbf` + `f99951b`）——切点走廊太短的根因修复**：新增 `include/corridor_model_core.hpp`（纯 std）：
-    - `FitConcentricWallsCore`：给定瓣心，用半径直方图找**两条同心壁**；壁半径残差 RMS、弧角跨度、「瓣心在锥桶云外侧」、「两壁之间留空」四道判据把关；中线半径 = (r_in + r_out)/2。
-    - `FitCorridorModelCore`：瓣心候选按 (半径, 方位角) 网格多起点搜索 + 细化；评分 = 支持度 − 3×相位误差 − 1×连续性误差；「半径/半宽比 ≤ 10」排除直走廊伪弧。
-    - `GenerateCorridorArcCore`：弧的切向必须与自车航向同向（旧实现比较弧两端 x，弧顶处退化 → 方向选反 → x 回跳 11 次）；转向角上限 90°（判据 3：路径 x 不得回退）。
-    - `ComputeCorridorPathCore` 迁入本头（生产入口，瓣模型法 → 圆法 → 中点法）。
-  - 新增 `test/test_corridor_model.cpp`（12 例纯 std），按 #40 登记进 `tests/core_standalone/CMakeLists.txt`（+ `ament_add_gtest`）。
+- **#101 的 ②**：`gh pr merge 103 --squash --delete-branch` → `079f58f` @ `main`；合入前 PR CI `40498109179` = success，合入后 push run `40700768939` = success。→ Issue #101 已 `needs-info` + 执行报告已贴（comment 6471396547）。
+- **#100**：调研报告已贴（comment 6471424514），Issue 已 `in-review`。无代码改动。
+- **日报补记**：`.agent/DIARY/2026-10-27.md` 已按 git / Issue / STATE 证据反推补写（文首明确标注「本轮补记，非当日实时书写」）。
 
 ## 未完成 / 进行中（下一棒最优先看这里）
 
-- **今日队列内无未完成项**（#96 / #69 / #95 全部合入 main + 转 in-review + 贴报告）。
-- **会话3 新增（#92 收口，分支就绪但 PR 未开）**：
-  - 分支 `agent/issue-92-skidpad-closed-loop-mount`（已推远端）两个提交：
-    - `aaf8eb2` 脚本加「未停滞」断言（末速 ≥ 0.1 m/s，仅正样本臂）+ 节点注册表入 JSON + 头注释同步（**无条件有效**，Planner 选 A 时只合这个）；
-    - `9c6b014` 挂载本身（`drive_gates.sh` 新增 `skidpad-closed-loop` 门 + `ci.yml` 新增一步 + 报告 JSON 进 artifact）（**选 B/C 时才合**）。
-  - **为什么没直接开 PR**：实测正样本臂 **8 次只绿 3 次（37.5%）** → 挂上去主干约六成概率变红 → 已按 #92 正文的逃生阀「记录差距并转 needs-info」处置，并立 **#101**（P1）。
-- **#101（auto-discovered，P1，本轮新建）**：走廊模型偶发输出**退化短弧（9–14 点）** → 路径剩余点数 ≤ PP `end_decel_points=10` → PP 判「接近路径末端」刹车 → 车停滞。证据、机制与三个候选修法见 Issue 正文。**这是 #92 挂载的前置**。
-- **#92 状态建议回到 `needs-info`**（等 #101 把正样本跑稳：同机连跑 10 次全绿）。证据与三个选项已写进 #92 单内评论，等 Planner 二次裁定。
-- **CI 已复核**：`main` 的最终 HEAD（`0182b05`）push run `40427370565` = **success**；`2869018` 的 `40422709344` attempt 2 = success（attempt 1 卡死在「Prepare ROS 2 jazzy」→ cancel + rerun）；`ccad4d9` 的 `40420437594` = **success**，`cc616e4` 的 `40420320368` = **success**；三次 PR 级 CI（#97 / #98 / #99）全部 success。
-- **待 Planner 处置（非 Executor 可决）**：#92 的挂载二次裁定（选项 A/B/C，见 #92 评论）；#95 的关闭方式（判据 1 已按裁定改写，但需一并知悉 #101 的短弧缺陷）；#100 已定 P2 进下个队列（无待决）。
-- **#95 判据 1（已裁定）**：按 Planner 裁定改写为「路径非单圆，且落在某个真实瓣的中线上（误差 ≤ 0.3 m）」，已回写单内。
-- **#100（已定级 P2）**：切点处两瓣几何镜像对称 → 规划器靠连续性保持单瓣，不会自主换瓣。端到端脚本目标是 2π（单圈）已达成，但整条赛道（4π + 换瓣）跑不完 → 需赛道标记或产品决策 → 排在下一个队列。
+- **#101 等 Planner 裁定（needs-info）**，三选项（Executor 建议 A）：
+  - **A**：给规划器一条 mission 级航线输入（`initial_lobe` / `start_direction`），仿真侧从 `tracks.json` 的 `right_center` 推导后传入 → 改动=节点参数 + Core 一个显式选瓣分支 + 单测；
+  - **B**：门禁判据从 `abs(cum_angle) ≥ 2π` 改为 `signed ≥ 2π`（数据见 #100 报告：左瓣 0.80 vs 右瓣 6.42），属 Planner 权限；
+  - **C**：破对称（改 tracks.json / INIT_THETA / 标记锥）——本单明确排除。
+  - **裁定后继续 #101 的起手式**：在 `corridor_model_core.hpp` 的选瓣处加显式先验（A）或加「s 向单调、不得越过切点」的兜底硬约束；用 `test/test_corridor_model.cpp` 锁；再跑 10 连跑，逐跑记录 `cum_right_angle_rad / wall_s`。
+- **#92 挂载**：仍 blocked on #101；**不要**在 #101 裁定前挂载。
+- **无 WIP 分支、无未提交改动**：临时仪表 `[PROBE101]`（`icp_apf_planner.cpp` + `skidpad_planner_node.cpp`）已移除，`centerline_core.hpp` 的相位门限试验（0.5 / 0.3）已还原为 `1.0`；`git status` 干净。
 
 ## 验证情况
 
 | 验证 | 结果 |
 | --- | --- |
-| `colcon test --packages-select skidpad_planner` | **639 tests, 0 errors, 0 failures** |
-| `colcon test --packages-select track_benchmark` | **71 tests, 0 errors, 0 failures** |
-| `bash scripts/core_standalone_check.sh` | **35/35 PASS**（ASan+UBSan clean，含新增 `test_corridor_model`） |
-| `bash scripts/lint_cpp.sh` | rc=0 · `✔ cppcheck passed with 0 issues!`（注：本地 clang-format 是 21.1.8，CI 是 apt 旧版，**尾注释对齐会打架** → 新代码注释一律独占行） |
-| `bash scripts/lint_shell.sh` | rc=0 · 19 脚本 clean + 就绪探测自测全过 |
-| `bash scripts/node_readiness_selftest.sh` | 三情形断言全过（就绪 / 环境性不判红 / 真失败点名） |
-| `bash scripts/skidpad_closed_loop_smoke.sh build/skidpad_closed_95f` | **rc=0 PASS** · `cum_right_angle_rad 6.2864`、`max_lateral_dev_m 0.433`、`pathlimits_finite True`；PP 日志 `Approaching path end`/`refusing goal`/`Crosstrack` 计数**全 0** |
-| **会话3：`skidpad_closed_loop_smoke.sh` 正样本臂连跑 8 次（会话3 实测）** | **3 绿 / 5 红 = 通过率 37.5%**（绿：95c/95e/95f；红：95d + 连续 4 次复跑）。**这是 #92 挂载的阻断项**，详见 #92 与 #101 |
-| 会话3：`bash scripts/lint_shell.sh`（改后脚本） | rc=0 · 20 脚本 clean + 就绪探测自测全过 |
-| 会话3：绿/红跑的仿真速率对照 | `state_msgs/s` 均 ≈100、`path_msgs/s` 均 20.0，跑测时 load 0.42 → **排除机器负载** |
-| `ENABLE_PLANNER=0 skidpad_closed_loop_smoke.sh` | rc=1（负样本可证伪守住） |
-| `bash scripts/skidpad_finish_smoke.sh`（正样本，默认 180 s 预算） | rc=1 —— **既有环境问题**：A/B 对照 `main` 上同样红；`BUDGET_SEC=420` → rc=0 绿（真值中心线喂入，不依赖规划器） |
-| `bash scripts/skidpad_finish_smoke.sh`（负样本） | rc=1（按设计判红） |
-| PR #97（#96）CI | **success**（run `40336692425` attempt 2） |
-| PR #98（#69）CI | **success**（run `40355980015` attempt 3） |
-| PR #99（#95）CI | **success**（run `40368098627`；`40367022848` 因 clang-format 判红 → `f99951b` 修复，`40367937681` 被新 push 取消） |
+| `colcon build --packages-select skidpad_planner`（还原后的 main） | rc=0 |
+| `colcon test --packages-select skidpad_planner` + `test-result` | **72 tests, 0 errors, 0 failures** |
+| `skidpad_closed_loop_smoke.sh` 基线 5 连跑（`main`=079f58f，带仪表） | 3 右（27.5–28.6 s，rate 0.220–0.229）/ 2 左（59.2 s，**rate 0.106**）；`rc` 全 0；横偏 0.48–0.51 m |
+| 同上：首帧非 midpoint 时刻 | **t = 9.0–9.5 s**，自车 x ≈ −5.2~−5.8（切点在 x=0）；模型半径 10.6–11.4（真值 9.125），相位 0.88–0.97（门限 1.0） |
+| 同上：中后段回退（midpoint/circle） | **0 次 / 5 跑**（全部集中在 t<9.6 s 进近段） |
+| 对照实验：相位门限 1.0 / 0.5 / 0.3 | 3右2左 / 4/4 右（25.8–28.0 s）/ 3/4 右（第 4 次首帧伪模型 −y → 左瓣一圈后折返，**40.1 s / rate 0.157**） |
+| 赛道镜像对称 | 108 锥桶，每个都能在 **0.0001 m** 内找到 y 取反的镜像点 |
+| CI（`main` 079f58f） | run `40700768939` = **success** |
 
-**未跑**：`bash scripts/drive_gates.sh` 全量门禁（本轮改动的覆盖由两个 PR 的 CI 承担：build/test/core-standalone/lint + 各 runtime 门禁）。
+**未跑**：`bash scripts/drive_gates.sh` 全量（本轮无算法改动；代码变更仅来自已合并的 PR #103，其 CI + 合入后 main push run 均绿）。
 
 ## 风险与注意事项
 
-1. **【最高优先】#92 门禁正样本臂通过率仅 37.5%**（8 次跑 3 绿）——**不可直接挂进 `drive_gates.sh`/`ci.yml`**，否则主干约六成概率变红。根因与修法方向见 **#101**。
-2. **`Approaching path end` 是失败指纹**：`pp.log` 里该计数绿跑恒为 0、红跑恒为 1~2。排查在线闭环问题时先看这一行。
-3. **规划器短弧退化的代码位置**：`corridor_model_core.hpp:414 GenerateCorridorArcCore`（`max_arc_len = min(path_lookahead, radius × turn)`，`turn ≤ 90° − α0`）+ 模型选择里相位误差只作软惩罚（权重 3.0，压不过支持度）。
-4. **本机默认 180 s 预算下 `skidpad_finish_smoke.sh` 正样本红是既有环境问题**（非代码）：A/B 对照 `main` 上同样红；`BUDGET_SEC=420` 绿。
-5. **CI 的「Prepare ROS 2 jazzy」步骤会挂起**（无 step 级超时）：实测卡 22 分钟（正常 2.5 分钟）→ `gh run cancel` + `gh run rerun` 即绿（**#72 已立案**）。不要因此改代码或改 CI 配置。
-6. **clang-format 版本不一致**：本地 21.1.8 vs CI apt 旧版，**尾注释对齐**规则不同 → 新增/改动的 C++ 代码里注释一律**独占行**。
-7. **`ComputeCenterlineCore` 是差分基线**：任何改动它都会破坏 `test_icp_apf_planner.cpp` 的 `DifferentialEquivalenceWithLegacyPCL`（1000 组逐点比对）。要改排序语义，先更新 `docs/DEFECT_DIFFERENTIAL.md`（#24 级变更）。
-8. **不要用「壁弧角 ≥ 40°」当直走廊判据**：实测会让模型在真实位姿闪断 → 退回中点法产生跨瓣路径 → 端到端横偏 7.88 m。直走廊靠「半径/半宽比 ≤ 10」排除（伪弧 15.4 vs 真走廊 5.6~7.6）。
+1. **#101 的验收线 `rate ≥ 0.15` 余量极小**：右瓣本身实测 0.157–0.243（40.1 s 的那次只到 0.157）。即使选瓣问题解决，10 连跑也不能保证每次都 ≥0.15 → 建议 Planner 一并改判据口径（signed 计圈更硬）。
+2. **相位误差不是独立判据**（本轮新发现，值得写进 #101/#100 的后续设计）：`radius=(r_in+r_out)/2` 与「自车到圆心距离」同源 → 任何两排大致平行的锥桶都能拟出相位≈0 的伪弧（实测 r=14.07 / 相位 0.074）。要加固就换**壁的曲率一致性**判据，不是相位阈值。
+3. **进近直道会被拟合成 12 m 伪弧**：t≈9 s 时自车还在直道上（离切点 5 m 以上），模型却已给出 r=10.6–14 的弯曲路径 → 车提前 5 m 开始转向。这是「入口选瓣」之所以在**到达路口之前**就被决定的原因。
+4. **持久模型是双刃剑**：一旦选错瓣，`trusted_model` 会把车锁在该瓣整跑（左瓣 59.2 s）；`max_trusted_phase_error=1.5` 是唯一的解锁阀，实测在切点折返时才生效（见 exp3_4）。
+5. **左瓣跑的 rc 是 0**：现有门禁断言不会判红（59.2 s 内凑满 2π），`rate` 只是证据要求 → 挂 #92 时不会随机红，但墙钟贴近 60 s 预算上限。
+6. `ComputeCenterlineCore` 仍是差分基线，任何排序语义改动都会破坏 `test_icp_apf_planner.cpp` 的 `DifferentialEquivalenceWithLegacyPCL`（#24 级变更）。
 
 ## 给下一棒的第一步建议
 
-1. **先读 #92 的最新评论**（挂载二次裁定的三个选项 A/B/C）与 **#101**（短弧退化，阻塞挂载）。
-2. **分支 `agent/issue-92-skidpad-closed-loop-mount` 已推送、未开 PR**：
-   - 选 A（先修 #101）→ 只合 `aaf8eb2`（脚本断言 + 节点注册表），`9c6b014` 挂载暂不合；
-   - 选 B/C → 两提交一起走 PR，跑 `SKIP_BUILD=1 bash scripts/drive_gates.sh` + PR CI 全绿后合入。
-3. **领 #101 时的起手式**：先在 `corridor_model_core.hpp` 侧加**相位误差硬否决**与**前视长度下限**（两者都是纯 std、可用 `test_corridor_model.cpp` 锁），再跑 10 次连跑验收（硬指标：同机 10/10 绿 + `Approaching path end` 计数恒 0）。
-4. **不要再动 #95 的算法**（已全绿并合入 main）；#95 只等 Planner 的关闭裁定（判据 1 已改写回写）。
-5. **#100 排在下一个队列**：先做「赛道标记可行性调研 + 方案清单」，别急着写代码（需要产品决策）。
+1. 先读 **#101 的最新执行报告**（comment 6471396547）与 **#100 的调研报告**（comment 6471424514）——两份合起来把「选瓣歧义 → 计圈判据」讲完了。
+2. 若 Planner 选 **A**：直接在 `icp_apf_planner.cpp::GeneratePath` → `ComputeCorridorPathCore` 的模型选择处接一个显式首瓣先验（`CenterlineParams` 加字段，默认「无先验」保持现行为），用 `test_corridor_model.cpp` 加 2 例（先验=+y 时选 +y 候选；先验与几何冲突时按先验），然后 10 连跑。
+3. 若 Planner 选 **B**：改的是 `scripts/skidpad_closed_loop_smoke.sh` 的判据（`abs` → `signed`），属判据变更，需在 PR 里逐条对照 `docs/INTERFACE_CONTRACT.md` 无关、但要在 #92 单内留口径说明。
+4. **别再调 `max_model_phase_error`**——三档对照已证无效（见上表）。
 
 ## 今日日报
 
-- 已写入 `.agent/DIARY/2026-10-26.md`（会话1 + 会话2 追加）。
+- 已写入 `.agent/DIARY/2026-10-28.md`；补记 `.agent/DIARY/2026-10-27.md`（标注为反推补记）。
 
 ## 给 Planner 的信号
 
-- **四项裁定已逐项执行**：②「末速」按笔误=断言未停滞（已落 `aaf8eb2`）、③#95 判据 1 改写（已回写单内）、④#100 定 P2 + 进下个队列（标签已加 + 单内范围说明）。
-- **① 挂载被实测阻断**：正样本臂 **8 次只绿 3 次（37.5%）** → 挂上去主干约六成概率变红。已按 #92 正文的逃生阀「记录差距并转 needs-info」处置，并立 **#101**（P1）承接根因（走廊模型偶发输出退化短弧 → PP `end_decel_points=10` 末端刹车 → 停滞）。三个选项写在 #92 评论里，**建议 A：先修 #101 再挂载**。
-- **#69、#96 无需介入**：判据逐条 `[x]`、CI 绿、已合入 main，可验收关闭。
-- **#95**：判据 1 已按裁定改写；其余 8 条判据均达成且有实测证据。**但请一并知悉 #101 的短弧缺陷再关闭**（关闭方式三选项见 #95 评论，Executor 建议 A）。
-- **本轮新建 auto-discovered 2 条**（配额 1–3/轮，已用 2）：#100（P2，切点换瓣，需产品决策）、#101（P1，短弧退化，可由代码修）。
+- **需要 Planner 介入**：① #101 选瓣输入来源（A/B/C）；② `rate ≥ 0.15` 这条证据线的口径（建议改 signed 计圈）；③ #92 挂载继续等 #101。
+- #100 调研已完成，验收后可直接转成「加航线输入 + signed 计圈」的实现单。
+- 本轮**没有 auto-discovered 新单**（配额未用：发现的相位判据缺陷写在 #101 报告与 HANDOFF 风险 2；如需立案请示下）。
