@@ -43,6 +43,12 @@ class SkidpadPlannerNode {
     std::vector<Point2D> prev_path_global_;  // 全局坐标，避免车移动后坐标失效
     bool has_prev_path_;
 
+    // #101：持久走廊模型（**全局坐标**）：瓣圆心 + 中线半径。
+    // 存全局坐标的原因同 prev_path_global_——车在动，base_link 坐标每帧都变，
+    // 跨帧保留模型必须用全局坐标，否则模型会跟着车一起「漂」。
+    CorridorModel trusted_model_global_;
+    bool has_trusted_model_;
+
     int road_type_;
     std::string input_topic_;
     std::string output_topic_;

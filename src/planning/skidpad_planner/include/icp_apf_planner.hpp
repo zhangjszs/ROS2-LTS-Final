@@ -26,8 +26,17 @@ class IcpApfPlanner {
     // 根据当前锥桶生成路径
     // 如果 prev_path 非空，则使用 ICP 将当前中心线对齐到 prev_path
     // icp_rmse_limit: ICP rmse 超过此值时拒绝对齐，回退到原始中心线
+    //
+    // #101：走廊模型的**持久状态**（走廊不会突然改变，模型应当跨帧保持）：
+    //   - trusted_model（入参）：上一帧已验证的走廊模型（base_link 坐标）。
+    //     本帧壁证据变差时用它从当前位姿重新生成弧；
+    //   - fresh_trusted_model（出参）：本帧**新得到**的可信走廊模型
+    //     （base_link 坐标）；本帧没拿到新模型时保持调用方给的值不变
+    //     （调用方据此判断「继续沿用自己持有的那一个」）。
     std::vector<Point2D> GeneratePath(const std::vector<common_msgs::msg::HuatCone>& cones,
-                                      const std::vector<Point2D>& prev_path, double icp_rmse_limit = 0.5);
+                                      const std::vector<Point2D>& prev_path, double icp_rmse_limit = 0.5,
+                                      const CorridorModel* trusted_model = nullptr,
+                                      CorridorModel* fresh_trusted_model = nullptr);
 
     void ClusterCones(const std::vector<common_msgs::msg::HuatCone>& cones,
                       std::vector<common_msgs::msg::HuatCone>& left, std::vector<common_msgs::msg::HuatCone>& right);
@@ -56,7 +65,8 @@ class IcpApfPlanner {
     // 自车在 base_link 系的原点。
     CorridorPathResult ComputeCorridorPath(const std::vector<common_msgs::msg::HuatCone>& left,
                                            const std::vector<common_msgs::msg::HuatCone>& right,
-                                           const std::vector<Point2D>& prev_path);
+                                           const std::vector<Point2D>& prev_path,
+                                           const CorridorModel* trusted_model = nullptr);
 
     double center_margin_;
     int icp_max_iter_;

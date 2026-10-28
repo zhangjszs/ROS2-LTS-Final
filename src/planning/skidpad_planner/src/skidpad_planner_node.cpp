@@ -10,6 +10,7 @@ namespace skidpad {
 SkidpadPlannerNode::SkidpadPlannerNode(rclcpp::Node::SharedPtr node)
     : node_(node),
       has_prev_path_(false),
+      has_trusted_model_(false),
       empty_count_(0),
       car_x_(0.0),
       car_y_(0.0),
@@ -242,7 +243,23 @@ void SkidpadPlannerNode::OnConeMapMessage(const common_msgs::msg::HuatMap::Const
         }
     }
 
-    std::vector<Point2D> path = planner_->GeneratePath(cones, prev_path_bl, icp_rmse_limit_);
+    // #101：把持久走廊模型从**全局坐标**换算到当前 baseLink。
+    // 模型存全局坐标（理由同 prev_path_global_）：车在动，base_link 每帧都变，
+    // 跨帧保留的模型必须用全局坐标，否则模型会跟着车一起漂。
+    CorridorModel trusted_model_bl;
+    const CorridorModel* trusted_model_ptr = nullptr;
+    if (has_trusted_model_) {
+        const std::vector<Point2D> center_bl = GlobalPathToBaseLink({trusted_model_global_.center});
+        if (!center_bl.empty()) {
+            trusted_model_bl = trusted_model_global_;
+            trusted_model_bl.center = center_bl.front();
+            trusted_model_ptr = &trusted_model_bl;
+        }
+    }
+
+    CorridorModel fresh_trusted_model;
+    std::vector<Point2D> path =
+        planner_->GeneratePath(cones, prev_path_bl, icp_rmse_limit_, trusted_model_ptr, &fresh_trusted_model);
     if (path.empty()) {
         RCLCPP_WARN_THROTTLE(node_->get_logger(), *node_->get_clock(), 1000,
                              "[skidpad_planner] Failed to generate path");
@@ -252,6 +269,16 @@ void SkidpadPlannerNode::OnConeMapMessage(const common_msgs::msg::HuatMap::Const
             PublishEmptyPathLimits();
         }
         return;
+    }
+
+    // #101：本帧拿到新的可信走廊模型 → 更新持久状态（转回全局坐标保存）。
+    if (fresh_trusted_model.valid) {
+        const std::vector<Point2D> center_global = BaseLinkPathToGlobal({fresh_trusted_model.center});
+        if (!center_global.empty()) {
+            trusted_model_global_ = fresh_trusted_model;
+            trusted_model_global_.center = center_global.front();
+            has_trusted_model_ = true;
+        }
     }
 
     common_msgs::msg::HuatPathLimits path_limits;

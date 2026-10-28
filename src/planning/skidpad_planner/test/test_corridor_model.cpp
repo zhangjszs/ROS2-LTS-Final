@@ -323,4 +323,218 @@ TEST(SkidpadCorridorModel, ProductionEntryIsMonotoneAndUniformlySpaced) {
     }
 }
 
+// ── #101：走廊模型的**质量门槛**与「沿用上一帧路径」回退 ──────────────────────
+//
+// 背景（Issue #101，实测）：切点处左右两瓣的锥桶同时可见 → 壁证据被稀释 →
+// 模型退化（半径在 3~16 m 之间乱跳、相位误差 1.4~2.7 m、支持度只剩 4~10）→
+// 路径缩到 9~15 点 → Pure Pursuit 判「接近路径末端」刹车 → 车停滞并漂出中线。
+// 在线闭环门禁正样本臂通过率仅 37.5%。
+//
+// 三道守卫（全部可证伪）：
+//   1) 支持度下限：两壁上的锥桶数太少 → 该候选不可信（只能靠噪声拟合）；
+//   2) 相位误差上限：自车必须在这条走廊的中线上（文档里早有此约定，实现里
+//      却只当软惩罚）；
+//   3) 连续性误差上限：走廊不会突然改变——候选中线圆与上一帧路径差太远
+//      （实测切点误换瓣时相差 4~5 m）→ 不可信。
+// 不可信时的动作：沿用**上一帧已验证路径**，而不是退到切点处会跨瓣配对的
+// 中点法（那正是 #95 的原始根因）。
+
+// 把某瓣的两壁拆成节点层口径的「车左 / 车右」两组。
+void SplitWalls(const std::vector<Point2D>& walls, std::vector<Point2D>& left, std::vector<Point2D>& right) {
+    for (const auto& p : walls) {
+        if (p.y < -0.3) {
+            left.push_back(p);
+        } else if (p.y > 0.3) {
+            right.push_back(p);
+        }
+    }
+}
+
+TEST(SkidpadCorridorModel, WellSupportedCorridorIsTrusted) {
+    // 16 个锥桶（每壁 8 个）→ 支持度达标 → 模型可信。
+    const std::vector<Point2D> walls = LobeWalls(kRightLobeY, -75.0, 90.0, 8);
+    const CorridorModel model = FitCorridorModelCore(walls, Point2D{0.0, 0.0}, kParams, {});
+    ASSERT_TRUE(model.valid) << "两壁各 8 个锥桶应拟合出走廊模型";
+    EXPECT_TRUE(model.quality_ok) << "支持度 16 ≥ " << kParams.min_model_support << "，模型应可信";
+    EXPECT_GE(model.support, kParams.min_model_support);
+    EXPECT_LE(model.phase_error, kParams.max_model_phase_error);
+}
+
+TEST(SkidpadCorridorModel, SparseCorridorIsNotTrusted) {
+    // 只剩 8 个锥桶（每壁 4 个）→ 支持度 8 < 12 → 不可信。
+    // 证伪点：把 min_model_support 改回 0（或把评分里的支持度权重去掉），
+    // 本用例会失败——那时只有 4 个锥桶的壁也能被当成真走廊。
+    const std::vector<Point2D> walls = LobeWalls(kRightLobeY, -75.0, 90.0, 4);
+    const CorridorModel model = FitCorridorModelCore(walls, Point2D{0.0, 0.0}, kParams, {});
+    if (model.valid) {
+        EXPECT_FALSE(model.quality_ok) << "支持度仅 " << model.support << " 的候选不得被信任";
+    }
+}
+
+TEST(SkidpadCorridorModel, EgoOffTheMidlineMakesTheCorridorUntrusted) {
+    // 自车离开中线 2 m（‖ego − C‖ = 7.0，中线半径 9.125 → 相位误差 2.125 m）。
+    // 该值小于旧的 phase_tol(3.0) 但大于新的硬门槛 → 必须被否决。
+    const std::vector<Point2D> walls = LobeWalls(kRightLobeY, -75.0, 90.0, 8);
+    const Point2D off_midline{0.0, 2.125};
+    const CorridorModel model = FitCorridorModelCore(walls, off_midline, kParams, {});
+    if (model.valid) {
+        EXPECT_GT(model.phase_error, kParams.max_model_phase_error);
+        EXPECT_FALSE(model.quality_ok) << "自车已偏离中线 " << model.phase_error << " m，模型不得被信任";
+    }
+}
+
+TEST(SkidpadCorridorModel, CorridorThatJumpsAwayFromPrevPathIsNotTrusted) {
+    // 走廊不会突然改变：候选中线圆与上一帧路径差 4 m 以上 → 不可信
+    // （切点处误换瓣实测就是这样：上一帧在右瓣，候选却在左瓣/小半径伪圆）。
+    const std::vector<Point2D> walls = LobeWalls(kRightLobeY, -75.0, 90.0, 8);
+    // 上一帧路径：贴着左瓣中线（与右瓣相距 18.25 m）。
+    const std::vector<Point2D> prev = LobeWalls(kLeftLobeY, -75.0, 90.0, 8);
+    const CorridorModel model = FitCorridorModelCore(walls, Point2D{0.0, 0.0}, kParams, prev);
+    if (model.valid) {
+        EXPECT_GT(model.continuity_error, kParams.max_model_continuity_error);
+        EXPECT_FALSE(model.quality_ok) << "与上一帧路径差 " << model.continuity_error << " m 的候选不得被信任";
+    }
+}
+
+TEST(SkidpadCorridorModel, UntrustedCorridorFallsBackToPrevPath) {
+    // 锥桶稀疏（不可信）+ 上一帧路径充足 → 生产入口必须沿用上一帧路径，
+    // 而不是退到中点法（切点处会跨瓣配对）。
+    const std::vector<Point2D> walls = LobeWalls(kRightLobeY, -75.0, 90.0, 4);
+    std::vector<Point2D> left;
+    std::vector<Point2D> right;
+    SplitWalls(walls, left, right);
+
+    // 上一帧路径：沿右瓣中线的一串点（点数 ≥ min_publish_points）。
+    std::vector<Point2D> prev;
+    for (int i = 0; i < 30; ++i) {
+        const double a = (-90.0 + (3.0 * static_cast<double>(i))) * std::numbers::pi_v<double> / 180.0;
+        prev.emplace_back(kLobeMidR * std::cos(a), kRightLobeY + (kLobeMidR * std::sin(a)));
+    }
+
+    const auto corridor = ComputeCorridorPathCore(left, right, kParams, Point2D{0.0, 0.0}, prev);
+    ASSERT_FALSE(corridor.path.empty());
+    if (!corridor.model.quality_ok) {
+        EXPECT_TRUE(corridor.used_prev_path) << "模型不可信时必须沿用上一帧路径";
+        EXPECT_GE(static_cast<int>(corridor.path.size()), kParams.min_publish_points);
+        EXPECT_EQ(corridor.path.size(), prev.size());
+    }
+}
+
+TEST(SkidpadCorridorModel, PublishedPathAlwaysHasEnoughPointsForPurePursuit) {
+    // Pure Pursuit 的 end_decel_points = 10 → 发布的路径必须 ≥ min_publish_points，
+    // 否则会触发「Approaching path end」刹车（#101 的直接症状）。
+    const std::vector<Point2D> walls = LobeWalls(kRightLobeY, -75.0, 90.0, 8);
+    std::vector<Point2D> left;
+    std::vector<Point2D> right;
+    SplitWalls(walls, left, right);
+    const auto corridor = ComputeCorridorPathCore(left, right, kParams, Point2D{0.0, 0.0});
+    ASSERT_FALSE(corridor.path.empty());
+    EXPECT_GE(static_cast<int>(corridor.path.size()), kParams.min_publish_points);
+}
+
+// ── #101：持久走廊模型（上一帧已验证的走廊模型跨帧保持）──────────────────────
+//
+// 背景（实测）：本帧壁证据变差时模型半径会塌到 3~5 m（真值 9.125）→ 弧只剩
+// 9~15 点 → Pure Pursuit 判「接近路径末端」直接刹车 → 车停滞并漂出中线。
+// 两条旧退路各有硬伤：沿用上一帧**路径**会被车走完（3 s 后同样刹车）；退到
+// 圆法 / 中点法会在切点跨瓣配对（#95 原始根因）。
+// 正解：把走廊变成**持久状态**——保留上一帧可信模型，从当前位姿重新生成弧。
+
+// 构造一个「可信」的右瓣模型（自车在中线上）。
+CorridorModel RightLobeTrustedModel() {
+    CorridorModel m;
+    m.valid = true;
+    m.center = Point2D{0.0, kRightLobeY};
+    m.radius = kLobeMidR;
+    m.half_width = (kLobeOuterR - kLobeInnerR) * 0.5;
+    m.support = 24;
+    m.quality_ok = true;
+    return m;
+}
+
+TEST(SkidpadCorridorModel, TrustedModelKeepsLongPathWhenFreshModelCollapses) {
+    // 锥桶稀疏（本帧模型必然不可信：支持度上限 8 < min_model_support=12）
+    // + 上一帧的可信模型 → 必须用持久模型重新生成一条**够长**的路径。
+    const std::vector<Point2D> walls = LobeWalls(kRightLobeY, -75.0, 90.0, 4);
+    std::vector<Point2D> left;
+    std::vector<Point2D> right;
+    SplitWalls(walls, left, right);
+
+    const CorridorModel trusted = RightLobeTrustedModel();
+    const auto corridor = ComputeCorridorPathCore(left, right, kParams, Point2D{0.0, 0.0}, {}, &trusted);
+    ASSERT_FALSE(corridor.path.empty());
+    EXPECT_TRUE(corridor.used_trusted_model) << "本帧模型不可信时必须用上一帧的可信模型";
+    EXPECT_GE(static_cast<int>(corridor.path.size()), kParams.min_publish_points);
+    // 路径必须落在可信走廊的中线上（逐点检查半径）。
+    for (const auto& p : corridor.path) {
+        EXPECT_NEAR(std::hypot(p.x, p.y - kRightLobeY), kLobeMidR, 0.3);
+    }
+}
+
+TEST(SkidpadCorridorModel, TrustedModelIsRejectedWhenEgoLeftTheCorridor) {
+    // 自车已经离开走廊中线 2.1 m（> max_trusted_phase_error=1.5）→
+    // 持久模型必须作废（否则会把车拽回旧走廊 / 掩盖真实偏离）。
+    const std::vector<Point2D> walls = LobeWalls(kRightLobeY, -75.0, 90.0, 4);
+    std::vector<Point2D> left;
+    std::vector<Point2D> right;
+    SplitWalls(walls, left, right);
+
+    const CorridorModel trusted = RightLobeTrustedModel();
+    const auto corridor = ComputeCorridorPathCore(left, right, kParams, Point2D{0.0, 2.125}, {}, &trusted);
+    EXPECT_FALSE(corridor.used_trusted_model) << "自车已离开走廊中线，持久模型不得继续使用";
+}
+
+TEST(SkidpadCorridorModel, TrustedModelPathIsRegeneratedNotConsumed) {
+    // 「沿用上一帧路径」会被车走完（3 s 后触发末端刹车）；持久模型必须
+    // **每帧从当前位姿重新生成** → 车前进后路径前视仍然够长（不被消耗）。
+    const std::vector<Point2D> walls = LobeWalls(kRightLobeY, -75.0, 90.0, 4);
+    std::vector<Point2D> left;
+    std::vector<Point2D> right;
+    SplitWalls(walls, left, right);
+
+    // 自车在右瓣中线上前进 20°（= 3.19 m）。注意：Core 里自车恒在 base_link
+    // 原点，模型圆心随自车平移——这正是节点层「全局坐标 ↔ base_link」换算的
+    // 等价形式。
+    const double adv = 20.0 * std::numbers::pi_v<double> / 180.0;
+    const Point2D ego_adv{(kLobeMidR * std::cos(adv - (std::numbers::pi_v<double> / 2.0))),
+                          kRightLobeY + (kLobeMidR * std::sin(adv - (std::numbers::pi_v<double> / 2.0)))};
+
+    const CorridorModel trusted = RightLobeTrustedModel();
+    const auto first = ComputeCorridorPathCore(left, right, kParams, Point2D{0.0, 0.0}, {}, &trusted);
+    ASSERT_TRUE(first.used_trusted_model);
+    ASSERT_FALSE(first.path.empty());
+
+    CorridorModel trusted_adv = trusted;
+    trusted_adv.center = Point2D{trusted.center.x - ego_adv.x, trusted.center.y - ego_adv.y};
+    const auto second = ComputeCorridorPathCore(left, right, kParams, Point2D{0.0, 0.0}, {}, &trusted_adv);
+    ASSERT_TRUE(second.used_trusted_model);
+    ASSERT_FALSE(second.path.empty());
+
+    // 路径前视不得随车前进而缩水（被消耗的路径会一路缩到 0）。
+    const auto reach = [](const std::vector<Point2D>& path) {
+        return std::hypot(path.back().x - path.front().x, path.back().y - path.front().y);
+    };
+    EXPECT_GT(reach(second.path), 9.0) << "持久模型的路径前视被消耗了";
+    EXPECT_GT(reach(second.path), 0.8 * reach(first.path));
+    EXPECT_GE(static_cast<int>(second.path.size()), kParams.min_publish_points);
+    EXPECT_NEAR(second.path.front().x, 0.0, 0.05);
+    EXPECT_NEAR(second.path.front().y, 0.0, 0.05);
+}
+
+TEST(SkidpadCorridorModel, TrustedModelPathReachesPurePursuitLookahead) {
+    // 持久模型生成的路径必须够远（≥ 10 m），否则 Pure Pursuit 仍会因前视不足减速。
+    const std::vector<Point2D> walls = LobeWalls(kRightLobeY, -75.0, 90.0, 4);
+    std::vector<Point2D> left;
+    std::vector<Point2D> right;
+    SplitWalls(walls, left, right);
+
+    const CorridorModel trusted = RightLobeTrustedModel();
+    const auto corridor = ComputeCorridorPathCore(left, right, kParams, Point2D{0.0, 0.0}, {}, &trusted);
+    ASSERT_TRUE(corridor.used_trusted_model);
+    ASSERT_FALSE(corridor.path.empty());
+    const double reach =
+        std::hypot(corridor.path.back().x - corridor.path.front().x, corridor.path.back().y - corridor.path.front().y);
+    EXPECT_GT(reach, 10.0) << "持久模型的路径前视不足（" << reach << " m）";
+}
+
 }  // namespace
