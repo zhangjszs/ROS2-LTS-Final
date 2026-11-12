@@ -1,21 +1,18 @@
 # STATE
 
-- 更新时间：2026-10-28T22:18:00+08:00（exec-20261028 · #101 收口 + #100 调研）
-- 当前任务：**今日队列已清空**——#101 → `needs-info`（选瓣输入来源待裁定）、#100 → `in-review`（调研已交）
-- 分支：`main` = `079f58f`（= `origin/main`，PR #103 已 squash 合入）；无临时分支（`agent/issue-101-corridor-short-arc-guard` 已删）
-- 未完成工作：
-  - **#101 剩余项待 Planner 裁定**：入口选瓣歧义（赛道左右镜面对称，无几何依据）。三选项 A（mission 级航线输入，建议）/ B（门禁改 signed 计圈）/ C（破对称），见 Issue #101 评论。
-  - **#92 挂载**：仍 blocked on #101（重入条件 ①②③ 未变）。
-  - **无 WIP 代码**：临时仪表（`[PROBE101]`）与相位门限试验已全部移除，工作树与 `079f58f` 一致。
+- 更新时间：2026-11-13T01:20:00+08:00（exec-20261113 · 恢复 #101 收尾补交执行报告 + 同步 `eee6b39`）
+- 当前任务：**今日队列已清空**——#101 → `in-review`（PR #104 已合入 `main` = `eee6b39`，执行报告已贴 Issue）、#100 → `in-review`（第一阶段调研已交）
+- 分支：`main` = `eee6b39`（= `origin/main`）；已合并临时分支 `agent/issue-101-initial-lobe-prior` 已删除（本地与远端）；保留 `agent/issue-92-skidpad-closed-loop-smoke`（#92 未收口）与用户研究分支 `origin/research/ros1-pointcloud-shift`（Draft PR #105，不动）
+- 未完成工作：无（队列 `ready-for-agent` = 0、`in-progress` = 0；#92 挂载前置已满足，待 Planner 验收关闭 #101 并把 #92 转 `ready-for-agent`）
 - 最近提交（`main`）：
+  - `eee6b39` fix(skidpad): #101 首瓣先验 + 门禁改带符号绕角判据（Planner 裁定 A） (#104)
+  - `c1ac495` chore(agent): exec-20261028——#101 转 needs-info（选瓣歧义）、#100 调研交 in-review、补记 10-27 日报
   - `079f58f` fix(skidpad): #101 走廊模型退化的持久化修复——可信模型跨帧保持，路径不再塌缩 (#103)
-  - `4973311` chore(agent): plan-20261028 验收 #96/#69 关闭、#101 部分通过
-  - `a02f541` fix(gates): #92 在线闭环门禁加「未停滞」断言 + 节点注册表入 JSON（保持未挂载）
-- 今日日报：已写 `.agent/DIARY/2026-10-28.md`；**补记** `.agent/DIARY/2026-10-27.md`（10-27 两会话按 git/Issue 证据反推，已在文首标注）
+- 今日日报：已写 `.agent/DIARY/2026-11-13.md`（含对 10-28 第二会话与 11-12 合入动作的现场恢复记录）
 - CI 事实：
-  - `main` 的 `079f58f` push run `40700768939` = **success**（合入 #103 之后）。
-  - `4973311`（plan-20261028）= success（`40685236140`）；`a02f541` Nightly `40589165213` = success。
-  - PR #103 CI run `40498109179` = **success**（合入前）。
+  - `main` 的 `eee6b39` push run `43143150151` = **success**（合入 #104 之后）。
+  - PR #104 CI run `40726189514` = **success**。
+  - Nightly 截至 `2026-11-11T23:57Z`（run `43123706038`）连续 **success**。
 - 已知环境限制：
   1. **多节点 runtime 门禁必须 `export FASTDDS_BUILTIN_TRANSPORTS=SHM`**（漏设 → DDS 发现不收敛假 FAIL）。
   2. **单包构建跑测试必须显式 `-DBUILD_TESTING=ON`**。
