@@ -50,6 +50,17 @@
 #     2) 本脚本正样本臂在**同一台机器上连续 10 次全绿**（#101 的验收硬指标）；
 #     3) 挂载 PR 显式说明挂载动作，且不改动本脚本任何判据阈值。
 #
+#   推进判据（#101 Planner 2026-10-28 裁定，替代「rate ≥ 0.15 rad/s」）：
+#     **带符号绕角 signed ≥ 2π**（观测点 = tracks.json 的右圆心）。理由（实测）：
+#     绕左瓣一圈的**绝对**绕角同样是 2π（旧口径会被「绕错瓣」满足），而**带符号**
+#     绕角只有 0.80 rad —— 这个差异把「跑错瓣」直接判红，且不依赖墙钟/预算。
+#     JSON 里的 `cum_right_angle_rad`（绝对口径）保留仅供对照，不再作判据。
+#
+#   首瓣先验（#101 裁定 A）：入口处两瓣锥桶镜面对称，规划器只吃锥桶无法判定先绕
+#   哪一瓣（实测 5 连跑 3 右 2 左）→ 本脚本从 tracks.json 的 `right_center` 与
+#   起始位姿推导「右圆在起始方向的哪一侧」，经 `-p initial_lobe:=left|right|none`
+#   交给规划器。`LOBEPRIOR=none` 可关掉先验（对照实验用）。
+#
 #   「末速」口径（#92 收口时 Planner 裁定）：Issue 正文原写的「末速 < 0.1 m/s」
 #   与本单「完赛/停 非目标」自相矛盾（首轮失败报告里的「末速 0.0」恰恰是**停滞**
 #   症状），裁定按「笔误，实为断言**未停滞**」处理 → 脚本断言改为 **末速 ≥ 0.1 m/s**
@@ -123,7 +134,23 @@ PY
     exit 1
 fi
 read -r RCX RCY LCX LCY RADIUS LAPS EXIT_X <<<"$META_OUT"
-echo "=== skidpad 在线闭环冒烟：右圆($RCX,$RCY) 左圆($LCX,$LCY) r=$RADIUS ENABLE_PLANNER=$ENABLE_PLANNER ==="
+
+# ── 首瓣先验（#101 裁定 A）：起始位姿 + 右圆心 → 「右圆在起始方向的哪一侧」──────
+# auto = 按 tracks.json 推导；也可显式传 left/right/none（对照实验用）。
+LOBEPRIOR="${LOBEPRIOR:-auto}"
+if [ "$LOBEPRIOR" = "auto" ]; then
+    LOBEPRIOR="$(python3 - "$RCX" "$RCY" "$INIT_X" "$INIT_Y" "$INIT_THETA" <<'PYEOF'
+import math
+import sys
+
+rcx, rcy, x0, y0, t0 = (float(v) for v in sys.argv[1:6])
+cross = (math.cos(t0) * (rcy - y0)) - (math.sin(t0) * (rcx - x0))
+print("left" if cross > 0.0 else ("right" if cross < 0.0 else "none"))
+PYEOF
+)"
+fi
+echo "首瓣先验 initial_lobe=$LOBEPRIOR（起始位姿 $INIT_X,$INIT_Y,$INIT_THETA；右圆心 $RCX,$RCY）"
+echo "=== skidpad 在线闭环冒烟：右圆($RCX,$RCY) 左圆($LCX,$LCY) r=$RADIUS ENABLE_PLANNER=$ENABLE_PLANNER initial_lobe=$LOBEPRIOR ==="
 
 PIDS=()
 NODE_PIDS=()
@@ -177,7 +204,7 @@ start command_arbiter_node "$OUT_DIR/arbiter.log" ros2 run safety_monitor comman
 EXPECT_NODES="vehicle_simulator safety_monitor velocity_profiler pure_pursuit command_arbiter_node"
 if [ "$ENABLE_PLANNER" = "1" ]; then
     start skidpad_planner "$OUT_DIR/planner.log" ros2 run skidpad_planner skidpad_planner --ros-args \
-        -p use_sim_time:=true -p road_type:=1 \
+        -p use_sim_time:=true -p road_type:=1 -p initial_lobe:="$LOBEPRIOR" \
         -p input_cone_map_topic:=/sensors/cones/fused \
         -p output_pathlimits_topic:=/planning/raw_pathlimits \
         -p vehicle_state_topic:=/localization/vehicle_state
@@ -277,6 +304,8 @@ class DataPlaneWatch(Node):
 
         self.prev_angle = None
         self.cum_right_angle = 0.0
+        # #101 裁定：推进判据用**带符号**绕角（左瓣一圈只累积 ~0.80，右瓣 ~6.42）。
+        self.cum_right_angle_signed = 0.0
         self.finished_observed = False
         self.final_sys_state = None
 
@@ -327,6 +356,8 @@ class DataPlaneWatch(Node):
                 diff += 2 * math.pi
             # 车沿右圆逆时针或顺时针推进时角度单调变化，累积实际绕行绝对弧度
             self.cum_right_angle += abs(diff)
+            # 带符号累积：绕**别的**圆（左瓣）时净角≈0 → 「跑错瓣」可判。
+            self.cum_right_angle_signed += diff
         self.prev_angle = cur_ang
 
         # 横向走廊距离
@@ -359,8 +390,8 @@ watch = DataPlaneWatch()
 t0 = time.time()
 while time.time() - t0 < budget:
     rclpy.spin_once(watch, timeout_sec=0.1)
-    # 若绕角已达成目标（≥2π），可提前结束正样本
-    if expect_planner and watch.cum_right_angle >= target_angle:
+    # 若**带符号**绕角已达成目标（≥2π），可提前结束正样本
+    if expect_planner and watch.cum_right_angle_signed >= target_angle:
         break
     # 负样本若已超时 5s 且无 path，可提前判定
     if not expect_planner and (time.time() - t0 > 5.0) and watch.raw_path_n == 0:
@@ -385,6 +416,8 @@ snap = {
     "v_max": round(watch.v_max, 3),
     "v_final": round(watch.v_last, 3),
     "cum_right_angle_rad": round(watch.cum_right_angle, 4),
+    "cum_right_angle_signed_rad": round(watch.cum_right_angle_signed, 4),
+    "rate_signed_rad_per_s": round(watch.cum_right_angle_signed / wall_used, 4) if wall_used > 0 else 0.0,
     "target_angle_rad": round(target_angle, 4),
     "max_lateral_dev_m": round(watch.max_dev, 3),
     "max_lateral_dev_at": watch.max_dev_at,
@@ -427,10 +460,12 @@ if expect_planner:
     if watch.cmd_bad_frame or watch.cmd_bad_sum:
         fails.append(f"出口指令帧违反 #15 帧契约（坏帧 {watch.cmd_bad_frame} / 坏校验和 {watch.cmd_bad_sum}）")
 
-    # 3. 推进能力：右圆绕角 ≥ 2π
-    if watch.cum_right_angle < target_angle:
-        fails.append(f"车辆推进不足：右圆绕角 {watch.cum_right_angle:.3f} rad < 目标 {target_angle:.3f} rad (2π)"
-                     f"（末位姿 {snap['final_pos']}，末速 {watch.v_last:.3f} m/s）")
+    # 3. 推进能力：**带符号**绕右圆心 ≥ 2π
+    #    #101 Planner 2026-10-28 裁定：改用带符号口径（左瓣一圈的绝对绕角同样是
+    #    2π，旧口径会被「跑错瓣」满足；带符号只有 0.80 rad → 直接判红）。
+    if watch.cum_right_angle_signed < target_angle:
+        fails.append(f"车辆推进不足：带符号绕角 {watch.cum_right_angle_signed:.3f} rad < 目标 {target_angle:.3f} rad (2π)"
+                     f"（绝对口径 {watch.cum_right_angle:.3f}；末位姿 {snap['final_pos']}，末速 {watch.v_last:.3f} m/s）")
 
     # 4. 横向走廊 ≤ 1.0m
     if watch.max_dev > lateral_max:

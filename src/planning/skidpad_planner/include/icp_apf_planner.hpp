@@ -36,7 +36,7 @@ class IcpApfPlanner {
     std::vector<Point2D> GeneratePath(const std::vector<common_msgs::msg::HuatCone>& cones,
                                       const std::vector<Point2D>& prev_path, double icp_rmse_limit = 0.5,
                                       const CorridorModel* trusted_model = nullptr,
-                                      CorridorModel* fresh_trusted_model = nullptr);
+                                      CorridorModel* fresh_trusted_model = nullptr, const LobePrior* prior = nullptr);
 
     void ClusterCones(const std::vector<common_msgs::msg::HuatCone>& cones,
                       std::vector<common_msgs::msg::HuatCone>& left, std::vector<common_msgs::msg::HuatCone>& right);
@@ -65,8 +65,8 @@ class IcpApfPlanner {
     // 自车在 base_link 系的原点。
     CorridorPathResult ComputeCorridorPath(const std::vector<common_msgs::msg::HuatCone>& left,
                                            const std::vector<common_msgs::msg::HuatCone>& right,
-                                           const std::vector<Point2D>& prev_path,
-                                           const CorridorModel* trusted_model = nullptr);
+                                           const std::vector<Point2D>& prev_path, const CorridorModel* trusted_model,
+                                           const LobePrior* prior = nullptr);
 
     double center_margin_;
     int icp_max_iter_;

@@ -124,7 +124,7 @@ void IcpApfPlanner::ClusterCones(const std::vector<common_msgs::msg::HuatCone>& 
 CorridorPathResult IcpApfPlanner::ComputeCorridorPath(const std::vector<common_msgs::msg::HuatCone>& left,
                                                       const std::vector<common_msgs::msg::HuatCone>& right,
                                                       const std::vector<Point2D>& prev_path,
-                                                      const CorridorModel* trusted_model) {
+                                                      const CorridorModel* trusted_model, const LobePrior* prior) {
     std::vector<Point2D> left_pts;
     left_pts.reserve(left.size());
     for (const auto& c : left) {
@@ -142,7 +142,7 @@ CorridorPathResult IcpApfPlanner::ComputeCorridorPath(const std::vector<common_m
         .path_lookahead = path_lookahead_,
     };
     // 自车在 base_link 系原点。
-    return ComputeCorridorPathCore(left_pts, right_pts, params, Point2D{0.0, 0.0}, prev_path, trusted_model);
+    return ComputeCorridorPathCore(left_pts, right_pts, params, Point2D{0.0, 0.0}, prev_path, trusted_model, prior);
 }
 
 IcpResult IcpApfPlanner::IcpAlign(const std::vector<Point2D>& src, const std::vector<Point2D>& tgt) {
@@ -309,8 +309,8 @@ std::vector<Point2D> IcpApfPlanner::AlignPath(const std::vector<Point2D>& center
 
 std::vector<Point2D> IcpApfPlanner::GeneratePath(const std::vector<common_msgs::msg::HuatCone>& cones,
                                                  const std::vector<Point2D>& prev_path, double icp_rmse_limit,
-                                                 const CorridorModel* trusted_model,
-                                                 CorridorModel* fresh_trusted_model) {
+                                                 const CorridorModel* trusted_model, CorridorModel* fresh_trusted_model,
+                                                 const LobePrior* prior) {
     static rclcpp::Clock throttle_clock(RCL_SYSTEM_TIME);
     std::vector<common_msgs::msg::HuatCone> left, right;
     ClusterCones(cones, left, right);
@@ -329,7 +329,7 @@ std::vector<Point2D> IcpApfPlanner::GeneratePath(const std::vector<common_msgs::
     // #101：trusted_model 是**上一帧已验证的走廊模型**（持久走廊状态）——
     // 本帧壁证据变差（模型半径塌缩 → 弧只剩 9~15 点 → PP 刹车）时，用它从
     // 当前位姿重新生成弧。
-    const CorridorPathResult corridor = ComputeCorridorPath(left, right, prev_path, trusted_model);
+    const CorridorPathResult corridor = ComputeCorridorPath(left, right, prev_path, trusted_model, prior);
     std::vector<Point2D> centerline = corridor.path;
     if (centerline.empty()) {
         RCLCPP_WARN_THROTTLE(rclcpp::get_logger("skidpad_planner"), throttle_clock, 1000,

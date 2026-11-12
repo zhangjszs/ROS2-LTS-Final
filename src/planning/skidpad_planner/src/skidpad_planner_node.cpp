@@ -15,7 +15,12 @@ SkidpadPlannerNode::SkidpadPlannerNode(rclcpp::Node::SharedPtr node)
       car_x_(0.0),
       car_y_(0.0),
       car_theta_(0.0),
-      has_car_state_(false) {
+      has_car_state_(false),
+      initial_lobe_side_(0),
+      start_x_(0.0),
+      start_y_(0.0),
+      start_theta_(0.0),
+      has_start_pose_(false) {
     node_->declare_parameter<int>("road_type", 1);
     node_->get_parameter("road_type", road_type_);
     node_->declare_parameter<std::string>("input_cone_map_topic", "/sensors/cones/fused");
@@ -26,6 +31,22 @@ SkidpadPlannerNode::SkidpadPlannerNode(rclcpp::Node::SharedPtr node)
     node_->get_parameter("vehicle_state_topic", vehicle_state_topic_);
     node_->declare_parameter<int>("max_empty_messages_before_warn", 5);
     node_->get_parameter("max_empty_messages_before_warn", max_empty_messages_);
+    // #101（裁定 A）：首瓣先验——"none"（默认，行为不变）/ "left" / "right"。
+    // 入口处两瓣锥桶镜像对称，规划器无法只靠锥桶判定先绕哪一瓣，故由任务层给。
+    node_->declare_parameter<std::string>("initial_lobe", "none");
+    {
+        std::string lobe;
+        node_->get_parameter("initial_lobe", lobe);
+        if (lobe == "left") {
+            initial_lobe_side_ = 1;
+        } else if (lobe == "right") {
+            initial_lobe_side_ = -1;
+        } else {
+            initial_lobe_side_ = 0;
+        }
+        RCLCPP_INFO(node_->get_logger(), "[skidpad_planner] initial_lobe=%s (side=%d)", lobe.c_str(),
+                    initial_lobe_side_);
+    }
 
     double center_margin, k_a, k_r, d_0, path_spacing, path_lookahead;
     int icp_max_iter;
@@ -99,6 +120,13 @@ void SkidpadPlannerNode::OnCarStateMessage(const common_msgs::msg::HuatCarstate:
     car_y_ = msg->car_state.y;
     car_theta_ = msg->car_state.theta;
     has_car_state_ = true;
+    if (!has_start_pose_) {
+        // #101（裁定 A）：首瓣先验以**起始位姿**为参照系 → 第一帧位姿即航线起点。
+        start_x_ = car_x_;
+        start_y_ = car_y_;
+        start_theta_ = car_theta_;
+        has_start_pose_ = true;
+    }
 }
 
 void SkidpadPlannerNode::UpdateBaseLinkCoords(std::vector<common_msgs::msg::HuatCone>& cones) const {
@@ -257,9 +285,27 @@ void SkidpadPlannerNode::OnConeMapMessage(const common_msgs::msg::HuatMap::Const
         }
     }
 
+    // #101（裁定 A）：首瓣先验（base_link）。**只在尚未锁定瓣时生效**：
+    // 已锁定后换瓣由持久模型与连续性判据负责，先验不得阻止切点处的合法换瓣。
+    LobePrior prior;
+    if (initial_lobe_side_ != 0 && has_start_pose_ && !has_trusted_model_) {
+        const std::vector<Point2D> origin_bl = GlobalPathToBaseLink({Point2D{start_x_, start_y_}});
+        if (!origin_bl.empty()) {
+            double ct = 0.0;
+            {
+                std::lock_guard<std::mutex> lock(car_state_mutex_);
+                ct = car_theta_;
+            }
+            prior.active = true;
+            prior.origin = origin_bl.front();
+            prior.dir = Point2D{std::cos(start_theta_ - ct), std::sin(start_theta_ - ct)};
+            prior.side = initial_lobe_side_;
+        }
+    }
+
     CorridorModel fresh_trusted_model;
-    std::vector<Point2D> path =
-        planner_->GeneratePath(cones, prev_path_bl, icp_rmse_limit_, trusted_model_ptr, &fresh_trusted_model);
+    std::vector<Point2D> path = planner_->GeneratePath(cones, prev_path_bl, icp_rmse_limit_, trusted_model_ptr,
+                                                       &fresh_trusted_model, prior.active ? &prior : nullptr);
     if (path.empty()) {
         RCLCPP_WARN_THROTTLE(node_->get_logger(), *node_->get_clock(), 1000,
                              "[skidpad_planner] Failed to generate path");
