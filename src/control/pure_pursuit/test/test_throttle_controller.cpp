@@ -3,6 +3,7 @@
 #include <gtest/gtest.h>
 
 #include <vector>
+#include <cmath>
 
 #include "pure_pursuit/throttle_controller.h"
 
@@ -109,6 +110,26 @@ TEST(ThrottleController, ResetClearsIntegral) {
 }
 
 // #29：油门目标选择——显式剖面有效时取点速度，否则回退参数表。
+
+TEST(ThrottleController, ZeroTargetNeverOverridesLowSpeedStopWithLaunchCurrent) {
+    ThrottleController ctrl;
+    Params p;
+    p.target_speed = 0.0;
+    EXPECT_EQ(ctrl.update(0.0, p), 0);
+    EXPECT_EQ(ctrl.update(0.2, p), 0);
+    EXPECT_EQ(ctrl.update(5.0, p), 0);
+    EXPECT_DOUBLE_EQ(ctrl.lastCurrent(), 0.0);
+}
+
+TEST(ThrottleController, NonFiniteMeasurementsFailClosedWithoutIntegerConversion) {
+    ThrottleController ctrl;
+    Params p;
+    p.target_speed = std::nan("");
+    EXPECT_EQ(ctrl.update(1.0, p), 0);
+    p.target_speed = 5.0;
+    EXPECT_EQ(ctrl.update(std::nan(""), p), 0);
+}
+
 TEST(SelectThrottleTarget, ExplicitSpeedWins) {
     const std::vector<double> speeds{5.0, 4.0, 0.0};
     EXPECT_DOUBLE_EQ(pp_core::SelectThrottleTarget(true, speeds, 1, 10.0), 4.0);
