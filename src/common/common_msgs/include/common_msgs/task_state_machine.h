@@ -144,6 +144,9 @@ class TaskSafetyStateMachine {
     }
     // 完赛：任务 FINISHED 并触发锁存停（对齐 #8“完赛停车不被后续路径清掉”）。
     TaskSafetyTransition onFinish() {
+        // 完赛事件不能覆盖已锁存的 FAULT；故障具有最高优先级。
+        if (task_ == TaskState::FAULT || stop_kind_ == StopKind::FAULT)
+            return {false, StopEdge::NONE};
         const bool was_finished = (task_ == TaskState::FINISHED);
         auto t = enterStop(StopKind::REQUEST);
         task_ = TaskState::FINISHED;
@@ -153,14 +156,17 @@ class TaskSafetyStateMachine {
 
    private:
     TaskSafetyTransition enterStop(StopKind kind) {
-        // 锁存优先级：已在锁存停(REQUEST/FAULT)时，非更高强度的 TIMEOUT 不覆盖；相同来源幂等。
-        if (safety_ == SafetyState::STOP && stop_kind_ != StopKind::TIMEOUT && kind == StopKind::TIMEOUT) {
+        // FAULT > REQUEST > TIMEOUT。低优先级及重复事件均不得改写锁存来源。
+        if (safety_ == SafetyState::STOP &&
+            ((stop_kind_ == StopKind::FAULT && kind != StopKind::FAULT) ||
+             (stop_kind_ == StopKind::REQUEST && kind == StopKind::TIMEOUT))) {
             return {false, StopEdge::NONE};
         }
         const bool first_edge = (safety_ != SafetyState::STOP);
+        const bool changed = first_edge || stop_kind_ != kind;
         safety_ = SafetyState::STOP;
         stop_kind_ = kind;
-        return {first_edge, first_edge ? StopEdge::PUBLISH : StopEdge::NONE};
+        return {changed, first_edge ? StopEdge::PUBLISH : StopEdge::NONE};
     }
 
     TaskState task_ = TaskState::IDLE;
