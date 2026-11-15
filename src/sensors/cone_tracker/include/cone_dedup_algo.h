@@ -18,6 +18,20 @@ struct Point2D {
     constexpr auto operator<=>(const Point2D&) const = default;
 };
 
+// 用相邻两次采样计算车辆在 map 中的速度。位置与 dt 必须来自同一对时间戳。
+struct EgoVelocity {
+    double vx = 0.0;
+    double vy = 0.0;
+    bool valid = false;
+};
+
+[[nodiscard]] inline EgoVelocity EstimateEgoVelocity(Point2D previous, Point2D current, double dt) noexcept {
+    if (!std::isfinite(dt) || dt <= 0.005 || dt >= 0.5 || !std::isfinite(previous.x) ||
+        !std::isfinite(previous.y) || !std::isfinite(current.x) || !std::isfinite(current.y))
+        return {};
+    return {(current.x - previous.x) / dt, (current.y - previous.y) / dt, true};
+}
+
 /**
  * @brief C++20 非拥有型二维连续矩阵视图（MatrixView）。
  * 对任意底层连续一维缓冲区（如 std::vector<T>, std::array<T>, std::span<T>）提供零拷贝行优先 (Row-Major) 二维索引。
