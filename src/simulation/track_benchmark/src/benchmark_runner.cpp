@@ -660,7 +660,7 @@ int main(int argc, char** argv) {
     // 此 runner 的 PP 是运动学代理控制律（P 速度环），不是车载 PP 的电流标定和仲裁链。
     // 不得将其通过结果当作“实车 PP 已验收”。
     if (cfg.controller == "pure_pursuit")
-        std::cerr << "[benchmark_runner] NOTICE: PP is a kinematic surrogate, not the ROS PurePursuit+arbiter+actuator chain; run ROS integration tests for safety acceptance.\\n";
+        std::cerr << "[benchmark_runner] NOTICE: PP is a kinematic surrogate, not the ROS PurePursuit+arbiter+actuator chain; run ROS integration tests for safety acceptance.\n";
     const RunResult res = run(cfg);
     // #45：只要用了调参旋钮就显式标记，使“这一跑不是比较集口径”无法被事后忽略
     // （KPI JSON 不能加字段，所以审计信息走 stderr + 驱动脚本的产物目录命名）。
