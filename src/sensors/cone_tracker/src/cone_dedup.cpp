@@ -89,16 +89,16 @@ ConeDedup::ConeDedup(rclcpp::Node::SharedPtr node) : node_(node) {
 void ConeDedup::OnCarState(const common_msgs::msg::HuatCarstate::ConstSharedPtr msgs) {
     current_speed_ = std::fabs(static_cast<double>(msgs->v));
 
-    // 用相邻帧位置差分估计全局速度，供自运动补偿使用
+    // 历史位置与时间必须对应同一帧 (t-1)，避免用 t-2 位置除以 t-t-1 时间。
     if (enable_ego_motion_compensation_ && has_car_state_) {
-        double dt_ego = (rclcpp::Time(msgs->header.stamp) - prev_car_time_).seconds();
-        if (dt_ego > 0.005 && dt_ego < 0.5) {
-            car_vx_ = (msgs->car_state.x - prev_car_x_) / dt_ego;
-            car_vy_ = (msgs->car_state.y - prev_car_y_) / dt_ego;
-        }
+        const double dt = (rclcpp::Time(msgs->header.stamp) - prev_car_time_).seconds();
+        const auto velocity = cone_dedup_algo::EstimateEgoVelocity(
+            {prev_car_x_, prev_car_y_}, {msgs->car_state.x, msgs->car_state.y}, dt);
+        car_vx_ = velocity.vx;
+        car_vy_ = velocity.vy;
     }
-    prev_car_x_ = car_x_;
-    prev_car_y_ = car_y_;
+    prev_car_x_ = msgs->car_state.x;
+    prev_car_y_ = msgs->car_state.y;
     prev_car_time_ = msgs->header.stamp;
 
     car_x_ = msgs->car_state.x;
@@ -147,9 +147,8 @@ void ConeDedup::KalmanPredict(TrackedCone& tc, double dt) {
         tc.kf_state(2) *= decay;
         tc.kf_state(3) *= decay;
 
-        float factor = static_cast<float>(kf_ego_correction_factor_);
-        tc.kf_state(0) -= factor * static_cast<float>(car_vx_) * dt_f;
-        tc.kf_state(1) -= factor * static_cast<float>(car_vy_) * dt_f;
+        // 这里 track 的位置及锥桶观测均在 map 全局系。静止锥桶不应随车平移。
+        // 保留虚假速度的衰减，但绝不能再次减去车辆位移（重复补偿）。
     }
 }
 
