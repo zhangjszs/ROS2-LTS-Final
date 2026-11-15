@@ -241,7 +241,7 @@ class SafetyMonitor {
     void OnResetStop(const common_msgs::msg::HuatStop::ConstSharedPtr& msg) {
         std::scoped_lock lock(state_mutex_);
         if (!msg->stop) {
-            const double state_age = (node_->now() - last_vehicle_state_time_).seconds();
+            const double state_age = has_vehicle_state_ ? (node_->now() - last_vehicle_state_time_).seconds() : -1.0;
             if (!has_vehicle_state_ || !has_nonempty_pathlimits_ || !std::isfinite(state_age) ||
                 state_age < 0.0 || state_age > planner_timeout_.seconds() ||
                 planner_lease_.check(node_->now().seconds()) != common_msgs::vehicle::Freshness::kFresh) {
