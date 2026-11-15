@@ -46,3 +46,6 @@
     # 锥桶积累（稀疏场景）
     accumulate_max_cones: 20          # 最大积累锥桶数
     accumulate_max_age_sec: 0.5       # position_base_link 坐标在车辆移动后失效，0.5s 内漂移约 1-3m 可接受
+
+    # 仅新计算出的轨迹刷新此时间；历史轨迹绝不无限续命
+    max_path_reuse_age_sec: 0.5
