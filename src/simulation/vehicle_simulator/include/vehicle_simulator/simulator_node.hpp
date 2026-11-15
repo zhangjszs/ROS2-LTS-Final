@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <chrono>
 #include <geometry_msgs/msg/transform_stamped.hpp>
 #include <nav_msgs/msg/path.hpp>
 #include <rclcpp/rclcpp.hpp>
@@ -14,6 +15,7 @@
 #include "common_msgs/msg/huat_map.hpp"
 #include "common_msgs/msg/huat_stop.hpp"
 #include "common_msgs/msg/huat_vehicle_cmd.hpp"
+#include "freshness_lease.h"
 #include "steering_calibration.h"   // 仓库约定：common_msgs 手写头不带前缀（同 cone_types.h）
 #include "vehicle_command_codec.h"  // #15：纵向执行器解码单一来源（与 PP/MPC 编码对称）
 #include "vehicle_simulator/bicycle_model.hpp"
@@ -48,6 +50,8 @@ class SimulatorNode : public rclcpp::Node {
     // 控制指令缓存
     ControlCommand current_cmd_{};
     bool stop_active_{false};
+    double cmd_timeout_sec_{0.5};
+    common_msgs::vehicle::FreshnessLease cmd_lease_{common_msgs::vehicle::LeaseConfig{0.5, 0.0}};
 
     // 参数
     double sim_rate_{100.0};
