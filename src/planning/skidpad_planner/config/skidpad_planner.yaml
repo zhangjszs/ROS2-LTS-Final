@@ -29,3 +29,6 @@
 
     # 回退
     max_empty_messages_before_warn: 5
+
+    # 历史轨迹复用绝对年龄上限（秒），超期发布空轨迹以触发停车
+    max_path_reuse_age_sec: 0.5
