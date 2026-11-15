@@ -10,6 +10,7 @@
 #include <cstdint>
 #include <memory>
 #include <span>
+#include <stdexcept>
 #include <string>
 
 #include "command_arbitration.h"  // #16：CommandArbiterFilter（复用 #12/#15/#16 契约原语）
@@ -69,6 +70,15 @@ class CommandArbiterNode : public rclcpp::Node {
         source_b_topic_ = declare_parameter<std::string>("topics.source_b", "/mpc/vehicle_command");
         output_topic_ = declare_parameter<std::string>("topics.output", "/vehicle_command");
         stop_topic_ = declare_parameter<std::string>("topics.stop", std::string(common_msgs::contract::kTopicStop));
+        stop_request_topic_ = declare_parameter<std::string>("topics.stop_request", "/planning/track/stop_request");
+        const std::string deployment_mode = declare_parameter<std::string>("deployment.mode", "real");
+        const bool simulation_mode = deployment_mode == "simulation";
+        if (deployment_mode != "real" && !simulation_mode)
+            throw std::invalid_argument("deployment.mode must be real or simulation");
+        if (!simulation_mode &&
+            (output_topic_ != "/vehicle_command" || source_a_topic_ == output_topic_ ||
+             source_b_topic_ == output_topic_))
+            throw std::invalid_argument("Real mode requires unique /vehicle_command output owned by arbiter");
         state_topic_ =
             declare_parameter<std::string>("topics.state", std::string(common_msgs::contract::kTopicSystemState));
         event_topic_ = declare_parameter<std::string>("topics.task_event", "/system/task_event");
@@ -79,7 +89,12 @@ class CommandArbiterNode : public rclcpp::Node {
         cfg_.preferred = (preferred == "mpc") ? ControlSource::MPC : ControlSource::PURE_PURSUIT;
 
         // 行驶许可授予：默认关闭。开发/仿真可显式 autostart；实车应由人工/任务层发 arm+start 事件。
-        const bool autostart = declare_parameter<bool>("task.autostart", false);
+        const bool autostart_requested = declare_parameter<bool>("task.autostart", false);
+        const bool autostart = autostart_requested && simulation_mode;
+        if (autostart_requested && !simulation_mode)
+            RCLCPP_ERROR(get_logger(), "[command_arbiter] autostart denied in real mode");
+        monitor_heartbeat_timeout_sec_ =
+            std::max(0.1, declare_parameter<double>("safety.stop_heartbeat_timeout_sec", 0.5));
 
         ActuatorCalibration cal;
         cal.max_accel = declare_parameter<double>("actuator.max_accel", 5.0);
@@ -105,6 +120,10 @@ class CommandArbiterNode : public rclcpp::Node {
         sub_stop_ = create_subscription<common_msgs::msg::HuatStop>(
             stop_topic_, makeQoS(common_msgs::contract::kQosStop),
             [this](const common_msgs::msg::HuatStop::SharedPtr m) { onStop(*m); });
+        // 完赛/停车请求独立输入，避免 HuatStop(bool) 在监控转发时丢失 REQUEST 语义。
+        sub_stop_request_ = create_subscription<common_msgs::msg::HuatStop>(
+            stop_request_topic_, 10,
+            [this](const common_msgs::msg::HuatStop::SharedPtr m) { onStopRequest(*m); });
         // 任务事件（arm/start/finish/abort/reset）：行驶许可的唯一授予入口。
         sub_event_ = create_subscription<std_msgs::msg::String>(
             event_topic_, 10, [this](const std_msgs::msg::String::SharedPtr m) { onTaskEvent(m->data); });
@@ -114,8 +133,9 @@ class CommandArbiterNode : public rclcpp::Node {
         publishSafeBrake();  // 启动即产出确定性安全指令，使最终出口一开始就有发布者
 
         if (autostart) {
-            applyEvent("arm");
-            applyEvent("start");
+            // 仅隔离仿真允许自动授权；实车必须经事件门控与安全监控心跳检查。
+            sm_.onArm();
+            sm_.onStart();
             RCLCPP_WARN(get_logger(), "[command_arbiter] task.autostart=true -> RUNNING (development aid)");
         }
 
@@ -152,17 +172,29 @@ class CommandArbiterNode : public rclcpp::Node {
     }
 
     void onStop(const common_msgs::msg::HuatStop& m) {
-        // 监控看门狗是“可恢复停车”的来源（HuatStop 不携带 reason，只有 bool）：
-        //   stop=true  → TIMEOUT 停（可被监控释放）；
-        //   stop=false → onResume 仅解除 TIMEOUT 停。
-        // 任务级锁存（abort → FAULT、finish → REQUEST）只能由 reset 事件解除：
-        // 监控“恢复”不会把急停类锁存带出来（#16 验收第 3 条）。
-        if (m.stop) {
+        monitor_seen_ = true;
+        monitor_stop_active_ = m.stop;
+        monitor_last_rx_ = std::chrono::steady_clock::now();
+        if (m.stop)
             sm_.onTimeoutStop();
-        } else {
-            sm_.onResume();
-        }
+        else
+            sm_.onResume();  // 不解除 REQUEST/FAULT 锁存
     }
+
+    void onStopRequest(const common_msgs::msg::HuatStop& m) {
+        request_latched_ = m.stop;
+        if (m.stop)
+            sm_.onStopRequest();
+        // false 仅表示请求源已撤销；不会自动清除已经锁存的停车。
+    }
+
+    bool monitorFresh() const {
+        return monitor_seen_ &&
+               std::chrono::duration<double>(std::chrono::steady_clock::now() - monitor_last_rx_).count() <=
+                   monitor_heartbeat_timeout_sec_;
+    }
+
+    bool monitorReady() const { return monitorFresh() && !monitor_stop_active_; }
 
     void onTaskEvent(const std::string& data) { applyEvent(data); }
 
@@ -172,6 +204,15 @@ class CommandArbiterNode : public rclcpp::Node {
         for (char ch : raw) {
             if (ch != ' ' && ch != '\t' && ch != '\n' && ch != '\r')
                 ev.push_back(static_cast<char>(std::tolower(static_cast<unsigned char>(ch))));
+        }
+        // 任何运行授权或人工复位必须建立在有效、明确解除停车的监控状态上。
+        if ((ev == "arm" || ev == "start" || ev == "reset") && !monitorReady()) {
+            RCLCPP_WARN(get_logger(), "[command_arbiter] event=%s rejected: monitor unavailable or stopped", ev.c_str());
+            return;
+        }
+        if (ev == "reset" && request_latched_) {
+            RCLCPP_WARN(get_logger(), "[command_arbiter] reset rejected: stop request remains asserted");
+            return;
         }
         if (ev == "arm") {
             sm_.onArm();
@@ -197,6 +238,11 @@ class CommandArbiterNode : public rclcpp::Node {
     }
 
     void tick() {
+        // 监控进程失联后锁存 FAULT；恢复心跳不会自动恢复车辆行驶授权。
+        if (!monitor_seen_)
+            sm_.onTimeoutStop();
+        else if (!monitorFresh())
+            sm_.onFault();
         const double t = now().seconds();
         const CommandArbiterFilter::SourceObs obs[] = {obs_a_, obs_b_};
         tallyRejections(t, obs);
@@ -256,7 +302,7 @@ class CommandArbiterNode : public rclcpp::Node {
         s.safety_state = static_cast<uint8_t>(sm_.safety());
         s.stop_kind = static_cast<uint8_t>(sm_.stopKind());
         s.stop_active = sm_.stopActive();
-        s.can_drive = sm_.canDrive();
+        s.can_drive = sm_.canDrive() && monitorReady();
         s.winner_source = static_cast<uint8_t>(r.winner);
         s.committed_source = static_cast<uint8_t>(arbiter_->winner());
         s.reason = static_cast<uint8_t>(r.reason);
@@ -283,7 +329,12 @@ class CommandArbiterNode : public rclcpp::Node {
         return (o.last_rx_sec < 0.0) ? -1.0 : (t - o.last_rx_sec);
     }
 
-    std::string source_a_topic_, source_b_topic_, output_topic_, stop_topic_, state_topic_, event_topic_;
+    std::string source_a_topic_, source_b_topic_, output_topic_, stop_topic_, stop_request_topic_, state_topic_, event_topic_;
+    bool monitor_seen_{false};
+    bool monitor_stop_active_{true};
+    bool request_latched_{false};
+    double monitor_heartbeat_timeout_sec_{0.5};
+    std::chrono::steady_clock::time_point monitor_last_rx_{};
     std::string calibration_version_;
     ArbitrationConfig cfg_;
     std::uint8_t neutral_steering_{90};
@@ -299,6 +350,7 @@ class CommandArbiterNode : public rclcpp::Node {
     std::unique_ptr<CommandArbiterFilter> arbiter_;
     rclcpp::Subscription<common_msgs::msg::HuatVehicleCmd>::SharedPtr sub_a_, sub_b_;
     rclcpp::Subscription<common_msgs::msg::HuatStop>::SharedPtr sub_stop_;
+    rclcpp::Subscription<common_msgs::msg::HuatStop>::SharedPtr sub_stop_request_;
     rclcpp::Subscription<std_msgs::msg::String>::SharedPtr sub_event_;
     rclcpp::Publisher<common_msgs::msg::HuatVehicleCmd>::SharedPtr pub_out_;
     rclcpp::Publisher<StateMsg>::SharedPtr pub_state_;
