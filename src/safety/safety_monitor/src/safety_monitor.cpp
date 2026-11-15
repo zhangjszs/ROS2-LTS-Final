@@ -1,6 +1,7 @@
 #include <diagnostic_msgs/msg/diagnostic_status.hpp>
 #include <diagnostic_updater/diagnostic_updater.hpp>
 #include <format>
+#include <cmath>
 #include <mutex>
 #include <rclcpp/rclcpp.hpp>
 #include <stop_token>
@@ -9,6 +10,7 @@
 #include "common_msgs/msg/huat_carstate.hpp"
 #include "common_msgs/msg/huat_path_limits.hpp"
 #include "common_msgs/msg/huat_stop.hpp"
+#include "interface_contract.h"        // path frame/geometry validity contract
 #include "freshness_lease.h"           // #30：planner 心跳租约
 #include "interface_contract_qos.hpp"  // #14：stop 锁存 QoS 由契约单一来源构造
 #include "safety_monitor/stop_state_machine.h"
@@ -61,7 +63,9 @@ class SafetyMonitor {
         }
         const auto stop_qos = common_msgs::contract::makeQoS(common_msgs::contract::kQosStop);
         pub_stop_ = node_->create_publisher<common_msgs::msg::HuatStop>(stop_topic, stop_qos);
-        publishStop(false);
+        // 上电及节点重启均先发布停车；无有效状态和路径时不得发出解除停车。
+        state_machine_.onTimeoutExpired();
+        publishStop(true, StopReason::TIMEOUT);
 
         // last_pathlimits_time_ starts on first vehicle_state so a silent planner still times out.
 
@@ -115,9 +119,14 @@ class SafetyMonitor {
      * @brief 50Hz 安全检测主循环，通过 std::stop_token 检测外部中断请求。
      */
     void watchdogLoop(std::stop_token st) {
-        rclcpp::Rate rate(50);  // 50Hz 检查
+        rclcpp::Rate rate(50);  // 50Hz 检查；stop 状态每 5 拍以 10Hz 发送心跳
+        unsigned heartbeat_tick = 0;
         while (!st.stop_requested() && rclcpp::ok()) {
             checkPlannerLiveness();
+            if (++heartbeat_tick % 5 == 0) {
+                std::scoped_lock lock(state_mutex_);
+                publishStop(stop_active_, stop_reason_);
+            }
             diag_updater_->force_update();
             rate.sleep();
         }
@@ -157,15 +166,33 @@ class SafetyMonitor {
 
     void OnPathLimits(const common_msgs::msg::HuatPathLimits::ConstSharedPtr& msg) {
         std::scoped_lock lock(state_mutex_);
-        if (msg->path.empty()) {
+        // 非空不意味着有效：非法坐标、未知坐标系、历史/未来消息不得续租，更不能解除停车。
+        const auto rx_time = node_->now();
+        const auto stamp = rclcpp::Time(msg->header.stamp, node_->get_clock()->get_clock_type());
+        const double source_age = (rx_time - stamp).seconds();
+        bool valid = msg->path.size() >= 2 && common_msgs::contract::isFrameSupported(msg->header.frame_id) &&
+                     std::isfinite(source_age) && source_age >= -0.05 &&
+                     source_age <= planner_timeout_.seconds();
+        if (valid) {
+            for (const auto& point : msg->path) {
+                if (!std::isfinite(point.x) || !std::isfinite(point.y)) {
+                    valid = false;
+                    break;
+                }
+            }
+        }
+        if (!valid) {
             RCLCPP_WARN_THROTTLE(node_->get_logger(), *node_->get_clock(), 1000,
-                                 "[safety_monitor] Empty pathlimits ignored (not a liveness heartbeat)");
+                                 "[safety_monitor] Rejected path (points=%zu, frame=%s, age=%.3fs)",
+                                 msg->path.size(), msg->header.frame_id.c_str(), source_age);
             return;
         }
-        last_pathlimits_time_ = node_->now();
+        last_pathlimits_time_ = rx_time;
         planner_lease_.observe(last_pathlimits_time_.seconds());
         has_nonempty_pathlimits_ = true;
-        auto result = state_machine_.onPathReceived();
+        // 规划消息先于车辆状态时不能解除上电停车。
+        auto result = has_vehicle_state_ ? state_machine_.onPathReceived()
+                                         : StopStateMachineResult{StopAction::NONE, StopReason::NONE};
         if (result.action == StopAction::CLEAR_STOP) {
             RCLCPP_INFO(
                 node_->get_logger(), "%s",
@@ -177,12 +204,19 @@ class SafetyMonitor {
 
     void OnVehicleState(const common_msgs::msg::HuatCarstate::ConstSharedPtr& msg) {
         std::scoped_lock lock(state_mutex_);
+        if (!std::isfinite(msg->car_state.x) || !std::isfinite(msg->car_state.y) ||
+            !std::isfinite(msg->car_state.theta) || !std::isfinite(msg->v)) {
+            RCLCPP_WARN_THROTTLE(node_->get_logger(), *node_->get_clock(), 1000,
+                                 "[safety_monitor] Invalid vehicle state ignored");
+            return;
+        }
         if (!has_vehicle_state_) {
             last_pathlimits_time_ = node_->now();
             planner_lease_.observe(last_pathlimits_time_.seconds());
         }
         has_vehicle_state_ = true;
         current_speed_ = msg->v;
+        last_vehicle_state_time_ = node_->now();
     }
 
     void OnStopRequest(const common_msgs::msg::HuatStop::ConstSharedPtr& msg) {
@@ -196,6 +230,10 @@ class SafetyMonitor {
                                         result.action, result.reason)
                                 .c_str());
                 publishStop(true, StopReason::REQUEST);
+            } else if (state_machine_.state() == StopState::REQUEST_STOP &&
+                       stop_reason_ != StopReason::REQUEST) {
+                // TIMEOUT -> REQUEST 是优先级提升；即使不需要新停车边沿也要更新锁存原因。
+                publishStop(true, StopReason::REQUEST);
             }
         }
     }
@@ -203,6 +241,13 @@ class SafetyMonitor {
     void OnResetStop(const common_msgs::msg::HuatStop::ConstSharedPtr& msg) {
         std::scoped_lock lock(state_mutex_);
         if (!msg->stop) {
+            const double state_age = (node_->now() - last_vehicle_state_time_).seconds();
+            if (!has_vehicle_state_ || !has_nonempty_pathlimits_ || !std::isfinite(state_age) ||
+                state_age < 0.0 || state_age > planner_timeout_.seconds() ||
+                planner_lease_.check(node_->now().seconds()) != common_msgs::vehicle::Freshness::kFresh) {
+                RCLCPP_WARN(node_->get_logger(), "[safety_monitor] Reset refused: state or path not fresh");
+                return;
+            }
             auto result = state_machine_.onManualReset();
             if (result.action == StopAction::CLEAR_STOP) {
                 RCLCPP_WARN(
@@ -223,7 +268,7 @@ class SafetyMonitor {
 
         // #30：心跳超时走租约判定（Stale=自上次非空 pathlimits 超时；Absent 不可能至此，仅防御）。
         const double now_sec = node_->now().seconds();
-        if (planner_lease_.check(now_sec) != common_msgs::vehicle::Freshness::kStale)
+        if (planner_lease_.check(now_sec) == common_msgs::vehicle::Freshness::kFresh)
             return;
         {
             rclcpp::Duration elapsed = node_->now() - last_pathlimits_time_;
@@ -257,6 +302,7 @@ class SafetyMonitor {
     rclcpp::Publisher<common_msgs::msg::HuatStop>::SharedPtr pub_stop_;
 
     rclcpp::Time last_pathlimits_time_;
+    rclcpp::Time last_vehicle_state_time_;
     rclcpp::Duration planner_timeout_ = rclcpp::Duration(0, 0);
     // #30：planner 心跳租约（observe=非空 pathlimits 到达；check=看门狗判定）。
     common_msgs::vehicle::FreshnessLease planner_lease_;
