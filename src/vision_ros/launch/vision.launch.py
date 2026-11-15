@@ -30,8 +30,9 @@ import os
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, ExecuteProcess
 from launch.conditions import IfCondition, UnlessCondition
-from launch.substitutions import LaunchConfiguration, PythonExpression
+from launch.substitutions import LaunchConfiguration, PythonExpression, PathJoinSubstitution
 from launch_ros.actions import Node, PushRosNamespace
+from launch_ros.parameter_descriptions import ParameterValue
 from ament_index_python.packages import get_package_share_directory
 
 
@@ -119,11 +120,11 @@ def generate_launch_description():
         'config',
         'vision_base.yaml',
     )
-    vision_mission_config = os.path.join(
+    vision_mission_config = PathJoinSubstitution([
         get_package_share_directory('vision_ros'),
         'config',
-        PythonExpression(["'vision_'", LaunchConfiguration("mission"), "'.yaml'"]),
-    )
+        PythonExpression(["'vision_' + '", LaunchConfiguration('mission'), "' + '.yaml'"]),
+    ])
 
     # Vision node (Python implementation)
     vision_node = Node(
@@ -141,16 +142,26 @@ def generate_launch_description():
             LaunchConfiguration('extra_local_config'),
             {
                 # Mode overrides
-                'inference/backend_type': 'fallback_only',
-                'node/require_model': False,
-                # Lightweight mode
-                'inference/input_width': 320,
-                'inference/input_height': 320,
+                'inference/backend_type': PythonExpression([
+                    "'fallback_only' if '", LaunchConfiguration('mode'),
+                    "' == 'fallback_only' else 'onnx'",
+                ]),
+                # lightweight 保留 ONNX，仅减小推理输入；standard 使用标定尺寸。
+                'inference/input_width': ParameterValue(PythonExpression([
+                    "320 if '", LaunchConfiguration('mode'), "' == 'lightweight' else 1152",
+                ]), value_type=int),
+                'inference/input_height': ParameterValue(PythonExpression([
+                    "320 if '", LaunchConfiguration('mode'), "' == 'lightweight' else 1152",
+                ]), value_type=int),
                 # Model path
                 'inference/model_path': LaunchConfiguration('model_path'),
-                'node/require_model': LaunchConfiguration('require_model'),
-                # Debug
-                'output/publish_debug_image': True,
+                'node/require_model': ParameterValue(PythonExpression([
+                    "False if '", LaunchConfiguration('mode'),
+                    "' == 'fallback_only' else ('",
+                    LaunchConfiguration('require_model'), "'.lower() == 'true')",
+                ]), value_type=bool),
+                # Debug 只由显式 launch 参数决定，避免默认产生高带宽图像。
+                'output/publish_debug_image': ParameterValue(LaunchConfiguration('debug'), value_type=bool),
                 # Image topic
                 'node/image_topic': LaunchConfiguration('image_topic'),
             },
