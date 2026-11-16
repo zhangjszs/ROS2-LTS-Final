@@ -42,6 +42,8 @@ class Harness(Node):
         self.logs = []
         self.stop = self.state = self.command = None
         self.monitor_inputs = None
+        # 重启故障场景启用逐消息约束，不依赖 harness 的调度新鲜度。
+        self.enforce_safe_stream = False
         self.stop_at = self.state_at = self.command_at = -math.inf
         self.sim = 100.0
         self.clock_runs = True
@@ -124,15 +126,21 @@ class Harness(Node):
     def on_stop(self, m):
         self.stop, self.stop_at = bool(m.stop), time.monotonic()
         self.record("system_stop", stop=self.stop)
+        if self.enforce_safe_stream and not self.stop:
+            raise AssertionError("unsafe stop=false frame observed after monitor restart")
 
     def on_state(self, m):
         self.state, self.state_at = m, time.monotonic()
         self.record("system_state", stop=bool(m.stop_active), task=int(m.task_state),
                     kind=int(m.stop_kind), can_drive=bool(m.can_drive), pedal=int(m.pedal_ratio))
+        if self.enforce_safe_stream and (not m.stop_active or m.can_drive):
+            raise AssertionError("unsafe task state frame observed after monitor restart")
 
     def on_command(self, m):
         self.command, self.command_at = m, time.monotonic()
         self.record("vehicle_command", pedal=int(m.pedal_ratio), brake=int(m.brake_force))
+        if self.enforce_safe_stream and (m.pedal_ratio != 0 or m.brake_force <= 0):
+            raise AssertionError("unsafe actuator frame observed after monitor restart")
 
     def on_diagnostics(self, m):
         for status in m.status:
@@ -404,7 +412,20 @@ def run(h):
                and h.monitor_inputs["vehicle_freshness"] == "Absent"
                and h.monitor_inputs["planner_freshness"] == "Absent"
                and h.safe())
-        h.pump(0.5, h.safe)
+        # CI 43843363098: harness 在收到安全帧后被调度暂停约 337ms，
+        # 超过其 300ms 观测新鲜度窗口；这不是已观察到的正油门。
+        # 每条接收帧持续检查不可行驶/有效制动；观察末尾再要求新鲜三源，
+        # 并证实观察窗口内确有消息。生产 watchdog/停车超时均不改。
+        stream_start = len(h.timeline)
+        h.enforce_safe_stream = True
+        try:
+            h.pump(0.5)
+            h.wait(h.safe, STATE_TIMEOUT + JITTER)
+        finally:
+            h.enforce_safe_stream = False
+        observed = h.timeline[stream_start:]
+        for kind in ("system_stop", "system_state", "vehicle_command"):
+            assert any(item["event"] == kind for item in observed), f"no {kind} frames during restart observation"
         h.state_runs = h.path_runs = True
         h.wait(lambda: h.stop is False)
         h.pump(0.4)
