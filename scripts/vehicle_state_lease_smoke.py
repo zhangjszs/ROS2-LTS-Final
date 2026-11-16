@@ -266,6 +266,9 @@ def run(h):
 
     def recovery(path_first):
         h.state_runs = h.path_runs = False
+        # 两种租约期限不同；仅观察到 STOP 不能证明两源都已过期。
+        # 先建立双源过期前提，再恢复其中一个，避免尚新鲜的另一租约造成假失败。
+        h.pump(max(STATE_TIMEOUT, PATH_TIMEOUT) + JITTER)
         h.wait(h.safe, PATH_TIMEOUT + JITTER)
         if path_first:
             h.path_runs = True
