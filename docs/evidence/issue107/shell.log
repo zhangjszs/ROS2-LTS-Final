@@ -1,0 +1,14 @@
+=== [1/4] bash -n syntax check (mandatory) ===
+✔ bash -n passed: 21 shell scripts clean
+=== [2/4] 断言型 ros2 查询必须走 daemon（#49，mandatory） ===
+✔ 未发现 --no-daemon 断言型查询（21 个脚本）
+=== [3/4] node readiness selftest (#69, mandatory) ===
+  ✔ A 进程全活且视图完整 → 就绪：返回码 0
+  ✔ B 进程全活但视图为空 → 环境性（不判红）：返回码 2
+  ✔ B 未误报节点死亡（PROBE_DEAD_NODES 为空）
+  ✔ C 节点进程已退出 → 真失败（判红）：返回码 1
+  ✔ C 正确点名未起来的节点：dead_node
+node_readiness selftest: 全部断言通过 ✔
+✔ node readiness selftest passed
+=== [4/4] shellcheck (advisory) ===
+⚠ shellcheck 未安装，跳过建议性检查（CI 的 apt 步骤已安装它；本地装法：apt-get install shellcheck）

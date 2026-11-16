@@ -1,3 +1,14 @@
+## 2026-11-16 · Execution #107（最新，保留既有任务历史）
+
+- Issue #107：实现交付 in-review，保持 OPEN；Draft stacked PR #108，base 为 #106 安全分支。
+- 基线 `8d9479ef930e75192a3391259b1c8486d03a3f79`；实现 `b290425bdc3971ba54797f44ba0770fc0b8a395b`。
+- 单次状态 + 持续 10Hz 路径：抽离旧判定 RED rc=1；修复核心 16/16；全量 core ASan/UBSan 36/36（容器关闭不支持的 LSan）。
+- 无 ROS/Jazzy/colcon/rclpy，ROS 构建/包测/新旧故障注入 NOT_RUN；新 CI 正在运行。没有 HIL/实车认证。
+- 详情及命令/原始证据：`docs/VEHICLE_STATE_LEASE_107.md`、`docs/evidence/issue107/`。
+- 下一棒：Planner 验收源码和核心证据；补 Jazzy Topic/QoS 故障时间线与全部 CI。未关闭 Issue、未合并、未部署。
+
+---
+
 # HANDOFF
 
 ## 本轮概要

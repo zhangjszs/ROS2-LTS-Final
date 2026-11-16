@@ -1,0 +1,142 @@
+=== [1/2] Checking C++20 code formatting with clang-format ===
+✔ clang-format passed with 0 formatting violations!
+=== [2/2] Checking C++20 compliance with cppcheck ===
+/workspace/scratch/b9b4de71e9ff/ROS2-LTS-Final/src/planning/straight_line_planner/include/line_fit_core.hpp:0:0: information: Limiting analysis of branches. Use --check-level=exhaustive to analyze all branches. [normalCheckLevelMaxBranches]
+
+^
+/workspace/scratch/b9b4de71e9ff/ROS2-LTS-Final/src/planning/straight_line_planner/include/straight_line_planner_node.hpp:0:0: information: Limiting analysis of branches. Use --check-level=exhaustive to analyze all branches. [normalCheckLevelMaxBranches]
+
+^
+/workspace/scratch/b9b4de71e9ff/ROS2-LTS-Final/src/planning/straight_line_planner/include/line_detector.hpp:0:0: information: Limiting analysis of branches. Use --check-level=exhaustive to analyze all branches. [normalCheckLevelMaxBranches]
+
+^
+/workspace/scratch/b9b4de71e9ff/ROS2-LTS-Final/src/planning/straight_line_planner/src/straight_line_planner_node.cpp:0:0: information: Limiting analysis of branches. Use --check-level=exhaustive to analyze all branches. [normalCheckLevelMaxBranches]
+
+^
+/workspace/scratch/b9b4de71e9ff/ROS2-LTS-Final/src/planning/velocity_profiler/test/test_velocity_profiler.cpp:19:1: error: syntax error [syntaxError]
+TEST(VelocityProfilerTest, StraightLineAcceleration) {
+^
+/workspace/scratch/b9b4de71e9ff/ROS2-LTS-Final/src/planning/velocity_profiler/src/velocity_profiler.cpp:0:0: information: Limiting analysis of branches. Use --check-level=exhaustive to analyze all branches. [normalCheckLevelMaxBranches]
+
+^
+/workspace/scratch/b9b4de71e9ff/ROS2-LTS-Final/src/planning/skidpad_planner/test/test_corridor_model.cpp:76:1: error: syntax error [syntaxError]
+TEST(SkidpadCorridorModel, StraightCorridorProducesNoArcModel) {
+^
+/workspace/scratch/b9b4de71e9ff/ROS2-LTS-Final/src/planning/skidpad_planner/test/test_circle_centerline_core.cpp:34:1: error: syntax error [syntaxError]
+TEST(CircleCenterlineCore, OffsetCircleGoldenSample) {
+^
+/workspace/scratch/b9b4de71e9ff/ROS2-LTS-Final/src/planning/skidpad_planner/test/test_centerline_core.cpp:23:1: error: syntax error [syntaxError]
+TEST(CenterlineCore, SymmetricConesGoldenSample) {
+^
+/workspace/scratch/b9b4de71e9ff/ROS2-LTS-Final/src/planning/skidpad_planner/test/test_icp_apf_planner.cpp:0:0: information: Limiting analysis of branches. Use --check-level=exhaustive to analyze all branches. [normalCheckLevelMaxBranches]
+
+^
+/workspace/scratch/b9b4de71e9ff/ROS2-LTS-Final/src/planning/skidpad_planner/test/test_corridor_core.cpp:59:1: error: syntax error [syntaxError]
+TEST(SkidpadCorridorCore, Figure8CrossoverDoesNotAverageTwoLobes) {
+^
+/workspace/scratch/b9b4de71e9ff/ROS2-LTS-Final/src/planning/skidpad_planner/include/corridor_model_core.hpp:0:0: information: Limiting analysis of branches. Use --check-level=exhaustive to analyze all branches. [normalCheckLevelMaxBranches]
+
+^
+/workspace/scratch/b9b4de71e9ff/ROS2-LTS-Final/src/planning/skidpad_planner/include/icp_apf_planner.hpp:0:0: information: Limiting analysis of branches. Use --check-level=exhaustive to analyze all branches. [normalCheckLevelMaxBranches]
+
+^
+/workspace/scratch/b9b4de71e9ff/ROS2-LTS-Final/src/planning/skidpad_planner/include/skidpad_planner_node.hpp:0:0: information: Limiting analysis of branches. Use --check-level=exhaustive to analyze all branches. [normalCheckLevelMaxBranches]
+
+^
+/workspace/scratch/b9b4de71e9ff/ROS2-LTS-Final/src/planning/skidpad_planner/include/centerline_core.hpp:0:0: information: Limiting analysis of branches. Use --check-level=exhaustive to analyze all branches. [normalCheckLevelMaxBranches]
+
+^
+/workspace/scratch/b9b4de71e9ff/ROS2-LTS-Final/src/control/mpc_controller/test/test_reject_watchdog.cpp:21:1: error: syntax error [syntaxError]
+TEST(RejectWatchdog, LatchesAtThresholdAndCountsTotals) {
+^
+/workspace/scratch/b9b4de71e9ff/ROS2-LTS-Final/src/control/mpc_controller/test/test_param_consistency.cpp:0:0: information: Limiting analysis of branches. Use --check-level=exhaustive to analyze all branches. [normalCheckLevelMaxBranches]
+
+^
+/workspace/scratch/b9b4de71e9ff/ROS2-LTS-Final/src/control/mpc_controller/test/test_param_consistency.cpp:57:24: performance: Ineffective call of function 'substr' because a prefix of the string is assigned to itself. Use resize() or pop_back() instead. [uselessCallsSubstr]
+                rest = rest.substr(0, p);
+                       ^
+/workspace/scratch/b9b4de71e9ff/ROS2-LTS-Final/src/control/mpc_controller/src/mpc_model.cpp:0:0: information: Limiting analysis of branches. Use --check-level=exhaustive to analyze all branches. [normalCheckLevelMaxBranches]
+
+^
+/workspace/scratch/b9b4de71e9ff/ROS2-LTS-Final/src/control/mpc_controller/src/qp_solver.cpp:0:0: information: Limiting analysis of branches. Use --check-level=exhaustive to analyze all branches. [normalCheckLevelMaxBranches]
+
+^
+/workspace/scratch/b9b4de71e9ff/ROS2-LTS-Final/src/control/pure_pursuit/include/pure_pursuit/throttle_controller.h:0:0: information: Limiting analysis of branches. Use --check-level=exhaustive to analyze all branches. [normalCheckLevelMaxBranches]
+
+^
+/workspace/scratch/b9b4de71e9ff/ROS2-LTS-Final/src/visualization/fsac_viz/src/fsd_viz_node.cpp:0:0: information: Limiting analysis of branches. Use --check-level=exhaustive to analyze all branches. [normalCheckLevelMaxBranches]
+
+^
+/workspace/scratch/b9b4de71e9ff/ROS2-LTS-Final/src/safety/safety_monitor/src/command_arbiter_node.cpp:0:0: information: Limiting analysis of branches. Use --check-level=exhaustive to analyze all branches. [normalCheckLevelMaxBranches]
+
+^
+/workspace/scratch/b9b4de71e9ff/ROS2-LTS-Final/src/safety/safety_monitor/src/command_arbiter_node.cpp:69:9: performance: Variable 'source_a_topic_' is assigned in constructor body. Consider performing initialization in initialization list. [useInitializationList]
+        source_a_topic_ = declare_parameter<std::string>("topics.source_a", "/control/vehicle_command");
+        ^
+/workspace/scratch/b9b4de71e9ff/ROS2-LTS-Final/src/safety/safety_monitor/src/command_arbiter_node.cpp:70:9: performance: Variable 'source_b_topic_' is assigned in constructor body. Consider performing initialization in initialization list. [useInitializationList]
+        source_b_topic_ = declare_parameter<std::string>("topics.source_b", "/mpc/vehicle_command");
+        ^
+/workspace/scratch/b9b4de71e9ff/ROS2-LTS-Final/src/safety/safety_monitor/src/command_arbiter_node.cpp:71:9: performance: Variable 'output_topic_' is assigned in constructor body. Consider performing initialization in initialization list. [useInitializationList]
+        output_topic_ = declare_parameter<std::string>("topics.output", "/vehicle_command");
+        ^
+/workspace/scratch/b9b4de71e9ff/ROS2-LTS-Final/src/safety/safety_monitor/src/command_arbiter_node.cpp:72:9: performance: Variable 'stop_topic_' is assigned in constructor body. Consider performing initialization in initialization list. [useInitializationList]
+        stop_topic_ = declare_parameter<std::string>("topics.stop", std::string(common_msgs::contract::kTopicStop));
+        ^
+/workspace/scratch/b9b4de71e9ff/ROS2-LTS-Final/src/sensors/cone_tracker/test/test_cone_tracker_differential.cpp:0:0: information: Limiting analysis of branches. Use --check-level=exhaustive to analyze all branches. [normalCheckLevelMaxBranches]
+
+^
+/workspace/scratch/b9b4de71e9ff/ROS2-LTS-Final/src/sensors/cone_tracker/src/cone_dedup.cpp:0:0: information: Limiting analysis of branches. Use --check-level=exhaustive to analyze all branches. [normalCheckLevelMaxBranches]
+
+^
+/workspace/scratch/b9b4de71e9ff/ROS2-LTS-Final/src/sensors/cone_tracker/src/cone_dedup_algo.cpp:0:0: information: Limiting analysis of branches. Use --check-level=exhaustive to analyze all branches. [normalCheckLevelMaxBranches]
+
+^
+/workspace/scratch/b9b4de71e9ff/ROS2-LTS-Final/src/sensors/cone_fusion/src/cone_fusion.cpp:0:0: information: Limiting analysis of branches. Use --check-level=exhaustive to analyze all branches. [normalCheckLevelMaxBranches]
+
+^
+/workspace/scratch/b9b4de71e9ff/ROS2-LTS-Final/src/sensors/lidar_cluster/include/lidar_cluster_scoring.h:0:0: information: Limiting analysis of branches. Use --check-level=exhaustive to analyze all branches. [normalCheckLevelMaxBranches]
+
+^
+/workspace/scratch/b9b4de71e9ff/ROS2-LTS-Final/src/sensors/lidar_cluster/include/lidar_cluster/scoring_core.hpp:0:0: information: Limiting analysis of branches. Use --check-level=exhaustive to analyze all branches. [normalCheckLevelMaxBranches]
+
+^
+/workspace/scratch/b9b4de71e9ff/ROS2-LTS-Final/src/sensors/lidar_cluster/include/string_utils.h:0:0: information: Limiting analysis of branches. Use --check-level=exhaustive to analyze all branches. [normalCheckLevelMaxBranches]
+
+^
+/workspace/scratch/b9b4de71e9ff/ROS2-LTS-Final/src/sensors/lidar_cluster/src/ground_segmentation/svd_ground_strategy.cpp:0:0: information: Limiting analysis of branches. Use --check-level=exhaustive to analyze all branches. [normalCheckLevelMaxBranches]
+
+^
+/workspace/scratch/b9b4de71e9ff/ROS2-LTS-Final/src/sensors/lidar_cluster/src/lidar_cluster.cpp:0:0: information: Limiting analysis of branches. Use --check-level=exhaustive to analyze all branches. [normalCheckLevelMaxBranches]
+
+^
+/workspace/scratch/b9b4de71e9ff/ROS2-LTS-Final/src/sensors/lidar_cluster/src/lidar_cluster_scoring.cpp:0:0: information: Limiting analysis of branches. Use --check-level=exhaustive to analyze all branches. [normalCheckLevelMaxBranches]
+
+^
+/workspace/scratch/b9b4de71e9ff/ROS2-LTS-Final/src/sensors/lidar_cluster/src/preprocessor/point_cloud_preprocessor.cpp:0:0: information: Limiting analysis of branches. Use --check-level=exhaustive to analyze all branches. [normalCheckLevelMaxBranches]
+
+^
+/workspace/scratch/b9b4de71e9ff/ROS2-LTS-Final/src/common/common_msgs/include/common_msgs/command_arbitration.h:0:0: information: Limiting analysis of branches. Use --check-level=exhaustive to analyze all branches. [normalCheckLevelMaxBranches]
+
+^
+/workspace/scratch/b9b4de71e9ff/ROS2-LTS-Final/src/common/common_msgs/include/common_msgs/command_arbitration.h:175:53: performance: Function parameter 'arb' should be passed by const reference. [passedByValue]
+    explicit CommandArbiterFilter(CommandArbitrator arb) : arb_(arb) { reset(); }
+                                                    ^
+/workspace/scratch/b9b4de71e9ff/ROS2-LTS-Final/src/simulation/track_benchmark/test/test_track_generator.cpp:0:0: information: Limiting analysis of branches. Use --check-level=exhaustive to analyze all branches. [normalCheckLevelMaxBranches]
+
+^
+/workspace/scratch/b9b4de71e9ff/ROS2-LTS-Final/src/simulation/track_benchmark/src/kpi_evaluator.cpp:0:0: information: Limiting analysis of branches. Use --check-level=exhaustive to analyze all branches. [normalCheckLevelMaxBranches]
+
+^
+/workspace/scratch/b9b4de71e9ff/ROS2-LTS-Final/src/simulation/track_benchmark/src/benchmark_node.cpp:0:0: information: Limiting analysis of branches. Use --check-level=exhaustive to analyze all branches. [normalCheckLevelMaxBranches]
+
+^
+/workspace/scratch/b9b4de71e9ff/ROS2-LTS-Final/src/simulation/track_benchmark/src/track_generator.cpp:0:0: information: Limiting analysis of branches. Use --check-level=exhaustive to analyze all branches. [normalCheckLevelMaxBranches]
+
+^
+/workspace/scratch/b9b4de71e9ff/ROS2-LTS-Final/src/simulation/track_benchmark/src/benchmark_runner.cpp:0:0: information: Limiting analysis of branches. Use --check-level=exhaustive to analyze all branches. [normalCheckLevelMaxBranches]
+
+^
+/workspace/scratch/b9b4de71e9ff/ROS2-LTS-Final/src/simulation/vehicle_simulator/include/vehicle_simulator/sensor_model_core.hpp:0:0: information: Limiting analysis of branches. Use --check-level=exhaustive to analyze all branches. [normalCheckLevelMaxBranches]
+
+^
+✔ cppcheck passed with 0 issues!
