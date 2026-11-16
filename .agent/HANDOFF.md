@@ -1,3 +1,16 @@
+## 2026-11-16 · #107 最终交接（最新）
+
+- Issue #107：OPEN + in-review；Draft stacked PR #108，base 为 #106 安全分支，未合并/未部署。
+- 已验证代码：d903b10262ba6777dc548a96063fb8e50633e5af；CI 43839420046 SUCCESS。
+- 纯核先 RED（rc=1，7 失败断言）后 GREEN：16 新测试、36/36 核心程序；Jazzy 677 tests 无错误/失败/跳过。
+- 真实 Topic 原始监控 RED→修复 GREEN；21/21 新场景，旧 fault 10/10，QoS/正常闭环/故障样本/八字正负样本均 PASS。
+- 复验中修正双租约过期前提、REQUEST 显式 reset 契约、仿真时间域、跨 Topic reset ACK、新监控 epoch 与失联 FAULT 优先级；未放宽检测阈值、未修改硬件使能/制动标定。
+- 本机无 ROS，后段环境断连；ROS 结论来自远端 Jazzy，原始 JSON/时间线在 CI artifact，索引与日志摘录见 docs/evidence/issue107/ci_runs.json。
+- 报告：docs/VEHICLE_STATE_LEASE_107.md。下一步仅 Planner 核对 SHA/JSON/CI 并决定验收；HIL/实车、测量质量/设备时间和实际停车预算未验证。
+- 当前提交只补文档和证据；不要把本软件 CI 当作实车安全认证，也不要自动关闭 Issue。
+
+---
+
 ## 2026-11-16 · Execution #107（最新，保留既有任务历史）
 
 - Issue #107：实现交付 in-review，保持 OPEN；Draft stacked PR #108，base 为 #106 安全分支。

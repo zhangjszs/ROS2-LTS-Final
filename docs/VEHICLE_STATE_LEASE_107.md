@@ -1,59 +1,82 @@
-# Issue #107 执行报告（2026-11-16）
+# Issue #107 最终执行报告（2026-11-16）
 
 Issue: [#107](https://github.com/zhangjszs/ROS2-LTS-Final/issues/107)
 
-状态: **in-review**。软件实现和可执行核心证据已交付；ROS 2/Jazzy 集成尚未验收。Issue 保持 OPEN，不合并、不上车。
+状态: **OPEN + in-review**。代码和可证伪的软件证据已交付；不关闭 Issue、不合并 PR、不部署实车。
 
-基线 SHA: `8d9479ef930e75192a3391259b1c8486d03a3f79`。开工及发布前分别核对 PR #106，远端未变化。`main` 为 `b769baff033e9d952a4bb936d976e0e7a8850ac8`。
+基线 SHA: `8d9479ef930e75192a3391259b1c8486d03a3f79`。开工及首次发布前均确认 #106 HEAD 未变化；没有覆盖基线分支。
 
 新分支: `fix/vehicle-state-lease-107`
 
-PR: [Draft #108](https://github.com/zhangjszs/ROS2-LTS-Final/pull/108)，base=`fix/fsac-fail-closed-arbiter-20261115`（stacked on #106）。
+PR: [Draft #108](https://github.com/zhangjszs/ROS2-LTS-Final/pull/108)，base=`fix/fsac-fail-closed-arbiter-20261115`，stacked on #106。
 
-## Commits
+已验证的控制/测试代码 SHA: `d903b10262ba6777dc548a96063fb8e50633e5af`。本报告及证据索引提交只更新文档。
 
-| 提交 | 作用 |
+## 结果与证据范围
+
+先在抽离的旧生产判定上取得纯 C++ RED，再实现双租约，随后用远端 Jazzy 临时构建原始 SHA 的监控补齐真实 Topic RED→GREEN。原始监控通过启动场景后，在“单帧合法车辆状态 + 持续 10Hz 规划”场景超过预算仍不停车；修复版同一场景及完整 21 场景通过。
+
+本机 Debian 13 没有 ROS 2/colcon/rclpy，最初 ROS 门禁明确 NOT_RUN。后续 ROS 结果全部来自 GitHub Actions Jazzy，不能写成本机执行。执行后段本地环境断连，源代码已在 GitHub 保存，后续测试修正通过连接的 GitHub 提交并由 CI 执行。
+
+**代码版本 `d903b10262ba6777dc548a96063fb8e50633e5af` 的全量 [Jazzy CI 43839420046](https://github.com/zhangjszs/ROS2-LTS-Final/actions/runs/43839420046) 为 SUCCESS。** 677 包测试、36 个核心测试程序、新增 21 场景、原有 10 故障场景、QoS、闭环正常/故障样本、八字正负样本均通过。后续本报告提交只更新文档和证据索引，其检查状态以 PR Checks 为准。
+
+## Commits：完整 SHA 与链接
+
+| Commit | 内容 |
 | --- | --- |
-| [`c9e70859dfea0f5ec20e75532a180c67028cb22b`](https://github.com/zhangjszs/ROS2-LTS-Final/commit/c9e70859dfea0f5ec20e75532a180c67028cb22b) | 抽离旧接收判定、先提交失败回归；此中间提交故意 RED，不可单独交付 |
-| [`41fd324423fbd040d10bfd2061fff7c9da0c43dc`](https://github.com/zhangjszs/ROS2-LTS-Final/commit/41fd324423fbd040d10bfd2061fff7c9da0c43dc) | 独立修复 #106 遗留 C++ 格式 |
-| [`345bec67b9a9011ef7ef09219d80948d27c43392`](https://github.com/zhangjszs/ROS2-LTS-Final/commit/345bec67b9a9011ef7ef09219d80948d27c43392) | 独立修正旧 PP 限幅测试夹具与非正目标停车契约的冲突 |
-| [`b290425bdc3971ba54797f44ba0770fc0b8a395b`](https://github.com/zhangjszs/ROS2-LTS-Final/commit/b290425bdc3971ba54797f44ba0770fc0b8a395b) | 双租约生产修复、16 项核心回归、ROS 故障注入、契约/CI 接入 |
+| [c9e70859dfea0f5ec20e75532a180c67028cb22b](https://github.com/zhangjszs/ROS2-LTS-Final/commit/c9e70859dfea0f5ec20e75532a180c67028cb22b) | test(safety): extract existing liveness decision and reproduce vehicle dropout (#107) |
+| [41fd324423fbd040d10bfd2061fff7c9da0c43dc](https://github.com/zhangjszs/ROS2-LTS-Final/commit/41fd324423fbd040d10bfd2061fff7c9da0c43dc) | style: correct inherited PR 106 C++ formatting separately |
+| [345bec67b9a9011ef7ef09219d80948d27c43392](https://github.com/zhangjszs/ROS2-LTS-Final/commit/345bec67b9a9011ef7ef09219d80948d27c43392) | test(pp): align inherited pedal clamp fixture with nonpositive-target stop contract |
+| [b290425bdc3971ba54797f44ba0770fc0b8a395b](https://github.com/zhangjszs/ROS2-LTS-Final/commit/b290425bdc3971ba54797f44ba0770fc0b8a395b) | fix(safety): require independent steady receive leases for state and path (#107) |
+| [b2bb06e00d3f8596a21d5c90987bc15a8b2ca853](https://github.com/zhangjszs/ROS2-LTS-Final/commit/b2bb06e00d3f8596a21d5c90987bc15a8b2ca853) | docs(safety): record issue 107 red-green evidence and explicit ROS validation gaps |
+| [0ee77e3875a003ae58ea61100a7be55d55e9c375](https://github.com/zhangjszs/ROS2-LTS-Final/commit/0ee77e3875a003ae58ea61100a7be55d55e9c375) | test(safety): expire both independent leases before recovery-order scenarios |
+| [09db7a7c9ce6fe0dc6e61c78b0047e476b5a58ba](https://github.com/zhangjszs/ROS2-LTS-Final/commit/09db7a7c9ce6fe0dc6e61c78b0047e476b5a58ba) | test(safety): align isolated smoke parameters and stop requests with PR 106 contract |
+| [6d402f012c2728839a45e98158e569517d28aea5](https://github.com/zhangjszs/ROS2-LTS-Final/commit/6d402f012c2728839a45e98158e569517d28aea5) | test(safety): prove baseline monitor RED and fixed monitor GREEN on real ROS topics |
+| [d573712859317c40059ccfd66179d0cdc03de3ee](https://github.com/zhangjszs/ROS2-LTS-Final/commit/d573712859317c40059ccfd66179d0cdc03de3ee) | test(safety): record monitor-side receive lease timestamps in fault timelines |
+| [4070a10ed7a968aa790d51e22059b26c401702c6](https://github.com/zhangjszs/ROS2-LTS-Final/commit/4070a10ed7a968aa790d51e22059b26c401702c6) | test(safety): distinguish explicit request reset from data-only recovery and idle reset |
+| [7a1c765a5b38190327acf0440550bde79a3c59e3](https://github.com/zhangjszs/ROS2-LTS-Final/commit/7a1c765a5b38190327acf0440550bde79a3c59e3) | test(safety): reject false RED caused by startup failure or missing planner traffic |
+| [b85d0c6351613970ee196bd661880bb360a9474e](https://github.com/zhangjszs/ROS2-LTS-Final/commit/b85d0c6351613970ee196bd661880bb360a9474e) | test(safety): stamp simulation fixture paths in the same ROS clock domain |
+| [9197772172dbb1234c238d8e11bba279cb70faae](https://github.com/zhangjszs/ROS2-LTS-Final/commit/9197772172dbb1234c238d8e11bba279cb70faae) | ci(safety): run required fault gate despite unrelated smoke failures after successful build |
+| [0ced8f225434ab0358e529ee50225138c341263b](https://github.com/zhangjszs/ROS2-LTS-Final/commit/0ced8f225434ab0358e529ee50225138c341263b) | test(safety): await explicit reset acknowledgement across independent DDS topics |
+| [d903b10262ba6777dc548a96063fb8e50633e5af](https://github.com/zhangjszs/ROS2-LTS-Final/commit/d903b10262ba6777dc548a96063fb8e50633e5af) | test(safety): acknowledge restarted monitor epoch and retain fault priority on late join |
 
-代码通过已连接 GitHub 的 Git Data API 发布；与本地测试源码的 Git tree 哈希逐项相等，随后 fetch 并将本地分支对齐远端历史。测试代码树为 `5c05aa2fc55c61e4249d01e18baf05e604863991`。证据/交接提交只补文档，不改变该实现。
+## 根因：基线代码路径
 
-## 根因：旧代码路径
+- `src/safety/safety_monitor/src/safety_monitor.cpp:205–219`：有限值校验后永久设置 `has_vehicle_state_`；断流不会撤销。
+- 同文件 `167–202`：新规划只检查“曾收到状态”即可调用 `onPathReceived()` 清 TIMEOUT。
+- 同文件 `264–287`：watchdog 只检查 planner lease，新规划持续时提前返回。
+- 同文件 `241–259`：车辆年龄只用于人工 reset，没有进入运行期停车判定。
 
-以基线 SHA 的 `src/safety/safety_monitor/src/safety_monitor.cpp` 为准：
-
-- **205–219**：合法车辆状态设置 `has_vehicle_state_=true`，断流不会撤销这个永久标记。
-- **167–202**：合法路径只检查曾收到状态，即可调用 `onPathReceived()` 清 TIMEOUT。
-- **264–287**：watchdog 只检查 `planner_lease_`，新路径持续到达时提前返回。
-- **241–259**：车辆年龄只在人工 reset 局部使用，没有进入运行期停车判定。
-
-因此“单次状态 + 持续路径”会保持监控健康。PP 的独立状态保护不等同于系统监控保护，也不能覆盖其他控制源。
-
-新代码证据（`b290425`）：`safety_monitor.cpp:22–25` 参数；`:83–96` wall watchdog / 周期停车；`:113–142` 合法输入分别续租；`:145–165` 双源统一停车/恢复/复位门。`input_freshness.h` 是可注入两种时间的纯 C++ 核心。
+因此规划恢复可掩盖陈旧状态。系统保护不能借助 PP 私有 watchdog 来证明，测试持续提供合法 MPC 正油门以避免这种掩盖。行号以基线 SHA 为准。
 
 ## 修改：逐文件说明
 
-| 文件 | 具体修改 |
+| 文件 | 修改 |
 | --- | --- |
-| `src/safety/safety_monitor/include/safety_monitor/input_freshness.h` | 新增独立车辆/规划 FreshnessLease；有限状态校验；有限正超时参数；steady 接收活性；ROS/接收时间回退作废两个旧 epoch 租约；health/age 诊断数据 |
-| `src/safety/safety_monitor/src/safety_monitor.cpp` | 去掉永久健康布尔及规划代续租；两回调、watchdog、reset 共用健康门；50Hz WallRate，10Hz 持续 stop 心跳；状态/路径订阅走契约 QoS；诊断两源年龄与 freshness |
-| `src/safety/safety_monitor/test/test_input_freshness.cpp` | 16 项确定性测试，组合生产停车/任务状态机和最终仲裁核；虚拟时间，无长 sleep |
-| `src/safety/safety_monitor/CMakeLists.txt` | 注册新测试；把旧停车状态机改为静态库供节点及两测试链接，避免业务源码在测试中重复编译 |
-| `tests/core_standalone/CMakeLists.txt` | 新测试进入 ASan/UBSan 门及覆盖审计，链接同一停车状态机库 |
-| `scripts/vehicle_state_lease_smoke.py` | 真实监控/仲裁进程；合法 MPC 油门持续输入；覆盖启动、单帧定位、各断流、恢复顺序、NaN、非法路径、锁存、授权、两种重启、暂停/回退时钟；记录输入、状态、stop 和最终输出的 steady JSON 时间线 |
-| `scripts/vehicle_state_lease_smoke.sh` | 独立 DDS 域/localhost、150s 总预算、非零失败、缺依赖 NOT_RUN JSON，超时清理 |
-| `scripts/fault_injection_smoke.sh` | arbiter 链先运行独立双租约注入，失败阻断旧门禁；原有场景保留 |
-| `scripts/qos_contract_check.sh` | 显式 simulation 模式允许隔离测试出口重映射（不放宽 real 约束）；增加两个 safety_monitor 输入端点断言 |
-| `.github/workflows/ci.yml` | 支持 stacked PR 的目标分支，新增独立 Jazzy 注入步骤，上传时间线 JSON |
-| `docs/INTERFACE_CONTRACT.md` | 定义各 freshness 状态、时钟域、预算、授权/恢复及设备时间边界 |
-| `src/control/pure_pursuit/test/test_throttle_controller.cpp` | 限幅夹具使用正目标但负速度误差；另断言零目标覆盖正 pedal_min。只改测试，不改参数/标定/控制律 |
-| `docs/VEHICLE_STATE_LEASE_107.md`、`docs/evidence/issue107/*` | 本报告、原始 RED/GREEN/门禁输出和证据哈希 |
-| `.agent/STATE.md`、`.agent/HANDOFF.md`、`.agent/DIARY/2026-11-16.md` | 追加本任务执行事实、边界及 Planner 验收入口；保留其他任务状态 |
+| `src/safety/safety_monitor/include/safety_monitor/input_freshness.h` | 新增独立车辆/规划 FreshnessLease、有限状态校验、有限正超时参数、可注入 steady/ROS 时间；回退/非有限时钟作废旧 epoch，提供 age/freshness |
+| `src/safety/safety_monitor/src/safety_monitor.cpp` | 去掉永久健康布尔和车辆代续规划租约；回调/watchdog/reset 共用双源门；50Hz WallRate、10Hz 持续 stop；契约 QoS；诊断精确 steady 检查时刻及接收年龄 |
+| `src/safety/safety_monitor/test/test_input_freshness.cpp` | 16 项确定性纯核回归；组合生产停车/任务状态机和仲裁核；覆盖未 ARM/START、锁存、重启、时钟、非有限输入与恢复顺序 |
+| `src/safety/safety_monitor/CMakeLists.txt` | 注册测试；停车状态机静态库供节点及测试链接，避免重复编译业务源码 |
+| `tests/core_standalone/CMakeLists.txt` | 新测试进入 ASan/UBSan 和覆盖审计，链接同一状态机库 |
+| `scripts/vehicle_state_lease_smoke.py` | 生产监控/仲裁进程，合法 MPC 帧持续输入；21 场景、自动断言、JSON 时间线、失败快照；显式 reset 等待状态确认；新监控双 Absent 确认其 epoch |
+| `scripts/vehicle_state_lease_smoke.sh` | 独立 DDS 域/localhost、150s 总预算、进程清理、缺依赖 NOT_RUN、超时非零 |
+| `scripts/vehicle_state_lease_red_green.sh` | 备份/临时构建原始监控并精确判定 RED，恢复源码重建 GREEN；EXIT 恢复源文件；拒绝启动失败/无持续规划等假 RED |
+| `scripts/fault_injection_smoke.sh` | 先运行独立双租约场景；旧外部停车走 request/撤销/两级 reset；显式 daemon 启动；仿真时间戳；晚加入在监控已被杀的前提下允许安全 FAULT，强化零油门+有效制动断言 |
+| `scripts/qos_contract_check.sh` | 隔离重映射出口显式 simulation；断言监控真实订阅车辆和规划两个输入 |
+| `scripts/closed_loop_sim_smoke.sh` | Python 路径发布器显式 use_sim_time，统一来源时间域，判据不变 |
+| `scripts/closed_loop_fault_smoke.sh` | 同上，保留全部故障及预算判据 |
+| `scripts/acceleration_finish_smoke.sh` | 隔离仿真显式 simulation；Python 路径戳使用仿真时间 |
+| `scripts/skidpad_finish_smoke.sh` | 同上；不改变圈数/完赛负样本判据 |
+| `scripts/skidpad_closed_loop_smoke.sh` | 隔离仿真显式 simulation，符合 #106 拒绝 real autostart 的约束 |
+| `scripts/mpc_reject_smoke.sh` | Python 路径戳使用仿真时间；不改变拒解判据 |
+| `.github/workflows/ci.yml` | 支持 stacked PR 的目标分支；真实 RED→GREEN；保存 JSON；构建成功后即使无关 smoke 失败也执行关键 fault gate，原失败仍保留 |
+| `docs/INTERFACE_CONTRACT.md` | 双租约、时间域、预算、恢复/授权、设备测量时间边界 |
+| `src/control/pure_pursuit/test/test_throttle_controller.cpp` | 独立修正旧限幅夹具：使用正目标但负误差；另验证零目标覆盖正 pedal_min；只改测试 |
+| `.agent/STATE.md`、`.agent/HANDOFF.md` | 更新本任务执行事实、验证边界及 Planner 入口，保留原队列历史 |
+| `.agent/DIARY/2026-11-16.md` | 追加最终结论和测试问题，不重写既有日记 |
+| `docs/VEHICLE_STATE_LEASE_107.md`、`docs/evidence/issue107/*` | 本报告、既有核心原始日志/JSON、CI 摘要及原始 JSON artifact 索引 |
 
-独立格式提交涉及以下 10 文件，仅 include 排序/换行/空白变化，无业务修改：
+独立格式提交 `41fd324` 只处理 include/空白/换行，涉及以下十文件（PP 测试另有上述独立夹具修改）：
 
 - `src/common/common_msgs/include/common_msgs/task_state_machine.h`
 - `src/control/pure_pursuit/include/pure_pursuit/throttle_controller.h`
@@ -68,48 +91,36 @@ PR: [Draft #108](https://github.com/zhangjszs/ROS2-LTS-Final/pull/108)，base=`f
 
 ## 判定与恢复规则
 
-1. 车辆接收预算默认 **0.3s**（与 PP 对齐），规划仍 **0.5s**，均不可负值/零/NaN/Inf；未做实车标定。
-2. 合法车辆状态只指 x/y/theta/v 有限；Header 是发布时刻，不是设备测量时间。本任务不解释质量枚举，不换算 GPS 时间，不声称解决持续旧观测或无效定位质量。
-3. Absent / Stale 都停车。FromFuture 的接收时钟异常或 ROS 回退作废双租约，报告 Absent；两个源须在新 epoch 重新到达。非有限时钟同样 fail closed。
-4. 接收租约与 watchdog 使用 steady 时间；ROS 暂停后没有新合法状态仍超时。ROS 前跳不延长接收租约，规划来源戳仍按 ROS 年龄校验。
-5. 仅双源 Fresh 可清 TIMEOUT；路径恢复不掩盖陈旧状态。健康数据不清 REQUEST/FAULT，reset 另受双源门约束。
-6. 监控 IDLE 不授予任务许可；仲裁器 IDLE/ARMED 保持制动，显式 ARM→START 才可行驶。已有 RUNNING 的可恢复 TIMEOUT 可在健康恢复后恢复，未新增授权。仲裁器重启回任务 IDLE；监控心跳中断超过仲裁预算锁存 FAULT。
-7. 名义软件检测预算 = 最后合法接收 + 超时阈值 + 一拍 50Hz watchdog；DDS/调度/仲裁延迟另计。集成测试预声明 0.35s 调度容差，不等于实车制动/停车距离预算。
+1. 车辆接收预算 `safety.state_timeout_sec=0.3` 秒，与 PP 默认值对齐；规划 `planner_timeout=0.5` 秒保持原预算。必须有限且 >0；均未完成实车标定。
+2. 合法状态在本单指 x/y/theta/v 有限；只有合法接收续车辆租约。Header 是发布时刻，未解释设备 GPS 测量时间或质量枚举。
+3. Absent / Stale 都停车；仅双源 Fresh 清 TIMEOUT。接收时钟 FromFuture 或 ROS 回退作废旧 epoch 两租约，对外呈 Absent；必须重收双源。非有限时钟同样 fail closed。
+4. 接收租约与 watchdog 用 steady 时间；暂停 ROS 不冻结断流保护。规划来源戳仍按 ROS 时间验证，合法区间保持 `[-0.05, planner_timeout]`，无效帧不续租。
+5. 健康数据不清 REQUEST/FAULT。监控 IDLE 不授予任务许可；仲裁器 IDLE/ARMED 无动力，须显式 ARM→START。
+6. 既有 REQUEST 显式 reset 会保留原 RUNNING；FAULT/FINISHED reset 才回 IDLE。此为原任务契约，未在本单改变。是否要求所有 reset 后重新 ARM→START 属于 #16 的协议决策。
+7. 软件名义检测预算为最后合法接收 + 对应 timeout + 一拍 50Hz watchdog；DDS/调度/仲裁延迟另计。测试 0.35s 调度容差不等于实际制动建立或停车距离预算。
 
-## 测试证据
+## 测试证据：命令、环境与结果
 
-环境：Debian 13，GCC 14.2.0，CMake 3.31.6，clang-format 19.1.7，cppcheck 2.17.1；没有 `/opt/ros`、`ros2`、`colcon` 或 `rclpy`。纯核依赖 GTest/Eigen 安装在临时用户前缀，通过 PATH / LD_LIBRARY_PATH / CMAKE_PREFIX_PATH 使用，无生产依赖修改。
+本机：Debian 13 / GCC 14.2.0 / CMake 3.31.6 / clang-format 19.1.7 / cppcheck 2.17.1。GTest/Eigen 使用临时用户前缀，无生产依赖修改。容器 ptrace 不支持 LSan，`ASAN_OPTIONS=detect_leaks=0`；AddressSanitizer/UndefinedBehaviorSanitizer 保持启用，不声称检过泄漏。远端：Ubuntu 24.04 / ROS 2 Jazzy，工作流包含完整 rosdep 依赖及 mold/ccache。
 
-容器在 ptrace 下不支持 LSan，设置 `ASAN_OPTIONS=detect_leaks=0`；AddressSanitizer 和 UndefinedBehaviorSanitizer 保持启用，不能据此声称检过泄漏。
+| 验证 | 结果及证据 |
+| --- | --- |
+| 旧判定 `test_input_freshness_red` | 预期 FAIL rc=1，1 用例 7 失败断言；状态最后接收 100.0s，规划到 101.0s 仍错误健康；`red.log/red.json` |
+| 修复后 `test_input_freshness` | PASS rc=0，16/16；`green.log/green.json` |
+| `ASAN_OPTIONS=detect_leaks=0 bash scripts/core_standalone_check.sh` | PASS，36/36 测试程序，含旧 stop/task/arbiter/PP 回归；`core.log` |
+| `bash scripts/lint_cpp.sh` | 命令 rc=0，clang-format PASS；本机 cppcheck 有基线解析/性能诊断，不能称 0 issues；`lint.log/baseline-cppcheck.log` |
+| `bash scripts/lint_shell.sh`、Python py_compile | 本机及断连前已执行部分 PASS；最后远端脚本修改由 CI 实际执行验证；本机 shellcheck 建议层缺失明确跳过 |
+| 本机 colcon build/test/test-result、ROS 注入 | NOT_RUN：缺 colcon/rclpy，rc=127/2；既有 `ros-*.log` 和 NOT_RUN JSON 保留 |
+| Jazzy 全量 colcon build/test/test-result | PASS；已核对 677 tests、0 errors/0 failures/0 skipped；最新代码各对应步骤亦通过 |
+| `bash scripts/vehicle_state_lease_red_green.sh` | 真实原始监控精确 RED，修复监控 GREEN；21/21 Topic 场景，含实际两种重启/时钟/锁存/授权 |
+| `bash scripts/fault_injection_smoke.sh` | PASS：独立 21 场景前置 + 原有 10/10 场景；最终出口零油门/有效制动、锁存和晚加入已自动判定 |
+| headless / QoS / benchmark / 闭环正常及故障样本 | 全部 PASS；八字完赛正样本及 REQUIRED_LAPS=3 可证伪负样本也通过 |
 
-| 命令/范围 | 结果 | 原始证据 |
-| --- | --- | --- |
-| 旧判定回归：`test_input_freshness_red --gtest_output=json:...` | **预期 FAIL, rc=1**；车辆最后接收 100.0s，路径 100.4–101.0s 持续到达，错误地仍健康，共 7 个失败断言 | `evidence/issue107/red.log`、`red.json` |
-| 修复后 `test_input_freshness --gtest_output=json:...` | **PASS, rc=0, 16/16** | `green.log`、`green.json` |
-| `ASAN_OPTIONS=detect_leaks=0 bash scripts/core_standalone_check.sh` | **PASS, rc=0, 36/36 测试程序**；覆盖审计通过；包含旧 stop/task/arbiter/PP 回归 | `core.log` |
-| `bash scripts/lint_cpp.sh` | **rc=0**；clang-format PASS。cppcheck 有基线解析/性能诊断，不能称“0 issues”；脚本未设 error-exitcode，不以 rc=0 消除这些诊断 | `lint.log`、`baseline-cppcheck.log` |
-| `bash scripts/lint_shell.sh` | **PASS, rc=0**；bash -n / 禁止 no-daemon 断言 / readiness 自测通过；shellcheck 缺失，建议层跳过 | `shell.log` |
-| `python3 -m py_compile scripts/vehicle_state_lease_smoke.py` | **PASS, rc=0**；只验证 Python 语法 | 可按命令重现 |
-| 下列带完整参数 `colcon build` | **NOT_RUN**，启动命令 rc=127，缺 colcon/ROS | `ros-build.log` |
-| `colcon test --packages-select safety_monitor pure_pursuit` | **NOT_RUN**，rc=127 | `ros-test.log` |
-| `colcon test-result --verbose` | **NOT_RUN**，rc=127 | `ros-test-result.log` |
-| `bash scripts/vehicle_state_lease_smoke.sh build/issue107/integration` | **NOT_RUN**，rc=2，缺 rclpy | `ros-integration.json` |
-| `bash scripts/fault_injection_smoke.sh build/issue107/fault` | **NOT_RUN**，rc=2；前置注入明确缺 rclpy，旧场景未运行 | `fault.log` |
+原始核心证据已提交于本目录下 `evidence/issue107/`，`manifest.json` 提供初始 14 文件 SHA256。远端证据索引为 `ci_runs.json`，包含精确运行 SHA、原生 artifact URL 和服务端 ZIP SHA256；每个 `ci-<run>-excerpt.log` 是日志摘录，原始 Topic `summary.json/timeline.json` 在对应 artifact ZIP 中。CI 原始 artifact 按仓库配置保留 14 天，验收时应下载归档；脚本可按固定提交重新生成。
 
-**RED 的证据范围**：这是从旧节点接收判定抽离的纯 C++ 逻辑复现，不是运行旧 ROS 节点或真实 Topic 的 RED。不能把上述核心 PASS 写成 Topic、QoS、ROS adapter、HIL 或实车 PASS。首次全量核心测试还有旧 PP 夹具失败，已在原始基线 worktree 单独复核相同失败（`baseline-throttle.log`），并由独立测试提交修正。
+时间线含 harness 输入发送/输出接收，以及 `monitor_input_leases` 中监控检查时刻与两源最后合法接收；没有把发送时刻冒充接收时刻。首次 21 GREEN 的 artifact 实测含 1108 条监控侧租约记录。
 
-在已安装 GTest/Eigen 的环境重放 RED：
-
-```bash
-git worktree add ../issue107-red c9e70859dfea0f5ec20e75532a180c67028cb22b
-cd ../issue107-red
-cmake -S tests/core_standalone -B build/core_standalone -DCORE_ASAN=ON
-cmake --build build/core_standalone --target test_input_freshness --parallel 4
-ASAN_OPTIONS=detect_leaks=0 build/core_standalone/test_input_freshness
-# 期望非零；同一用例在修复分支必须返回零
-```
-
-Jazzy 补验命令（源依赖须先按工程 rosdep 安装；门禁需要仿真器、profiler 等完整工作区）：
+Jazzy 对应构建/测试命令（CLI cmake-args 重列默认项，开启测试）：
 
 ```bash
 source /opt/ros/jazzy/setup.bash
@@ -121,38 +132,32 @@ source install/setup.bash
 colcon test --packages-select safety_monitor pure_pursuit
 colcon test-result --verbose
 bash scripts/vehicle_state_lease_smoke.sh build/vehicle_state_lease
-# 完整旧 smoke 另需先构建整个仿真依赖链，使用工程全量命令：
-colcon build --symlink-install --packages-ignore hello_world huat_launch --cmake-args \
-  -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_STANDARD=20 -DCMAKE_LINKER_TYPE=MOLD \
-  -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DBUILD_TESTING=ON
-source install/setup.bash
-timeout 20 ros2 daemon stop || true
-ros2 daemon start
-sleep 3
+bash scripts/vehicle_state_lease_red_green.sh build/vehicle_state_lease_red_green
+# 旧 smoke 还需要仿真器/profiler 等完整工作区；CI 实际采用同一参数的全量构建/包测试。
 bash scripts/fault_injection_smoke.sh
 ```
 
-本地若有既知 UDP 发现限制，再按工程约定设 `FASTDDS_BUILTIN_TRANSPORTS=SHM`；不以修改超时/判据迁就失败。
+## CI 状态：原有失败与新增问题
 
-JSON 时间线使用 steady 接收时刻，记录最后输入、trigger、`/system/stop`、`/system/state` 与每帧最终制动值。不得用没有新消息的旧快照冒充持续保护。异常/超时返回非零；缺依赖返回 2 并写 NOT_RUN。
+- #106 原 [43686642036](https://github.com/zhangjszs/ROS2-LTS-Final/actions/runs/43686642036) 失败于格式，后续未执行。由独立格式提交修复；后续 CI lint 已通过。
+- 新增恢复夹具最初只等 0.3s 定位到期，规划 0.5s 尚 Fresh；以及把 REQUEST 显式 reset 误判为必须 IDLE。均根据源码/失败 JSON 修测试前提，未放宽停止阈值或改生产授权规则。
+- DDS 不保证跨 Topic 顺序。单次 reset 曾因仲裁器尚未处理恢复而被安全拒绝；现按幂等语义有限重发，等待状态确认。重启监控以新实例双 Absent/steady epoch 作为就绪确认，保留严格输出不变量。
+- 旧闭环 Python feeder 用系统时间戳、消费者用仿真时间，严格来源年龄门正确拒收。修正测试时钟，不删除安全门。旧晚加入场景先杀了监控，故可合法进入更安全的 FAULT；只放宽字面任务态到 IDLE/FAULT，同时强化零油门+有效制动，清洁重启 IDLE 在独立场景另验。
+- setup-ros 多次 HTTP404 属环境失败，均在业务测试前结束，不计作 RED；已对失败 job 重试。
 
-## CI 状态
-
-- #106 已有失败：[run 43686642036](https://github.com/zhangjszs/ROS2-LTS-Final/actions/runs/43686642036)，失败于 clang-format，后续构建/测试未执行。该失败不归因于本修复。
-- #108 新 CI：[run 43830539804](https://github.com/zhangjszs/ROS2-LTS-Final/actions/runs/43830539804)，发布报告时运行中；尚无 Jazzy 成功结论。若后续状态变化，以 PR 检查和后续证据追加为准。
-- 本机 cppcheck 2.17.1 对既有 GTest 文件产生解析诊断；已在原基线的 `test_velocity_profiler.cpp` 复核同样症状。未扩展本单去重构无关测试或宣称静态分析全干净。
+最新代码 [43839420046](https://github.com/zhangjszs/ROS2-LTS-Final/actions/runs/43839420046) **SUCCESS**，准确绑定 `d903b10262ba6777dc548a96063fb8e50633e5af`；没有剩余的新代码 CI 失败。本次仅文档/证据提交不改变受测控制代码，最终文档 HEAD 的新检查可能仍在运行。
 
 ## 遗留风险与回退
 
-- ROS 适配层编译、Topic/QoS、并发和 DDS 时序尚未在本机执行；新注入脚本的运行正确性也待 Jazzy 验证。
-- 定位质量、设备测量时间语义、实际制动/执行器延迟、硬件 watchdog/驱动使能仍无标定/HIL/实车证据。
-- `HuatStop` 仍只有 bool，REQUEST 依赖独立请求通道和两级 reset 协调；断连、请求持久重发、快速重启等系统风险仍属 #16。
-- 仲裁器在已经 RUNNING 的 TIMEOUT 恢复后允许继续；监控重启若短于心跳失联阈值，是否要求全新人工 ARM→START，仍由 #16 的系统级重启授权协议验收。本单不改变既有任务状态机或硬件使能策略。
-- 回退使用 revert 生产修复提交恢复原行为；这会重新引入已确认的定位断流缺口，必须继续禁止作为已验收实车基线。更安全的处置是保留 Draft/OPEN，在隔离环境修复验证。
+- 无 HIL/台架/实车证据，未做实际制动距离、执行器延迟、硬件 watchdog/驱动使能标定；没有实车部署或认证。
+- 仅证明合法状态的接收活性。持续旧观测、定位质量枚举及 GPS/ROS 时间标定仍需 #12/#16 后续证据，不能由本单替代。
+- HuatStop 仍只有 bool；REQUEST 的独立请求通道、两级 reset、快速重启/旧消息 epoch 和操作员安全网关的系统级协议仍需 #16 验收。
+- 本单未把单调接收租约扩展为所有控制源的时钟协议；其他源暂停/回退及硬件断连矩阵仍需独立覆盖。
+- 回退本分支会重引定位断流缺口；应保持隔离软件测试及 Draft，不能把原始基线当已验证实车方案。没有部署动作需要回滚。
 
-## 下一步：Planner 验收
+## 下一步：Planner 验收清单
 
-1. 复核 RED/GREEN 的证据层级、完整 SHA、源码树与 36 个核心程序结果，确认定位门与规划门真正独立。
-2. 在 Jazzy 跑新增注入和旧故障门禁，审查每一场景 JSON 时间线、持续心跳、两种恢复顺序、REQUEST/FAULT 与重启授权，补齐真实 Topic RED/GREEN。
-3. 检查 #108 CI 全部结果，区分新失败、基线失败和环境缺失；本单不得以“静态分析/核心通过”验收全部集成标准。
-4. 单独安排 HIL/台架/实车预算与执行器验证；仅 Planner 根据证据决定是否关闭 #107、处理 #106 的合入顺序。
+1. 核对完整 SHA、纯核与真实 Topic RED→GREEN；确认单帧定位场景曾先解除 TIMEOUT，规划持续到达，故障后 stop 与最终制动持续。
+2. 审查 21 场景及旧 10 场景 JSON，重点为双恢复顺序、REQUEST/FAULT、ARM→START、新实例 epoch、暂停/回退；区分节点接收与 harness 发送。
+3. 核对最新代码 CI 和最终文档提交的检查，确认原有门禁无退化；不得用本机 NOT_RUN 或单项 PASS 代替完整结论。
+4. 安排 HIL/实车预算、设备质量/测量时间及硬件保护验证；仅 Planner 根据证据决定 #107 是否关闭和 #106/#108 合入顺序。

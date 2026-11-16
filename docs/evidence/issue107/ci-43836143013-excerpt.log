@@ -1,0 +1,57 @@
+2026-11-16T09:14:38.7653090Z Summary: 677 tests, 0 errors, 0 failures, 0 skipped
+2026-11-16T09:15:20.4132806Z PASS startup_no_vehicle
+2026-11-16T09:15:21.1361274Z     raise AssertionError(f"condition timed out after {budget}s")
+2026-11-16T09:15:21.1361792Z AssertionError: condition timed out after 0.6499999999999999s
+2026-11-16T09:15:21.3101332Z EXPECTED RED: 原始监控在单帧定位+持续规划场景失败
+2026-11-16T09:15:23.9446458Z PASS startup_no_vehicle
+2026-11-16T09:15:24.6769796Z PASS one_vehicle_frame_continuous_path
+2026-11-16T09:15:25.3769265Z PASS healthy_and_explicit_arm_start
+2026-11-16T09:15:26.0768968Z PASS vehicle_only_lost_while_driving
+2026-11-16T09:15:27.2170213Z PASS path_only_lost_while_driving
+2026-11-16T09:15:28.1367958Z PASS both_lost
+2026-11-16T09:15:29.7567309Z PASS path_recovers_before_vehicle
+2026-11-16T09:15:31.3768810Z PASS vehicle_recovers_before_path
+2026-11-16T09:15:32.3567810Z PASS nonfinite_vehicle_x
+2026-11-16T09:15:33.3169927Z PASS nonfinite_vehicle_y
+2026-11-16T09:15:34.2769628Z PASS nonfinite_vehicle_theta
+2026-11-16T09:15:35.2369604Z PASS nonfinite_vehicle_v
+2026-11-16T09:15:36.3368902Z PASS invalid_path_empty
+2026-11-16T09:15:37.4368155Z PASS invalid_path_old
+2026-11-16T09:15:38.4568928Z PASS invalid_path_future
+2026-11-16T09:15:39.3969709Z PASS request_latch_survives_healthy_data
+2026-11-16T09:15:40.1172144Z PASS fault_latch_survives_healthy_data
+2026-11-16T09:15:42.3262411Z PASS arbiter_restart_no_permission
+2026-11-16T09:15:45.6059231Z AssertionError: safety invariant violated during sustained observation
+2026-11-16T09:15:45.7806364Z ##[error]Process completed with exit code 1.
+2026-11-16T09:15:47.2518408Z PASS startup_no_vehicle
+2026-11-16T09:15:47.9767867Z PASS one_vehicle_frame_continuous_path
+2026-11-16T09:15:48.6518331Z PASS healthy_and_explicit_arm_start
+2026-11-16T09:15:49.3627331Z PASS vehicle_only_lost_while_driving
+2026-11-16T09:15:50.4026960Z PASS path_only_lost_while_driving
+2026-11-16T09:15:51.3317212Z PASS both_lost
+2026-11-16T09:15:52.9318007Z PASS path_recovers_before_vehicle
+2026-11-16T09:15:54.5366879Z PASS vehicle_recovers_before_path
+2026-11-16T09:15:55.5167771Z PASS nonfinite_vehicle_x
+2026-11-16T09:15:56.4718433Z PASS nonfinite_vehicle_y
+2026-11-16T09:15:57.3717965Z PASS nonfinite_vehicle_theta
+2026-11-16T09:15:58.3366777Z PASS nonfinite_vehicle_v
+2026-11-16T09:15:59.4568005Z PASS invalid_path_empty
+2026-11-16T09:16:00.5518031Z PASS invalid_path_old
+2026-11-16T09:16:01.6317630Z PASS invalid_path_future
+2026-11-16T09:16:02.6026531Z PASS request_latch_survives_healthy_data
+2026-11-16T09:16:03.3228404Z PASS fault_latch_survives_healthy_data
+2026-11-16T09:16:04.4366512Z PASS arbiter_restart_no_permission
+2026-11-16T09:16:09.3199474Z PASS monitor_restart_timeout_and_fault_latch
+2026-11-16T09:16:10.2799416Z PASS paused_ros_clock_vehicle_timeout
+2026-11-16T09:16:10.9599305Z PASS ros_clock_rollback_needs_both_sources
+2026-11-16T09:17:03.4314856Z OK   01_baseline_drive: task=2 safety=0 kind=0 reason=0 winner=1 A=0 B=1 pedal=4 brake=0 v=1.379
+2026-11-16T09:17:03.4316375Z OK   02_path_lost: task=2 safety=2 kind=1 reason=1 winner=0 A=0 B=1 pedal=0 brake=80 v=0.0
+2026-11-16T09:17:03.4318313Z OK   03_empty_path: task=2 safety=2 kind=1 reason=1 winner=0 A=0 B=1 pedal=0 brake=80 v=0.0
+2026-11-16T09:17:03.4319899Z OK   04_tampered_source_frame: task=2 safety=0 kind=0 reason=0 winner=1 A=0 B=3 pedal=5 brake=0 v=0.95
+2026-11-16T09:17:03.4321313Z OK   05_external_stop_and_resume: task=2 safety=0 kind=0 reason=0 winner=1 A=0 B=3 pedal=5 brake=0 v=1.317
+2026-11-16T09:17:03.4322547Z OK   06_abort_is_latched: task=4 safety=2 kind=3 reason=1 winner=0 A=0 B=3 pedal=0 brake=80 v=0.0
+2026-11-16T09:17:03.4323869Z OK   07_repeat_stop_idempotent: task=4 safety=2 kind=3 reason=1 winner=0 A=0 B=3 pedal=0 brake=80 v=0.0
+2026-11-16T09:17:03.4325256Z OK   08_manual_reset_no_permission: task=0 safety=0 kind=0 reason=2 winner=0 A=0 B=3 pedal=0 brake=80 v=0.0
+2026-11-16T09:17:03.4326593Z OK   09_monitor_exit: task=4 safety=2 kind=3 reason=1 winner=0 A=0 B=3 pedal=0 brake=80 v=0.0
+2026-11-16T09:17:03.4327727Z FAIL 10_arbiter_restart_late_join: task=4 safety=2 kind=3 reason=1 winner=0 A=0 B=1 pedal=0 brake=80 v=0.0
+2026-11-16T09:17:05.1479275Z ##[error]Process completed with exit code 1.
