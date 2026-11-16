@@ -23,6 +23,7 @@ class SkidpadPlannerNode {
     void PublishEmptyPathLimits();
     void PublishPrevPath(const std::vector<Point2D>& prev_path_bl);
     bool IsPrevPathFrozen(const std::vector<Point2D>& prev_path_bl) const;
+    bool CanReusePrevPath() const;
     static geometry_msgs::msg::Point MakePoint(double x, double y, double z);
 
     // 将锥桶的 position_global 转换到当前帧的 position_base_link
@@ -42,6 +43,8 @@ class SkidpadPlannerNode {
     std::unique_ptr<IcpApfPlanner> planner_;
     std::vector<Point2D> prev_path_global_;  // 全局坐标，避免车移动后坐标失效
     bool has_prev_path_;
+    rclcpp::Time last_fresh_path_time_;
+    double max_path_reuse_age_sec_ = 0.5;
 
     // #101：持久走廊模型（**全局坐标**）：瓣圆心 + 中线半径。
     // 存全局坐标的原因同 prev_path_global_——车在动，base_link 坐标每帧都变，

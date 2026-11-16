@@ -1,0 +1,57 @@
+Running main() from ../deps/googletest/googletest/src/gtest_main.cc
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from InputFreshness
+[ RUN      ] InputFreshness.OneVehicleSampleWithContinuousTenHzPathMustExpire
+src/safety/safety_monitor/test/test_input_freshness.cpp:14: Failure
+Value of: inputs.healthy(now, now)
+  Actual: true
+Expected: false
+vehicle last rx=100, path rx=100.40000000000001
+
+src/safety/safety_monitor/test/test_input_freshness.cpp:14: Failure
+Value of: inputs.healthy(now, now)
+  Actual: true
+Expected: false
+vehicle last rx=100, path rx=100.5
+
+src/safety/safety_monitor/test/test_input_freshness.cpp:14: Failure
+Value of: inputs.healthy(now, now)
+  Actual: true
+Expected: false
+vehicle last rx=100, path rx=100.59999999999999
+
+src/safety/safety_monitor/test/test_input_freshness.cpp:14: Failure
+Value of: inputs.healthy(now, now)
+  Actual: true
+Expected: false
+vehicle last rx=100, path rx=100.7
+
+src/safety/safety_monitor/test/test_input_freshness.cpp:14: Failure
+Value of: inputs.healthy(now, now)
+  Actual: true
+Expected: false
+vehicle last rx=100, path rx=100.8
+
+src/safety/safety_monitor/test/test_input_freshness.cpp:14: Failure
+Value of: inputs.healthy(now, now)
+  Actual: true
+Expected: false
+vehicle last rx=100, path rx=100.90000000000001
+
+src/safety/safety_monitor/test/test_input_freshness.cpp:14: Failure
+Value of: inputs.healthy(now, now)
+  Actual: true
+Expected: false
+vehicle last rx=100, path rx=101
+
+[  FAILED  ] InputFreshness.OneVehicleSampleWithContinuousTenHzPathMustExpire (4 ms)
+[----------] 1 test from InputFreshness (4 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (5 ms total)
+[  PASSED  ] 0 tests.
+[  FAILED  ] 1 test, listed below:
+[  FAILED  ] InputFreshness.OneVehicleSampleWithContinuousTenHzPathMustExpire
+
+ 1 FAILED TEST

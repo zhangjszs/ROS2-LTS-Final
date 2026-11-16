@@ -14,6 +14,22 @@ using cone_dedup_algo::Point2D;
 
 static constexpr double kInfCost = 1e9;
 
+TEST(EgoVelocity, UsesContiguousVehicleStateSamples) {
+    const auto v1 = cone_dedup_algo::EstimateEgoVelocity({0.0, 0.0}, {1.0, 0.0}, 0.1);
+    ASSERT_TRUE(v1.valid);
+    EXPECT_DOUBLE_EQ(v1.vx, 10.0);
+    const auto v2 = cone_dedup_algo::EstimateEgoVelocity({1.0, 0.0}, {2.0, 0.0}, 0.1);
+    ASSERT_TRUE(v2.valid);
+    EXPECT_DOUBLE_EQ(v2.vx, 10.0);  // 不能用 t-2 位置而得出 20 m/s
+}
+
+TEST(EgoVelocity, InvalidTimeOrCoordinatesFailClosed) {
+    EXPECT_FALSE(cone_dedup_algo::EstimateEgoVelocity({0, 0}, {1, 0}, 0.0).valid);
+    EXPECT_FALSE(cone_dedup_algo::EstimateEgoVelocity({0, 0}, {1, 0}, -0.1).valid);
+    EXPECT_FALSE(cone_dedup_algo::EstimateEgoVelocity({0, 0}, {1, 0}, 1.0).valid);
+    EXPECT_FALSE(cone_dedup_algo::EstimateEgoVelocity({0, 0}, {std::nan(""), 0}, 0.1).valid);
+}
+
 // ── HungarianAssign ────────────────────────────────────────────────────────
 
 TEST(HungarianAssignTest, EmptyCost) {

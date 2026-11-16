@@ -121,6 +121,25 @@ void PurePursuitController::OnPathLimitsMessage(const common_msgs::msg::HuatPath
         last_goal_idx_ = -1;
         return;
     }
+    bool geometry_ok = msgs->path.size() >= 2 && common_msgs::contract::isFrameSupported(msgs->header.frame_id);
+    if (geometry_ok) {
+        for (const auto& point : msgs->path) {
+            if (!std::isfinite(point.x) || !std::isfinite(point.y)) {
+                geometry_ok = false;
+                break;
+            }
+        }
+    }
+    if (!geometry_ok) {
+        RCLCPP_WARN(node_->get_logger(), "[pure_pursuit] Invalid path rejected; clearing active reference");
+        refx_.clear();
+        refy_.clear();
+        ref_speeds_.clear();
+        has_received_path_ = false;
+        has_explicit_speeds_ = false;
+        last_goal_idx_ = -1;
+        return;
+    }
     path_in_base_link_ = pp_math::isBaseLinkFrame(msgs->header.frame_id);
     has_received_path_ = true;
     refx_.clear();
@@ -333,6 +352,17 @@ void PurePursuitController::ComputeControlCommand(common_msgs::msg::HuatControlC
         throttle_params.target_speed = pp_core::SelectThrottleTarget(
             has_explicit_speeds_, std::span<const double>{ref_speeds_.data(), ref_speeds_.size()},
             static_cast<std::size_t>(std::max(goal_idx, 0)), throt.target_speed);
+        if (!std::isfinite(throttle_params.target_speed) || throttle_params.target_speed <= 0.0) {
+            // 显式目标 0 必须制动，不允许低速固定电流覆盖；无效目标硬制动。
+            throttle_ctrl_.reset();
+            filtered_angle_ = 0.0;
+            const auto brake = std::isfinite(throttle_params.target_speed) && throttle_params.target_speed == 0.0
+                                   ? actuator_calib_.softBrakeRaw()
+                                   : actuator_calib_.emergencyBrakeRaw();
+            finall_cmd = encoder_.encodeBrake(racing_num_, brake);
+            pub_finall_cmd_->publish(finall_cmd);
+            return;
+        }
         pedal_ratio_ = throttle_ctrl_.update(current_speed_, throttle_params);
         cmd.throttle.data = static_cast<float>(static_cast<int>(throttle_ctrl_.lastCurrent()));
         RCLCPP_DEBUG(node_->get_logger(), "[pure_pursuit] Throttle: %f, pedal ratio: %d", cmd.throttle.data,

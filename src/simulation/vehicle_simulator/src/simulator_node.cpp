@@ -1,6 +1,7 @@
 #include "vehicle_simulator/simulator_node.hpp"
 
 #include <chrono>
+#include <cmath>
 #include <numbers>
 #include <string>
 
@@ -15,6 +16,10 @@ namespace {
 
 constexpr double kPi = std::numbers::pi_v<double>;
 constexpr double kRadToDeg = 180.0 / kPi;
+
+[[nodiscard]] double SteadySeconds() {
+    return std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
+}
 
 }  // namespace
 
@@ -47,6 +52,7 @@ void SimulatorNode::LoadParameters() {
     declare_parameter<double>("fov_deg", 120.0);
     declare_parameter<double>("max_range", 15.0);
     declare_parameter<double>("noise_stddev", 0.01);
+    declare_parameter<double>("safety.cmd_timeout_sec", 0.5);
     declare_parameter<std::string>("track_file", "");
     // #17-B：publish_clock=true 时由物理 tick 以固定步长递进并发布 /clock（确定性回放/回归）；
     // seed 为感知噪声随机种子（默认 42，固定可复现）。
@@ -87,6 +93,10 @@ void SimulatorNode::LoadParameters() {
     get_parameter("fov_deg", fov_deg_);
     get_parameter("max_range", max_range_);
     get_parameter("noise_stddev", noise_stddev_);
+    get_parameter("safety.cmd_timeout_sec", cmd_timeout_sec_);
+    if (!std::isfinite(cmd_timeout_sec_) || cmd_timeout_sec_ <= 0.0)
+        cmd_timeout_sec_ = 0.5;
+    cmd_lease_ = common_msgs::vehicle::FreshnessLease(common_msgs::vehicle::LeaseConfig{cmd_timeout_sec_, 0.0});
     get_parameter("track_file", track_file_);
 
     double init_x = 0.0, init_y = 0.0, init_theta = 0.0, init_v = 0.0;
@@ -181,10 +191,13 @@ void SimulatorNode::OnVehicleCommand(const common_msgs::msg::HuatVehicleCmd::Con
 
     // #15：油门/制动 -> 加速度 解码统一走共用执行器标定层（与原 (raw/100)*满量程、制动优先语义一致）。
     current_cmd_.target_accel = actuator_calib_.decode(msg->pedal_ratio, msg->brake_force);
+    cmd_lease_.observe(SteadySeconds());
 }
 
 void SimulatorNode::OnControlCommand(const common_msgs::msg::HuatControlCommand::ConstSharedPtr& msg) {
     if (stop_active_)
+        return;
+    if (!std::isfinite(msg->steering_angle.data) || !std::isfinite(msg->throttle.data))
         return;
     current_cmd_.target_steering = msg->steering_angle.data;
     if (msg->throttle.data >= 0.0f) {
@@ -192,6 +205,7 @@ void SimulatorNode::OnControlCommand(const common_msgs::msg::HuatControlCommand:
     } else {
         current_cmd_.target_accel = static_cast<double>(msg->throttle.data) * bicycle_model_.params().max_decel;
     }
+    cmd_lease_.observe(SteadySeconds());
 }
 
 void SimulatorNode::OnStopMessage(const common_msgs::msg::HuatStop::ConstSharedPtr& msg) {
@@ -203,6 +217,11 @@ void SimulatorNode::OnStopMessage(const common_msgs::msg::HuatStop::ConstSharedP
 }
 
 void SimulatorNode::UpdatePhysics() {
+    // 物理 tick 使用单调时钟做独立指令租约：断流时不得无限执行旧油门。
+    if (stop_active_ || cmd_lease_.check(SteadySeconds()) != common_msgs::vehicle::Freshness::kFresh) {
+        current_cmd_.target_accel = -bicycle_model_.params().max_decel;
+        current_cmd_.target_steering = 0.0;
+    }
     const double dt = 1.0 / sim_rate_;
     const auto& state = bicycle_model_.Step(current_cmd_, dt);
     // #17-B：publish_clock_ 时以固定 dt 递进仿真时间并发布 /clock，使整链按仿真时钟确定性推进

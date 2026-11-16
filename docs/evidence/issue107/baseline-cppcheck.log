@@ -1,0 +1,3 @@
+/workspace/scratch/b9b4de71e9ff/baseline107/src/planning/velocity_profiler/test/test_velocity_profiler.cpp:19:1: error: syntax error [syntaxError]
+TEST(VelocityProfilerTest, StraightLineAcceleration) {
+^

@@ -31,6 +31,10 @@ SkidpadPlannerNode::SkidpadPlannerNode(rclcpp::Node::SharedPtr node)
     node_->get_parameter("vehicle_state_topic", vehicle_state_topic_);
     node_->declare_parameter<int>("max_empty_messages_before_warn", 5);
     node_->get_parameter("max_empty_messages_before_warn", max_empty_messages_);
+    node_->declare_parameter<double>("max_path_reuse_age_sec", 0.5);
+    node_->get_parameter("max_path_reuse_age_sec", max_path_reuse_age_sec_);
+    if (!std::isfinite(max_path_reuse_age_sec_) || max_path_reuse_age_sec_ <= 0.0)
+        max_path_reuse_age_sec_ = 0.5;
     // #101（裁定 A）：首瓣先验——"none"（默认，行为不变）/ "left" / "right"。
     // 入口处两瓣锥桶镜像对称，规划器无法只靠锥桶判定先绕哪一瓣，故由任务层给。
     node_->declare_parameter<std::string>("initial_lobe", "none");
@@ -194,6 +198,13 @@ geometry_msgs::msg::Point SkidpadPlannerNode::MakePoint(double x, double y, doub
     return p;
 }
 
+bool SkidpadPlannerNode::CanReusePrevPath() const {
+    if (!has_prev_path_ || !has_car_state_)
+        return false;
+    const double age = (node_->now() - last_fresh_path_time_).seconds();
+    return std::isfinite(age) && age >= 0.0 && age <= max_path_reuse_age_sec_;
+}
+
 void SkidpadPlannerNode::PublishPrevPath(const std::vector<Point2D>& prev_path_bl) {
     common_msgs::msg::HuatPathLimits path_limits;
     path_limits.header.stamp = node_->now();
@@ -234,9 +245,15 @@ void SkidpadPlannerNode::OnConeMapMessage(const common_msgs::msg::HuatMap::Const
         return;
     }
 
+    if (has_prev_path_ && !CanReusePrevPath()) {
+        // 超龄路径不得复用，也不得作为 ICP 的持久可信输入。
+        has_prev_path_ = false;
+        prev_path_global_.clear();
+        has_trusted_model_ = false;
+    }
     if (msg->cone.empty()) {
         ++empty_count_;
-        if (empty_count_ <= max_empty_messages_ && has_prev_path_ && has_car_state_) {
+        if (empty_count_ <= max_empty_messages_ && CanReusePrevPath()) {
             PublishPrevPath(GlobalPathToBaseLink(prev_path_global_));
         } else {
             PublishEmptyPathLimits();
@@ -309,7 +326,7 @@ void SkidpadPlannerNode::OnConeMapMessage(const common_msgs::msg::HuatMap::Const
     if (path.empty()) {
         RCLCPP_WARN_THROTTLE(node_->get_logger(), *node_->get_clock(), 1000,
                              "[skidpad_planner] Failed to generate path");
-        if (has_prev_path_) {
+        if (CanReusePrevPath()) {
             PublishPrevPath(prev_path_bl);
         } else {
             PublishEmptyPathLimits();
@@ -347,6 +364,7 @@ void SkidpadPlannerNode::OnConeMapMessage(const common_msgs::msg::HuatMap::Const
     path_limits_pub_->publish(path_limits);
 
     prev_path_global_ = BaseLinkPathToGlobal(path);
+    last_fresh_path_time_ = node_->now();
     has_prev_path_ = true;
 }
 

@@ -100,6 +100,42 @@ TEST(TaskSafetyFSM, FinishTriggersLatchedStopAndResetToIdle) {
     EXPECT_EQ(sm.task(), TaskState::IDLE);
 }
 
+TEST(TaskSafetyFSM, FinishCannotDowngradeFaultOrRestoreDrive) {
+    TaskSafetyStateMachine sm;
+    sm.onArm();
+    sm.onStart();
+    sm.onFault();
+    const auto ignored = sm.onFinish();
+    EXPECT_FALSE(ignored.changed);
+    EXPECT_EQ(sm.task(), TaskState::FAULT);
+    EXPECT_EQ(sm.stopKind(), StopKind::FAULT);
+    EXPECT_TRUE(sm.stopActive());
+    EXPECT_FALSE(sm.canDrive());
+}
+
+TEST(TaskSafetyFSM, FaultOverridesRequestButNeverTheReverse) {
+    TaskSafetyStateMachine sm;
+    sm.onStopRequest();
+    const auto fault = sm.onFault();
+    EXPECT_TRUE(fault.changed);
+    EXPECT_EQ(fault.stop_edge, StopEdge::NONE);
+    EXPECT_EQ(sm.task(), TaskState::FAULT);
+    EXPECT_EQ(sm.stopKind(), StopKind::FAULT);
+    EXPECT_FALSE(sm.onStopRequest().changed);
+    EXPECT_EQ(sm.stopKind(), StopKind::FAULT);
+}
+
+TEST(TaskSafetyFSM, TimeoutPromotionToRequestIsAnObservableChange) {
+    TaskSafetyStateMachine sm;
+    sm.onTimeoutStop();
+    const auto request = sm.onStopRequest();
+    EXPECT_TRUE(request.changed);
+    EXPECT_EQ(request.stop_edge, StopEdge::NONE);
+    EXPECT_EQ(sm.stopKind(), StopKind::REQUEST);
+    EXPECT_FALSE(sm.onResume().changed);
+    EXPECT_TRUE(sm.stopActive());
+}
+
 TEST(TaskSafetyFSM, StartWhileStoppedRejected) {
     TaskSafetyStateMachine sm;
     sm.onStopRequest();

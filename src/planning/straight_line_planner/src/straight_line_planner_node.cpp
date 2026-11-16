@@ -23,6 +23,10 @@ StraightLinePlannerNode::StraightLinePlannerNode(rclcpp::Node::SharedPtr node)
     node_->get_parameter("output_pathlimits_topic", output_topic_);
     node_->declare_parameter<int>("max_empty_messages_before_warn", 5);
     node_->get_parameter("max_empty_messages_before_warn", max_empty_messages_);
+    node_->declare_parameter<double>("max_path_reuse_age_sec", 0.5);
+    node_->get_parameter("max_path_reuse_age_sec", max_path_reuse_age_sec_);
+    if (!std::isfinite(max_path_reuse_age_sec_) || max_path_reuse_age_sec_ <= 0.0)
+        max_path_reuse_age_sec_ = 0.5;
     node_->declare_parameter<double>("path_station_spacing", 0.5);
     node_->get_parameter("path_station_spacing", path_station_spacing_);
     node_->declare_parameter<double>("path_lookahead_distance", 30.0);
@@ -201,6 +205,13 @@ void StraightLinePlannerNode::BuildPathLimits(const DetectedBoundaries& boundari
     out.replan = true;
 }
 
+bool StraightLinePlannerNode::CanReuseLastPath() const {
+    if (!has_last_valid_)
+        return false;
+    const double age = (node_->now() - last_fresh_path_time_).seconds();
+    return std::isfinite(age) && age >= 0.0 && age <= max_path_reuse_age_sec_;
+}
+
 void StraightLinePlannerNode::TrimConeAccumulator(const rclcpp::Time& now) {
     while (!cone_accumulator_.empty() && (now - cone_accumulator_.front().stamp).seconds() > accumulate_max_age_sec_) {
         cone_accumulator_.pop_front();
@@ -220,7 +231,7 @@ bool StraightLinePlannerNode::HandleDegradedBoundaries(const DetectedBoundaries&
                              "right valid=%d slope=%.3f int=%.3f)",
                              left_held, boundaries.left.slope, boundaries.left.intercept, right_held,
                              boundaries.right.slope, boundaries.right.intercept);
-        if (has_last_valid_) {
+        if (CanReuseLastPath()) {
             last_valid_path_limits_.header.stamp = node_->now();
             path_limits_pub_->publish(last_valid_path_limits_);
         } else {
@@ -237,7 +248,7 @@ bool StraightLinePlannerNode::HandleDegradedBoundaries(const DetectedBoundaries&
                              "left_slope=%.3f right_slope=%.3f — holding last valid path",
                              boundaries.left.intercept, boundaries.right.intercept, boundaries.left.slope,
                              boundaries.right.slope);
-        if (has_last_valid_) {
+        if (CanReuseLastPath()) {
             last_valid_path_limits_.header.stamp = node_->now();
             path_limits_pub_->publish(last_valid_path_limits_);
         } else {
@@ -261,6 +272,7 @@ bool StraightLinePlannerNode::HandleDegradedBoundaries(const DetectedBoundaries&
     BuildPathLimits(degraded, cones, single_side_lookahead_distance_, path_limits);
     path_limits_pub_->publish(path_limits);
     last_valid_path_limits_ = path_limits;
+    last_fresh_path_time_ = node_->now();
     has_last_valid_ = true;
     return true;
 }
@@ -309,7 +321,7 @@ void StraightLinePlannerNode::OnConeMapMessage(const common_msgs::msg::HuatMap::
         if (empty_count_ == max_empty_messages_ + 1)
             RCLCPP_WARN(node_->get_logger(), "[straight_line_planner] Empty cone map for %d consecutive messages",
                         empty_count_);
-        if (empty_count_ <= max_empty_messages_ && has_last_valid_) {
+        if (empty_count_ <= max_empty_messages_ && CanReuseLastPath()) {
             last_valid_path_limits_.header.stamp = node_->now();
             path_limits_pub_->publish(last_valid_path_limits_);
         } else {
@@ -344,5 +356,6 @@ void StraightLinePlannerNode::OnConeMapMessage(const common_msgs::msg::HuatMap::
                     path_limits);
     path_limits_pub_->publish(path_limits);
     last_valid_path_limits_ = path_limits;
+    last_fresh_path_time_ = node_->now();
     has_last_valid_ = true;
 }

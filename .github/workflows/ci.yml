@@ -4,7 +4,7 @@ on:
   push:
     branches: [ main ]
   pull_request:
-    branches: [ main ]
+    branches: [ main, fix/fsac-fail-closed-arbiter-20261115 ]
 
 jobs:
   build-test-lint:
@@ -63,6 +63,7 @@ jobs:
         run: bash scripts/core_standalone_check.sh
 
       - name: Build (Release, C++20, mold + ccache, tests on)
+        id: workspace-build
         run: |
           source "/opt/ros/${ROS_DISTRO}/setup.bash"
           # --cmake-args below re-states the colcon_defaults.yaml cmake-args
@@ -97,6 +98,13 @@ jobs:
           source "/opt/ros/${ROS_DISTRO}/setup.bash"
           source install/setup.bash
           bash scripts/headless_smoke.sh
+
+      - name: Vehicle state lease RED-GREEN integration (#107, isolated software only)
+        timeout-minutes: 6
+        run: |
+          source "/opt/ros/${ROS_DISTRO}/setup.bash"
+          source install/setup.bash
+          bash scripts/vehicle_state_lease_red_green.sh build/vehicle_state_lease_red_green
 
       - name: Interface contract runtime QoS check (#14)
         timeout-minutes: 5
@@ -133,6 +141,8 @@ jobs:
           bash scripts/closed_loop_fault_smoke.sh
 
       - name: Fault injection smoke (#16, software-observable subset)
+        # #107：已构建时独立运行关键故障矩阵，不让无关 KPI/闭环失败掩盖它。
+        if: ${{ !cancelled() && steps.workspace-build.outcome == 'success' }}
         timeout-minutes: 8
         run: |
           source "/opt/ros/${ROS_DISTRO}/setup.bash"
@@ -161,7 +171,10 @@ jobs:
             build/benchmark_regression/**/*.json
             build/closed_loop_smoke/*.json
             build/closed_loop_fault/*.json
-            build/fault_injection/*.json
+            build/fault_injection/**/*.json
+            build/vehicle_state_lease/*.json
+            build/vehicle_state_lease_red_green/**/*.json
+            build/vehicle_state_lease_red_green/**/*.log
           if-no-files-found: ignore
           retention-days: 14
 

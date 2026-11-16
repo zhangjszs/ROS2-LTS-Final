@@ -166,3 +166,17 @@ stale 回退/stop 复位后重接管/篡改帧被拒/帧头不合法被拒）纳
 - 实车故障注入端到端验收（真实 VCU 断连/掉电/急停按钮优先级）：依赖实车，未标定项保持“未标定”。
 - 把仲裁器接入 `fsac.launch` 作为权威单出口（控制器改发源话题）：需 e2e 时序验证，见 #16 接线开关。
 - 具体底盘通道/硬件急停优先级属仓库外，按 #15/#23 记录接口与证据归属。
+
+
+## #107：安全监控的独立接收租约
+
+- `safety_monitor` 对 `vehicle_state` / `pathlimits` 分别使用契约 `makeQoS(kQosState)` / `makeQoS(kQosPath)`；stop 继续使用 `makeQoS(kQosStop)`，消息字段不变。
+- `safety.state_timeout_sec=0.3` 秒，与 PP `safety.state_timeout=0.3` 默认接收保护预算对齐；`planner_timeout=0.5` 秒保持原预算。两值必须有限且 >0，禁止用负数禁用安全门。均为软件初值，**未完成实车标定**。
+- 两个租约独立以 `steady_clock` 接收时刻续期。仅有限 x/y/theta/v 的状态可续车辆租约；仅合法几何/frame 且 ROS 来源年龄在 `[-0.05, planner_timeout]` 的路径可续规划租约。无效帧不续期，前一合法帧只保留至原期限。
+- **Absent / Stale** 均停车；只有两个源均 **Fresh** 才清 TIMEOUT。**FromFuture** 的接收时钟异常及 ROS 时间回退会使旧 epoch 的两个租约作废（对外呈 Absent），必须在新 epoch 重收两个源；非有限时钟同样失效。ROS 时间前跳不延长 steady 租约；新路径仍须通过来源年龄门。
+- ROS `/clock` 暂停不暂停 50Hz wall watchdog 或 10Hz stop 心跳；没有新输入仍按 steady 期限停车。仅恢复路径不能掩盖车辆状态陈旧；两种恢复顺序等价。
+- `HuatCarstate.header.stamp` 是**发布时刻**，本修复只证明合法状态的接收活性，不证明设备观测新鲜度或定位质量；不使用未标定 GPS 时间/状态枚举推算健康。
+- 监控的 IDLE 仅代表无监控停车请求。行驶许可仍由仲裁器任务状态机显式 ARM → START 授予。恢复数据不清 REQUEST/FAULT；监控重启以 TIMEOUT 开始，仲裁器重启以任务 IDLE 开始；已有 RUNNING 的可恢复 TIMEOUT 可在双源恢复后恢复，此规则不新增任务授权。
+- 软件检测预算：最后合法接收 + 对应 timeout + 最多一拍 wall watchdog（名义 20ms），还需 DDS/调度/仲裁传播延迟。软件故障注入容差不是 HIL/实车制动认证预算。诊断分别输出两源 freshness 与 steady 接收年龄。
+
+回归入口：`bash scripts/vehicle_state_lease_smoke.sh`（隔离 DDS 域，真实 Topic + 监控 + 仲裁器，持续合法 MPC 油门，不借助 PP 私有 watchdog）；也挂入 arbiter 模式 `fault_injection_smoke.sh`。证据边界及重放见 [执行报告](VEHICLE_STATE_LEASE_107.md)。

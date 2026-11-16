@@ -19,12 +19,13 @@ find_package(std_msgs REQUIRED)
 
 include_directories(include)
 
-add_executable(safety_monitor
-  src/safety_monitor.cpp
-  src/state_machine/stop_state_machine.cpp
-)
+add_library(stop_state_machine_core STATIC src/state_machine/stop_state_machine.cpp)
+target_include_directories(stop_state_machine_core PUBLIC include)
+
+add_executable(safety_monitor src/safety_monitor.cpp)
 
 target_link_libraries(safety_monitor
+  stop_state_machine_core
   common_msgs::common_msgs
   diagnostic_updater::diagnostic_updater
   rclcpp::rclcpp
@@ -50,11 +51,13 @@ install(TARGETS
 
 if(BUILD_TESTING)
   find_package(ament_cmake_gtest REQUIRED)
+  ament_add_gtest(test_input_freshness test/test_input_freshness.cpp)
+  target_link_libraries(test_input_freshness common_msgs::common_msgs stop_state_machine_core)
   ament_add_gtest(test_stop_state_machine
     test/test_stop_state_machine.cpp
-    src/state_machine/stop_state_machine.cpp
   )
   target_link_libraries(test_stop_state_machine
+    stop_state_machine_core
     common_msgs::common_msgs
     diagnostic_updater::diagnostic_updater
     rclcpp::rclcpp

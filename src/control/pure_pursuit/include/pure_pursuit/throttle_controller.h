@@ -10,6 +10,7 @@
 // 也不复制字段（单一事实来源仍是 PurePursuitParams.algorithm.throttle）。
 // ============================================================================
 #include <algorithm>
+#include <cmath>
 #include <concepts>
 #include <span>
 
@@ -63,6 +64,12 @@ class ThrottleController {
     // 计算一帧油门：返回已截断为整数并限幅到 [pedal_min, pedal_max] 的 pedal 指令。
     template <ThrottleParamsLike P>
     int update(double current_speed, const P& p) {
+        // 纵向控制律的安全兜底：0 m/s 是停车目标，不是“低速起步”指令。
+        // 非有限测量或目标不得流入浮点转 int。
+        if (!std::isfinite(current_speed) || !std::isfinite(p.target_speed) || p.target_speed <= 0.0) {
+            reset();
+            return 0;
+        }
         const double v = current_speed;
         const double lo_hi = p.speed_low_threshold;
         const double hi_lo = p.speed_high_threshold;

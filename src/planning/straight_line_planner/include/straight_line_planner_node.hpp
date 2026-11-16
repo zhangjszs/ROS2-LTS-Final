@@ -19,6 +19,7 @@ class StraightLinePlannerNode {
     void OnConeMapMessage(const common_msgs::msg::HuatMap::ConstSharedPtr& msg);
     void OnCarStateMessage(const common_msgs::msg::HuatCarstate::ConstSharedPtr& msg);
     void PublishEmptyPathLimits();
+    bool CanReuseLastPath() const;
     geometry_msgs::msg::Point MakePoint(double x, double y, double z);
     bool IsBoundaryPlausible(const DetectedBoundaries& b) const;
     void BuildPathLimits(const DetectedBoundaries& boundaries, const std::vector<common_msgs::msg::HuatCone>& cones,
@@ -36,6 +37,8 @@ class StraightLinePlannerNode {
     std::unique_ptr<LineDetector> line_detector_;
     common_msgs::msg::HuatPathLimits last_valid_path_limits_;
     bool has_last_valid_;
+    rclcpp::Time last_fresh_path_time_;
+    double max_path_reuse_age_sec_ = 0.5;
 
     int road_type_;
     std::string input_topic_;

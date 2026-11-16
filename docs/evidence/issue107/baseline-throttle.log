@@ -1,0 +1,35 @@
+-- The CXX compiler identification is GNU 14.2.0
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Check for working CXX compiler: /usr/bin/c++ - skipped
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- Found GTest: /workspace/scratch/b9b4de71e9ff/deps/local/usr/lib/x86_64-linux-gnu/cmake/GTest/GTestConfig.cmake (found version "1.15.0")
+-- Configuring done (0.5s)
+-- Generating done (0.1s)
+-- Build files have been written to: /workspace/scratch/b9b4de71e9ff/baseline107/build/core_standalone
+[ 50%] Building CXX object CMakeFiles/test_throttle_controller.dir/workspace/scratch/b9b4de71e9ff/baseline107/src/control/pure_pursuit/test/test_throttle_controller.cpp.o
+[100%] Linking CXX executable test_throttle_controller
+[100%] Built target test_throttle_controller
+Running main() from ./googletest/src/gtest_main.cc
+Note: Google Test filter = ThrottleController.PedalMinAndMaxClamp
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from ThrottleController
+[ RUN      ] ThrottleController.PedalMinAndMaxClamp
+/workspace/scratch/b9b4de71e9ff/baseline107/src/control/pure_pursuit/test/test_throttle_controller.cpp:89: Failure
+Expected equality of these values:
+  ctrl.update(15.0, lo)
+    Which is: 0
+  5
+
+[  FAILED  ] ThrottleController.PedalMinAndMaxClamp (0 ms)
+[----------] 1 test from ThrottleController (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (1 ms total)
+[  PASSED  ] 0 tests.
+[  FAILED  ] 1 test, listed below:
+[  FAILED  ] ThrottleController.PedalMinAndMaxClamp
+
+ 1 FAILED TEST

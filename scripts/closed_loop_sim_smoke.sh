@@ -144,6 +144,7 @@ import time
 
 import rclpy
 from rclpy.node import Node
+from rclpy.parameter import Parameter
 
 from common_msgs.msg import HuatCarstate, HuatPathLimits, HuatVehicleCmd
 from geometry_msgs.msg import Point
@@ -156,7 +157,7 @@ class ClosedLoop(Node):
     """发布确定性直线路径（契约输入话题），并观测整条回路的实际数据流。"""
 
     def __init__(self):
-        super().__init__("closed_loop_watch")
+        super().__init__("closed_loop_watch", parameter_overrides=[Parameter("use_sim_time", value=True)])
         self.clock_last = None
         self.clock_advanced = 0.0
         self.speed_max = 0.0

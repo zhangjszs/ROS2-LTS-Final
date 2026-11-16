@@ -1,0 +1,22 @@
+2026-11-16T08:46:09.3381847Z Summary: 677 tests, 0 errors, 0 failures, 0 skipped
+2026-11-16T08:46:43.5175706Z PASS startup_no_vehicle
+2026-11-16T08:46:44.2199284Z     raise AssertionError(f"condition timed out after {budget}s")
+2026-11-16T08:46:44.2199687Z AssertionError: condition timed out after 0.6499999999999999s
+2026-11-16T08:46:44.4031585Z EXPECTED RED: 原始监控在单帧定位+持续规划场景失败
+2026-11-16T08:46:46.2793528Z PASS startup_no_vehicle
+2026-11-16T08:46:47.0394186Z PASS one_vehicle_frame_continuous_path
+2026-11-16T08:46:47.7394444Z PASS healthy_and_explicit_arm_start
+2026-11-16T08:46:48.4595862Z PASS vehicle_only_lost_while_driving
+2026-11-16T08:46:49.5395493Z PASS path_only_lost_while_driving
+2026-11-16T08:46:50.4795689Z PASS both_lost
+2026-11-16T08:46:52.0796489Z PASS path_recovers_before_vehicle
+2026-11-16T08:46:53.6796289Z PASS vehicle_recovers_before_path
+2026-11-16T08:46:54.6595975Z PASS nonfinite_vehicle_x
+2026-11-16T08:46:55.6293792Z PASS nonfinite_vehicle_y
+2026-11-16T08:46:56.5798771Z PASS nonfinite_vehicle_theta
+2026-11-16T08:46:57.5492959Z PASS nonfinite_vehicle_v
+2026-11-16T08:46:58.5795123Z PASS invalid_path_empty
+2026-11-16T08:46:59.5893702Z PASS invalid_path_old
+2026-11-16T08:47:00.5798583Z PASS invalid_path_future
+2026-11-16T08:47:01.3479961Z AssertionError
+2026-11-16T08:47:01.4971958Z ##[error]Process completed with exit code 1.

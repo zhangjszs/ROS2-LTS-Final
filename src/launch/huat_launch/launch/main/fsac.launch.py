@@ -30,12 +30,26 @@
 import os
 
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, OpaqueFunction
 from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration, PythonExpression
 from launch_ros.actions import Node
 from ament_index_python.packages import get_package_share_directory
+
+
+def _validate_deployment(context, *args, **kwargs):
+    """Do not permit a ROS launch override to bypass the sole real-car command authority."""
+    mode = LaunchConfiguration('deployment_mode').perform(context).strip().lower()
+    use_arbiter = LaunchConfiguration('use_arbiter').perform(context).strip().lower() in ('true', '1', 'yes')
+    autostart = LaunchConfiguration('arbiter_autostart').perform(context).strip().lower() in ('true', '1', 'yes')
+    if mode not in ('real', 'simulation'):
+        raise RuntimeError('deployment_mode must be real or simulation')
+    if mode == 'real' and not use_arbiter:
+        raise RuntimeError('Real-car mode requires use_arbiter:=true')
+    if mode == 'real' and autostart:
+        raise RuntimeError('Real-car mode forbids arbiter_autostart; use explicit ARM then START')
+    return []
 
 
 def generate_launch_description():
@@ -115,12 +129,17 @@ def generate_launch_description():
         default_value='/control/vehicle_command',
         description='Vehicle command topic',
     )
+    deployment_mode_arg = DeclareLaunchArgument(
+        'deployment_mode',
+        default_value='real',
+        description='real (fail-closed) or simulation (may use legacy direct control)',
+    )
     # #16：单一权威指令出口。true 时 PP 改发源话题，由 command_arbiter_node 产出契约出口
     # /vehicle_command（此时 vehicle_command_topic 不再决定最终出口）。
     use_arbiter_arg = DeclareLaunchArgument(
         'use_arbiter',
-        default_value='false',
-        description='Route the final command through command_arbiter_node (#16 single authority)',
+        default_value='true',
+        description='Route final commands through arbiter; mandatory when deployment_mode=real',
     )
     # 行驶许可默认不授予：需任务层发 arm+start 事件（#16 验收第 1 条）。
     arbiter_autostart_arg = DeclareLaunchArgument(
@@ -231,6 +250,8 @@ def generate_launch_description():
                 'topics.source_b': '/mpc/vehicle_command',
                 'topics.output': '/vehicle_command',
                 'topics.stop': LaunchConfiguration('stop_topic'),
+                'topics.stop_request': LaunchConfiguration('track_stop_request_topic'),
+                'deployment.mode': LaunchConfiguration('deployment_mode'),
                 'arbitration.preferred': 'pure_pursuit',
                 'task.autostart': PythonExpression([
                     "'", LaunchConfiguration('arbiter_autostart'), "' == 'true'",
@@ -287,6 +308,7 @@ def generate_launch_description():
 
     return LaunchDescription([
         # Arguments
+        deployment_mode_arg,
         road_type_arg,
         pointcloud_topic_arg,
         raw_ins_topic_arg,
@@ -305,6 +327,9 @@ def generate_launch_description():
         use_arbiter_arg,
         arbiter_autostart_arg,
         mux_initial_topic_arg,
+
+        # Safety preflight must run before launching any producer/consumer.
+        OpaqueFunction(function=_validate_deployment),
 
         # Launches
         sensor_stack_launch,

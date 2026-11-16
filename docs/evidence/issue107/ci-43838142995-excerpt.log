@@ -1,0 +1,45 @@
+2026-11-16T09:24:27.4714228Z Summary: 677 tests, 0 errors, 0 failures, 0 skipped
+2026-11-16T09:24:56.6426930Z PASS startup_no_vehicle
+2026-11-16T09:24:57.3445142Z     raise AssertionError(f"condition timed out after {budget}s")
+2026-11-16T09:24:57.3445462Z AssertionError: condition timed out after 0.6499999999999999s
+2026-11-16T09:24:57.5081612Z EXPECTED RED: 原始监控在单帧定位+持续规划场景失败
+2026-11-16T09:24:59.5675831Z PASS startup_no_vehicle
+2026-11-16T09:25:00.3074418Z PASS one_vehicle_frame_continuous_path
+2026-11-16T09:25:01.0044284Z PASS healthy_and_explicit_arm_start
+2026-11-16T09:25:01.7276155Z PASS vehicle_only_lost_while_driving
+2026-11-16T09:25:02.8044941Z PASS path_only_lost_while_driving
+2026-11-16T09:25:03.6843399Z PASS both_lost
+2026-11-16T09:25:05.3041904Z PASS path_recovers_before_vehicle
+2026-11-16T09:25:06.9244366Z PASS vehicle_recovers_before_path
+2026-11-16T09:25:07.8841332Z PASS nonfinite_vehicle_x
+2026-11-16T09:25:08.8441446Z PASS nonfinite_vehicle_y
+2026-11-16T09:25:09.7444151Z PASS nonfinite_vehicle_theta
+2026-11-16T09:25:10.7043473Z PASS nonfinite_vehicle_v
+2026-11-16T09:25:11.7642307Z PASS invalid_path_empty
+2026-11-16T09:25:12.7842126Z PASS invalid_path_old
+2026-11-16T09:25:13.7843013Z PASS invalid_path_future
+2026-11-16T09:25:14.5842688Z PASS request_latch_survives_healthy_data
+2026-11-16T09:25:15.2242873Z PASS fault_latch_survives_healthy_data
+2026-11-16T09:25:18.0674117Z PASS arbiter_restart_no_permission
+2026-11-16T09:25:21.3195137Z AssertionError: safety invariant violated during sustained observation
+2026-11-16T09:25:21.4837542Z ##[error]Process completed with exit code 1.
+2026-11-16T09:25:22.6891279Z PASS startup_no_vehicle
+2026-11-16T09:25:23.4413755Z PASS one_vehicle_frame_continuous_path
+2026-11-16T09:25:24.1393943Z PASS healthy_and_explicit_arm_start
+2026-11-16T09:25:24.8593249Z PASS vehicle_only_lost_while_driving
+2026-11-16T09:25:25.9215017Z PASS path_only_lost_while_driving
+2026-11-16T09:25:26.8594021Z PASS both_lost
+2026-11-16T09:25:28.4592143Z PASS path_recovers_before_vehicle
+2026-11-16T09:25:30.0793857Z PASS vehicle_recovers_before_path
+2026-11-16T09:25:31.0392823Z PASS nonfinite_vehicle_x
+2026-11-16T09:25:31.9991123Z PASS nonfinite_vehicle_y
+2026-11-16T09:25:32.8993988Z PASS nonfinite_vehicle_theta
+2026-11-16T09:25:33.8592599Z PASS nonfinite_vehicle_v
+2026-11-16T09:25:34.8590330Z PASS invalid_path_empty
+2026-11-16T09:25:35.9193292Z PASS invalid_path_old
+2026-11-16T09:25:37.0193097Z PASS invalid_path_future
+2026-11-16T09:25:37.8194332Z PASS request_latch_survives_healthy_data
+2026-11-16T09:25:38.4594404Z PASS fault_latch_survives_healthy_data
+2026-11-16T09:25:41.1014626Z PASS arbiter_restart_no_permission
+2026-11-16T09:25:44.3529818Z AssertionError: safety invariant violated during sustained observation
+2026-11-16T09:25:44.5142796Z ##[error]Process completed with exit code 1.
