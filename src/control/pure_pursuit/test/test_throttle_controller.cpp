@@ -2,8 +2,8 @@
 // 纯 std（无 ROS），验证与原节点内联实现逐条件等价：积分冻结/抗饱和/低高速定值/中段钳制/限幅/reset。
 #include <gtest/gtest.h>
 
-#include <vector>
 #include <cmath>
+#include <vector>
 
 #include "pure_pursuit/throttle_controller.h"
 

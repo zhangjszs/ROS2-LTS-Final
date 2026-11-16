@@ -92,8 +92,8 @@ void ConeDedup::OnCarState(const common_msgs::msg::HuatCarstate::ConstSharedPtr 
     // 历史位置与时间必须对应同一帧 (t-1)，避免用 t-2 位置除以 t-t-1 时间。
     if (enable_ego_motion_compensation_ && has_car_state_) {
         const double dt = (rclcpp::Time(msgs->header.stamp) - prev_car_time_).seconds();
-        const auto velocity = cone_dedup_algo::EstimateEgoVelocity(
-            {prev_car_x_, prev_car_y_}, {msgs->car_state.x, msgs->car_state.y}, dt);
+        const auto velocity = cone_dedup_algo::EstimateEgoVelocity({prev_car_x_, prev_car_y_},
+                                                                   {msgs->car_state.x, msgs->car_state.y}, dt);
         car_vx_ = velocity.vx;
         car_vy_ = velocity.vy;
     }

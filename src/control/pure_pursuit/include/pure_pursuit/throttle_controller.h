@@ -10,8 +10,8 @@
 // 也不复制字段（单一事实来源仍是 PurePursuitParams.algorithm.throttle）。
 // ============================================================================
 #include <algorithm>
-#include <concepts>
 #include <cmath>
+#include <concepts>
 #include <span>
 
 #include "interface_contract.h"  // #29：显式剖面有效性 + 参考速度选择集中判定

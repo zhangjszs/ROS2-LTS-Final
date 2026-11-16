@@ -100,7 +100,6 @@ TEST(TaskSafetyFSM, FinishTriggersLatchedStopAndResetToIdle) {
     EXPECT_EQ(sm.task(), TaskState::IDLE);
 }
 
-
 TEST(TaskSafetyFSM, FinishCannotDowngradeFaultOrRestoreDrive) {
     TaskSafetyStateMachine sm;
     sm.onArm();

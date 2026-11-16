@@ -96,8 +96,7 @@ void SimulatorNode::LoadParameters() {
     get_parameter("safety.cmd_timeout_sec", cmd_timeout_sec_);
     if (!std::isfinite(cmd_timeout_sec_) || cmd_timeout_sec_ <= 0.0)
         cmd_timeout_sec_ = 0.5;
-    cmd_lease_ = common_msgs::vehicle::FreshnessLease(
-        common_msgs::vehicle::LeaseConfig{cmd_timeout_sec_, 0.0});
+    cmd_lease_ = common_msgs::vehicle::FreshnessLease(common_msgs::vehicle::LeaseConfig{cmd_timeout_sec_, 0.0});
     get_parameter("track_file", track_file_);
 
     double init_x = 0.0, init_y = 0.0, init_theta = 0.0, init_v = 0.0;
