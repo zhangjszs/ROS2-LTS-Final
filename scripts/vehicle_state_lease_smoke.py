@@ -16,6 +16,7 @@ try:
     import rclpy
     from ament_index_python.packages import get_package_prefix
     from common_msgs.msg import HuatCarstate, HuatPathLimits, HuatStop, HuatSystemState, HuatVehicleCmd
+    from diagnostic_msgs.msg import DiagnosticArray
     from geometry_msgs.msg import Point
     from rclpy.node import Node
     from rclpy.qos import QoSProfile, DurabilityPolicy, ReliabilityPolicy
@@ -40,6 +41,7 @@ class Harness(Node):
         self.processes = {}
         self.logs = []
         self.stop = self.state = self.command = None
+        self.monitor_inputs = None
         self.stop_at = self.state_at = self.command_at = -math.inf
         self.sim = 100.0
         self.clock_runs = True
@@ -54,6 +56,7 @@ class Harness(Node):
         self.create_subscription(HuatStop, "/system/stop", self.on_stop, stop_qos)
         self.create_subscription(HuatSystemState, "/system/state", self.on_state, 10)
         self.create_subscription(HuatVehicleCmd, "/vehicle_command", self.on_command, 10)
+        self.create_subscription(DiagnosticArray, "/diagnostics", self.on_diagnostics, 10)
         self.pub_vehicle = self.create_publisher(HuatCarstate, "/localization/vehicle_state", 10)
         self.pub_path = self.create_publisher(HuatPathLimits, "/planning/pathlimits", 1)
         self.pub_command = self.create_publisher(HuatVehicleCmd, "/mpc/vehicle_command", 10)
@@ -131,6 +134,25 @@ class Harness(Node):
         self.command, self.command_at = m, time.monotonic()
         self.record("vehicle_command", pedal=int(m.pedal_ratio), brake=int(m.brake_force))
 
+    def on_diagnostics(self, m):
+        for status in m.status:
+            values = {v.key: v.value for v in status.values}
+            if "Steady check time (s)" not in values:
+                continue
+            checked = float(values["Steady check time (s)"])
+            vehicle_age = float(values["Vehicle receive age (steady s)"])
+            planner_age = float(values["Planner receive age (steady s)"])
+            # 同一 Linux 主机的 C++ steady_clock / Python monotonic 共用时钟域。
+            # 从节点检查时刻及节点报告年龄还原最后合法接收，不用 harness 的发送时刻冒充。
+            self.monitor_inputs = {
+                "checked_at_steady_sec": checked - self.started,
+                "vehicle_last_rx_steady_sec": checked - vehicle_age - self.started if math.isfinite(vehicle_age) else None,
+                "path_last_rx_steady_sec": checked - planner_age - self.started if math.isfinite(planner_age) else None,
+                "vehicle_freshness": values.get("Vehicle freshness"),
+                "planner_freshness": values.get("Planner freshness"),
+            }
+            self.record("monitor_input_leases", **self.monitor_inputs)
+
     def pump(self, duration, invariant=None):
         deadline = time.monotonic() + duration
         while time.monotonic() < deadline:
@@ -195,7 +217,8 @@ class Harness(Node):
         self.record("process_kill", name=name)
 
     def case(self, name, action):
-        self.record("trigger", case=name, last_vehicle_input=self.last_vehicle_rx, last_path_input=self.last_path_rx)
+        self.record("trigger", case=name, last_vehicle_input=self.last_vehicle_rx, last_path_input=self.last_path_rx,
+                    monitor_inputs=self.monitor_inputs)
         start = len(self.timeline) - 1
         try:
             action()

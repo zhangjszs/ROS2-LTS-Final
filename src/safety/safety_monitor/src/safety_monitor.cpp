@@ -97,15 +97,18 @@ class SafetyMonitor {
     }
     void DiagnoseHealth(diagnostic_updater::DiagnosticStatusWrapper& stat) {
         std::scoped_lock lock(state_mutex_);
-        const auto health = inputs_.check(steadySeconds(), node_->now().seconds());
+        const double checked_at = steadySeconds();
+        const auto health = inputs_.check(checked_at, node_->now().seconds());
         stat.summary(
             stop_active_ ? diagnostic_msgs::msg::DiagnosticStatus::WARN : diagnostic_msgs::msg::DiagnosticStatus::OK,
             std::format("{} (vehicle={}, planner={})", state_machine_.state(),
                         safety_monitor::freshnessName(health.vehicle), safety_monitor::freshnessName(health.planner)));
         stat.add("Stop active", stop_active_);
         stat.add("Stop reason", std::format("{}", state_machine_.reason()));
-        stat.add("Vehicle receive age (steady s)", health.vehicle_age);
-        stat.add("Planner receive age (steady s)", health.planner_age);
+        // 固定精度保留跨进程时间线所需的接收时间；缺席年龄仍为 inf。
+        stat.add("Steady check time (s)", std::format("{:.9f}", checked_at));
+        stat.add("Vehicle receive age (steady s)", std::format("{:.9f}", health.vehicle_age));
+        stat.add("Planner receive age (steady s)", std::format("{:.9f}", health.planner_age));
         stat.add("Vehicle freshness", safety_monitor::freshnessName(health.vehicle));
         stat.add("Planner freshness", safety_monitor::freshnessName(health.planner));
         stat.add("Current speed (m/s)", current_speed_);
