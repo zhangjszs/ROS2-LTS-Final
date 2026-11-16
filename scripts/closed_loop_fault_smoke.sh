@@ -110,6 +110,7 @@ cat >"$OUT_DIR/feeder.py" <<'PY'
 import math, sys, time
 import rclpy
 from rclpy.node import Node
+from rclpy.parameter import Parameter
 from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
 from common_msgs.msg import HuatPathLimits
 from geometry_msgs.msg import Point
@@ -123,7 +124,7 @@ out_dir, scenario, sim_dur, wall_cap, offset_m = (
 
 class Feeder(Node):
     def __init__(self):
-        super().__init__("closed_loop_fault_feeder")
+        super().__init__("closed_loop_fault_feeder", parameter_overrides=[Parameter("use_sim_time", value=True)])
         self.pts = None
         self.clock_t = None  # 最后一次 /clock 的仿真时刻
         qos = QoSProfile(depth=1, reliability=ReliabilityPolicy.RELIABLE,

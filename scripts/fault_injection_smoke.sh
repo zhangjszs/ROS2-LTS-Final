@@ -164,6 +164,7 @@ import time
 
 import rclpy
 from rclpy.node import Node
+from rclpy.parameter import Parameter
 
 from common_msgs.msg import HuatPathLimits, HuatStop, HuatSystemState, HuatVehicleCmd
 from geometry_msgs.msg import Point
@@ -190,7 +191,7 @@ class Harness(Node):
     """场景驱动器：注入故障 + 记录时间线 + 自动判定预期终态。"""
 
     def __init__(self):
-        super().__init__("fault_injection_harness")
+        super().__init__("fault_injection_harness", parameter_overrides=[Parameter("use_sim_time", value=True)])
         self.last_state = None
         self.last_cmd = None
         self.last_stop = None

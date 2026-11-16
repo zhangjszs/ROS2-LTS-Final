@@ -191,6 +191,7 @@ import time
 
 import rclpy
 from rclpy.node import Node
+from rclpy.parameter import Parameter
 
 from common_msgs.msg import HuatCarstate, HuatPathLimits, HuatSystemState, HuatVehicleCmd
 from geometry_msgs.msg import Point
@@ -206,7 +207,7 @@ class Watch(Node):
     """发布覆盖到缓冲区末端之后的直线路径，并观测完赛判据。"""
 
     def __init__(self):
-        super().__init__("accel_finish_watch")
+        super().__init__("accel_finish_watch", parameter_overrides=[Parameter("use_sim_time", value=True)])
         self.x_max = 0.0
         self.y_abs_max = 0.0
         self.state_n = 0

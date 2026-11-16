@@ -162,6 +162,7 @@ import time
 
 import rclpy
 from rclpy.node import Node
+from rclpy.parameter import Parameter
 
 from common_msgs.msg import HuatControllerHealth, HuatPathLimits, HuatVehicleCmd
 from geometry_msgs.msg import Point
@@ -173,7 +174,7 @@ class Watch(Node):
     """发布确定性直线路径 + 采样 health/出口指令（与闭环冒烟同一 pathsource 几何）。"""
 
     def __init__(self):
-        super().__init__("mpc_reject_watch")
+        super().__init__("mpc_reject_watch", parameter_overrides=[Parameter("use_sim_time", value=True)])
         self.health = None          # 最新一帧
         self.health_n = 0
         self.ever_rejecting = False
