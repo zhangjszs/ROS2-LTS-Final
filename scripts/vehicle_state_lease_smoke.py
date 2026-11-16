@@ -333,7 +333,15 @@ def run(h):
         h.pub_reset.publish(HuatStop(stop=False))
         h.wait(lambda: h.stop is False)
         h.event("reset")
+        # 现有任务契约：REQUEST 的显式 reset 保留先前 RUNNING；健康数据本身不能清锁。
+        h.wait(lambda: h.ready() and h.state.can_drive and h.command.pedal_ratio > 0)
+        assert h.state.task_state == HuatSystemState.TASK_RUNNING
+        # FINISHED / FAULT 的 reset 则回 IDLE，必须重新 ARM→START 才可起步。
+        h.event("finish")
+        h.wait(h.braked)
+        h.event("reset")
         h.wait(h.ready)
+        assert h.state.task_state == HuatSystemState.TASK_IDLE
         assert not h.state.can_drive and h.command.pedal_ratio == 0
     h.case("request_latch_survives_healthy_data", request)
 
