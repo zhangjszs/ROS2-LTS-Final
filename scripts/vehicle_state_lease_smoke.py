@@ -242,6 +242,15 @@ class Harness(Node):
                                "timeline_end": len(self.timeline) - 1})
             print(f"PASS {name}", flush=True)
         except Exception as exc:
+            self.record("failure_snapshot", monitor_stop=self.stop,
+                        monitor_receive_age_sec=time.monotonic() - self.stop_at if math.isfinite(self.stop_at) else None,
+                        task=None if self.state is None else int(self.state.task_state),
+                        stop_kind=None if self.state is None else int(self.state.stop_kind),
+                        can_drive=None if self.state is None else bool(self.state.can_drive),
+                        pedal=None if self.command is None else int(self.command.pedal_ratio),
+                        brake=None if self.command is None else int(self.command.brake_force),
+                        monitor_inputs=self.monitor_inputs)
+            print("FAIL snapshot: " + json.dumps(self.timeline[-1]), flush=True)
             self.cases.append({"case": name, "status": "FAIL", "reason": str(exc), "timeline_start": start})
             raise
         finally:
@@ -384,9 +393,17 @@ def run(h):
         h.state_runs = h.path_runs = False
         h.kill("monitor")
         h.wait(h.braked, 0.5 + JITTER)  # 监控心跳缺失锁存 FAULT
+        # 清除旧实例缓存；以新实例双 Absent 租约作为重启就绪确认。
+        h.monitor_inputs = None
+        h.stop = None
+        h.stop_at = -math.inf
+        restart_at = time.monotonic() - h.started
         h.start("monitor")
-        h.wait(lambda: h.pub_vehicle.get_subscription_count() > 0)
-        h.wait(h.safe)
+        h.wait(lambda: h.monitor_inputs is not None
+               and h.monitor_inputs["checked_at_steady_sec"] >= restart_at
+               and h.monitor_inputs["vehicle_freshness"] == "Absent"
+               and h.monitor_inputs["planner_freshness"] == "Absent"
+               and h.safe())
         h.pump(0.5, h.safe)
         h.state_runs = h.path_runs = True
         h.wait(lambda: h.stop is False)

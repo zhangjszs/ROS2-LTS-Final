@@ -179,7 +179,7 @@ SRC_A, SRC_B, OUT_CMD = "/control/vehicle_command", "/mpc/vehicle_command", "/ve
 STATE, EVENT, RAW_PATH, STOP = "/system/state", "/system/task_event", "/planning/raw_pathlimits", "/system/stop"
 
 # 与 HuatSystemState 常量一致的编码（msg 侧另有 static_assert 锁定）
-TASK_IDLE, TASK_RUNNING = 0, 2
+TASK_IDLE, TASK_RUNNING, TASK_FAULT = 0, 2, 4
 SAFETY_STOP, SAFETY_NORMAL = 2, 0
 KIND_NONE, KIND_TIMEOUT, KIND_REQUEST, KIND_FAULT = 0, 1, 2, 3
 SRC_NONE, SRC_PP, SRC_MPC = 0, 1, 2
@@ -478,9 +478,12 @@ def d10(h):
 
 
 def c10(tl, f, extra):
-    expect(tl.get("task_state") == TASK_IDLE, "重启后的仲裁器不处于 IDLE", f)
+    # d09 已杀监控：晚加入者可因心跳仍失联进入 FAULT，安全等级不能被 IDLE 字面值覆盖。
+    expect(tl.get("task_state") in (TASK_IDLE, TASK_FAULT), "重启后意外授予任务许可", f)
+    if tl.get("task_state") == TASK_FAULT:
+        expect(tl.get("stop_kind") == KIND_FAULT, "失联 FAULT 的来源不一致", f)
     expect(not tl.get("can_drive"), "晚加入者意外授予了行驶许可", f)
-    expect((tl.get("out_pedal") or 0) == 0, "晚加入者出口不是零油门", f)
+    expect(stopped_ok(tl), "晚加入者出口不是零油门+有效制动", f)
 
 
 CASES = [
