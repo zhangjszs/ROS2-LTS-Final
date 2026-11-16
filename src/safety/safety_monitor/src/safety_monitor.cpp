@@ -14,6 +14,7 @@
 #include "freshness_lease.h"           // #30：planner 心跳租约
 #include "interface_contract_qos.hpp"  // #14：stop 锁存 QoS 由契约单一来源构造
 #include "safety_monitor/stop_state_machine.h"
+#include "safety_monitor/input_freshness.h"
 
 class SafetyMonitor {
    public:
@@ -189,9 +190,10 @@ class SafetyMonitor {
         }
         last_pathlimits_time_ = rx_time;
         planner_lease_.observe(last_pathlimits_time_.seconds());
+        inputs_.observePath(true, rx_time.seconds(), rx_time.seconds());
         has_nonempty_pathlimits_ = true;
         // 规划消息先于车辆状态时不能解除上电停车。
-        auto result = has_vehicle_state_ ? state_machine_.onPathReceived()
+        auto result = inputs_.healthy(rx_time.seconds(), rx_time.seconds()) ? state_machine_.onPathReceived()
                                          : StopStateMachineResult{StopAction::NONE, StopReason::NONE};
         if (result.action == StopAction::CLEAR_STOP) {
             RCLCPP_INFO(
@@ -214,6 +216,7 @@ class SafetyMonitor {
             last_pathlimits_time_ = node_->now();
             planner_lease_.observe(last_pathlimits_time_.seconds());
         }
+        inputs_.observeVehicle(true, node_->now().seconds(), node_->now().seconds());
         has_vehicle_state_ = true;
         current_speed_ = msg->v;
         last_vehicle_state_time_ = node_->now();
@@ -268,7 +271,7 @@ class SafetyMonitor {
 
         // #30：心跳超时走租约判定（Stale=自上次非空 pathlimits 超时；Absent 不可能至此，仅防御）。
         const double now_sec = node_->now().seconds();
-        if (planner_lease_.check(now_sec) == common_msgs::vehicle::Freshness::kFresh)
+        if (inputs_.healthy(now_sec, now_sec))
             return;
         {
             rclcpp::Duration elapsed = node_->now() - last_pathlimits_time_;
@@ -308,6 +311,7 @@ class SafetyMonitor {
     common_msgs::vehicle::FreshnessLease planner_lease_;
     bool has_vehicle_state_;
     bool has_nonempty_pathlimits_;
+    safety_monitor::InputFreshness inputs_;
     StopStateMachine state_machine_;
     mutable std::mutex state_mutex_;
     double current_speed_ = 0.0;

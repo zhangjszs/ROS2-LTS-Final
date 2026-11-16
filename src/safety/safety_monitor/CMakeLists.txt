@@ -50,6 +50,8 @@ install(TARGETS
 
 if(BUILD_TESTING)
   find_package(ament_cmake_gtest REQUIRED)
+  ament_add_gtest(test_input_freshness test/test_input_freshness.cpp)
+  target_link_libraries(test_input_freshness common_msgs::common_msgs)
   ament_add_gtest(test_stop_state_machine
     test/test_stop_state_machine.cpp
     src/state_machine/stop_state_machine.cpp

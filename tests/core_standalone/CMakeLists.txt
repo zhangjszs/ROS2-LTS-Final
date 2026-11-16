@@ -253,3 +253,6 @@ add_core_test(test_geodetic_core
 #   test_pure_pursuit           → 节点级测试，依赖 rclcpp
 # 它们仍由 colcon 侧 `colcon test` 跑（普通构建，无 sanitizer）；要在 sanitizer 下跑
 # 需要先做 #22 风格的 core/ROS 拆分，那不在本 issue 范围。
+
+add_core_test(test_input_freshness
+    SOURCES "${REPO_ROOT}/src/safety/safety_monitor/test/test_input_freshness.cpp")
