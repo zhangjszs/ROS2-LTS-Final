@@ -2,8 +2,8 @@
 // 纯 std（无 ROS），验证与原节点内联实现逐条件等价：积分冻结/抗饱和/低高速定值/中段钳制/限幅/reset。
 #include <gtest/gtest.h>
 
-#include <vector>
 #include <cmath>
+#include <vector>
 
 #include "pure_pursuit/throttle_controller.h"
 
@@ -83,9 +83,9 @@ TEST(ThrottleController, PedalMinAndMaxClamp) {
     hi.pedal_max = 20.0;  // current_low_speed 30 超上限 => 20
     EXPECT_EQ(ctrl.update(0.0, hi), 20);
     Params lo;
-    lo.target_speed = -5.0;         // 负误差
+    lo.target_speed = 1.0;          // 合法正目标，仍有负误差（不进入停车目标分支）
     lo.pedal_min = 5.0;             // 下限抬到 5
-    lo.current_clamp_max = 1000.0;  // v=15 中段，long_current=kp*(-20)=-20 => int -20 => clamp min 5
+    lo.current_clamp_max = 1000.0;  // v=15 中段，long_current=kp*(-14)=-14 => int -14 => clamp min 5
     EXPECT_EQ(ctrl.update(15.0, lo), 5);
 }
 
@@ -115,6 +115,7 @@ TEST(ThrottleController, ZeroTargetNeverOverridesLowSpeedStopWithLaunchCurrent) 
     ThrottleController ctrl;
     Params p;
     p.target_speed = 0.0;
+    p.pedal_min = 5.0;  // 停车目标必须覆盖巡航油门下限
     EXPECT_EQ(ctrl.update(0.0, p), 0);
     EXPECT_EQ(ctrl.update(0.2, p), 0);
     EXPECT_EQ(ctrl.update(5.0, p), 0);

@@ -173,7 +173,7 @@ start pure_pursuit "$OUT_DIR/pp.log" ros2 run pure_pursuit pure_pursuit_controll
     -p use_sim_time:=true -p topics.vehicle_command:=/control/vehicle_command \
     -p safety.path_timeout:=600.0 -p algorithm.throttle.speed_high_threshold:=10.0
 start command_arbiter_node "$OUT_DIR/arbiter.log" ros2 run safety_monitor command_arbiter_node --ros-args \
-    -p use_sim_time:=true -p task.autostart:=true -p arbitration.source_timeout_sec:=0.5
+    -p use_sim_time:=true -p deployment.mode:=simulation -p task.autostart:=true -p arbitration.source_timeout_sec:=0.5
 
 EXPECT_NODES="vehicle_simulator safety_monitor velocity_profiler pure_pursuit command_arbiter_node"
 if [ "$ENABLE_FINISH_EVENT" = "1" ]; then
@@ -226,6 +226,7 @@ import time
 
 import rclpy
 from rclpy.node import Node
+from rclpy.parameter import Parameter
 
 from common_msgs.msg import HuatCarstate, HuatPathLimits, HuatSystemState, HuatVehicleCmd
 from geometry_msgs.msg import Point
@@ -255,7 +256,7 @@ class Watch(Node):
     """发布八字参考线（确认前低频重试），并观测完赛判据与横向走廊。"""
 
     def __init__(self):
-        super().__init__("skidpad_finish_watch")
+        super().__init__("skidpad_finish_watch", parameter_overrides=[Parameter("use_sim_time", value=True)])
         self.pub = self.create_publisher(HuatPathLimits, "/planning/raw_pathlimits", 10)
         self.confirmed = False   # 收到 profiler 转发 = PP 同样收到了（同一话题）
         self.create_timer(0.5, self.tick)

@@ -1,0 +1,18 @@
+2026-11-16T08:43:45.8546702Z Summary: 677 tests, 0 errors, 0 failures, 0 skipped
+2026-11-16T08:44:06.0361441Z PASS startup_no_vehicle
+2026-11-16T08:44:06.7679197Z PASS one_vehicle_frame_continuous_path
+2026-11-16T08:44:07.4479742Z PASS healthy_and_explicit_arm_start
+2026-11-16T08:44:08.1678979Z PASS vehicle_only_lost_while_driving
+2026-11-16T08:44:09.1879095Z PASS path_only_lost_while_driving
+2026-11-16T08:44:10.1162071Z PASS both_lost
+2026-11-16T08:44:11.6989413Z PASS path_recovers_before_vehicle
+2026-11-16T08:44:13.2879906Z PASS vehicle_recovers_before_path
+2026-11-16T08:44:14.2678231Z PASS nonfinite_vehicle_x
+2026-11-16T08:44:15.1677448Z PASS nonfinite_vehicle_y
+2026-11-16T08:44:16.1277448Z PASS nonfinite_vehicle_theta
+2026-11-16T08:44:17.0877999Z PASS nonfinite_vehicle_v
+2026-11-16T08:44:18.1277525Z PASS invalid_path_empty
+2026-11-16T08:44:19.1478082Z PASS invalid_path_old
+2026-11-16T08:44:20.1477569Z PASS invalid_path_future
+2026-11-16T08:44:20.9235053Z AssertionError
+2026-11-16T08:44:21.0909944Z ##[error]Process completed with exit code 1.

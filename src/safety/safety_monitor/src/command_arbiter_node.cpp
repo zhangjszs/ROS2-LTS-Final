@@ -75,9 +75,8 @@ class CommandArbiterNode : public rclcpp::Node {
         const bool simulation_mode = deployment_mode == "simulation";
         if (deployment_mode != "real" && !simulation_mode)
             throw std::invalid_argument("deployment.mode must be real or simulation");
-        if (!simulation_mode &&
-            (output_topic_ != "/vehicle_command" || source_a_topic_ == output_topic_ ||
-             source_b_topic_ == output_topic_))
+        if (!simulation_mode && (output_topic_ != "/vehicle_command" || source_a_topic_ == output_topic_ ||
+                                 source_b_topic_ == output_topic_))
             throw std::invalid_argument("Real mode requires unique /vehicle_command output owned by arbiter");
         state_topic_ =
             declare_parameter<std::string>("topics.state", std::string(common_msgs::contract::kTopicSystemState));
@@ -122,8 +121,7 @@ class CommandArbiterNode : public rclcpp::Node {
             [this](const common_msgs::msg::HuatStop::SharedPtr m) { onStop(*m); });
         // 完赛/停车请求独立输入，避免 HuatStop(bool) 在监控转发时丢失 REQUEST 语义。
         sub_stop_request_ = create_subscription<common_msgs::msg::HuatStop>(
-            stop_request_topic_, 10,
-            [this](const common_msgs::msg::HuatStop::SharedPtr m) { onStopRequest(*m); });
+            stop_request_topic_, 10, [this](const common_msgs::msg::HuatStop::SharedPtr m) { onStopRequest(*m); });
         // 任务事件（arm/start/finish/abort/reset）：行驶许可的唯一授予入口。
         sub_event_ = create_subscription<std_msgs::msg::String>(
             event_topic_, 10, [this](const std_msgs::msg::String::SharedPtr m) { onTaskEvent(m->data); });
@@ -207,7 +205,8 @@ class CommandArbiterNode : public rclcpp::Node {
         }
         // 任何运行授权或人工复位必须建立在有效、明确解除停车的监控状态上。
         if ((ev == "arm" || ev == "start" || ev == "reset") && !monitorReady()) {
-            RCLCPP_WARN(get_logger(), "[command_arbiter] event=%s rejected: monitor unavailable or stopped", ev.c_str());
+            RCLCPP_WARN(get_logger(), "[command_arbiter] event=%s rejected: monitor unavailable or stopped",
+                        ev.c_str());
             return;
         }
         if (ev == "reset" && request_latched_) {
@@ -329,7 +328,8 @@ class CommandArbiterNode : public rclcpp::Node {
         return (o.last_rx_sec < 0.0) ? -1.0 : (t - o.last_rx_sec);
     }
 
-    std::string source_a_topic_, source_b_topic_, output_topic_, stop_topic_, stop_request_topic_, state_topic_, event_topic_;
+    std::string source_a_topic_, source_b_topic_, output_topic_, stop_topic_, stop_request_topic_, state_topic_,
+        event_topic_;
     bool monitor_seen_{false};
     bool monitor_stop_active_{true};
     bool request_latched_{false};

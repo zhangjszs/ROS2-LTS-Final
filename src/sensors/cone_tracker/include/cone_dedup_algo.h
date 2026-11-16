@@ -26,8 +26,8 @@ struct EgoVelocity {
 };
 
 [[nodiscard]] inline EgoVelocity EstimateEgoVelocity(Point2D previous, Point2D current, double dt) noexcept {
-    if (!std::isfinite(dt) || dt <= 0.005 || dt >= 0.5 || !std::isfinite(previous.x) ||
-        !std::isfinite(previous.y) || !std::isfinite(current.x) || !std::isfinite(current.y))
+    if (!std::isfinite(dt) || dt <= 0.005 || dt >= 0.5 || !std::isfinite(previous.x) || !std::isfinite(previous.y) ||
+        !std::isfinite(current.x) || !std::isfinite(current.y))
         return {};
     return {(current.x - previous.x) / dt, (current.y - previous.y) / dt, true};
 }

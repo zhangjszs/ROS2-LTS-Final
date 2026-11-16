@@ -1,0 +1,44 @@
+Running main() from ./googletest/src/gtest_main.cc
+[==========] Running 16 tests from 2 test suites.
+[----------] Global test environment set-up.
+[----------] 12 tests from InputFreshness
+[ RUN      ] InputFreshness.OneVehicleSampleWithContinuousTenHzPathMustExpire
+[       OK ] InputFreshness.OneVehicleSampleWithContinuousTenHzPathMustExpire (0 ms)
+[ RUN      ] InputFreshness.AbsentSourcesNeverAuthorizeAndStateDoesNotSeedPlanner
+[       OK ] InputFreshness.AbsentSourcesNeverAuthorizeAndStateDoesNotSeedPlanner (0 ms)
+[ RUN      ] InputFreshness.IndependentConfiguredDeadlinesIncludingBoundary
+[       OK ] InputFreshness.IndependentConfiguredDeadlinesIncludingBoundary (0 ms)
+[ RUN      ] InputFreshness.BothSourcesExpire
+[       OK ] InputFreshness.BothSourcesExpire (0 ms)
+[ RUN      ] InputFreshness.InvalidVehicleAndInvalidPathDoNotRenewEitherLease
+[       OK ] InputFreshness.InvalidVehicleAndInvalidPathDoNotRenewEitherLease (0 ms)
+[ RUN      ] InputFreshness.RecoveryRequiresBothSourcesInEitherOrder
+[       OK ] InputFreshness.RecoveryRequiresBothSourcesInEitherOrder (0 ms)
+[ RUN      ] InputFreshness.PausedRosClockCannotFreezeReceiveTimeout
+[       OK ] InputFreshness.PausedRosClockCannotFreezeReceiveTimeout (0 ms)
+[ RUN      ] InputFreshness.RosRollbackInvalidatesBothUntilNewEpochSamplesArrive
+[       OK ] InputFreshness.RosRollbackInvalidatesBothUntilNewEpochSamplesArrive (0 ms)
+[ RUN      ] InputFreshness.FutureReceiveEpochCannotReviveOldLeaseAfterClockCatchesUp
+[       OK ] InputFreshness.FutureReceiveEpochCannotReviveOldLeaseAfterClockCatchesUp (0 ms)
+[ RUN      ] InputFreshness.NonFiniteClockFailsClosedAndRequiresBothAgain
+[       OK ] InputFreshness.NonFiniteClockFailsClosedAndRequiresBothAgain (0 ms)
+[ RUN      ] InputFreshness.InvalidBudgetsAreRejectedRatherThanDisableSafety
+[       OK ] InputFreshness.InvalidBudgetsAreRejectedRatherThanDisableSafety (0 ms)
+[ RUN      ] InputFreshness.NonFiniteVehicleFieldsCannotRefreshLease
+[       OK ] InputFreshness.NonFiniteVehicleFieldsCannotRefreshLease (0 ms)
+[----------] 12 tests from InputFreshness (1 ms total)
+
+[----------] 4 tests from InputSafetyChain
+[ RUN      ] InputSafetyChain.NoArmOrNoStartWithValidThrottleStillBrakes
+[       OK ] InputSafetyChain.NoArmOrNoStartWithValidThrottleStillBrakes (0 ms)
+[ RUN      ] InputSafetyChain.StateLossStopsDespiteHealthyPlannerAndTrustedMpc
+[       OK ] InputSafetyChain.StateLossStopsDespiteHealthyPlannerAndTrustedMpc (0 ms)
+[ RUN      ] InputSafetyChain.RecoveryNeverClearsRequestOrFault
+[       OK ] InputSafetyChain.RecoveryNeverClearsRequestOrFault (0 ms)
+[ RUN      ] InputSafetyChain.MonitorRestartBeginsTimeoutAndArbiterRestartNeedsAuthorization
+[       OK ] InputSafetyChain.MonitorRestartBeginsTimeoutAndArbiterRestartNeedsAuthorization (0 ms)
+[----------] 4 tests from InputSafetyChain (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 16 tests from 2 test suites ran. (1 ms total)
+[  PASSED  ] 16 tests.

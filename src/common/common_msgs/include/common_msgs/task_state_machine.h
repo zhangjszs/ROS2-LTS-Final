@@ -157,9 +157,8 @@ class TaskSafetyStateMachine {
    private:
     TaskSafetyTransition enterStop(StopKind kind) {
         // FAULT > REQUEST > TIMEOUT。低优先级及重复事件均不得改写锁存来源。
-        if (safety_ == SafetyState::STOP &&
-            ((stop_kind_ == StopKind::FAULT && kind != StopKind::FAULT) ||
-             (stop_kind_ == StopKind::REQUEST && kind == StopKind::TIMEOUT))) {
+        if (safety_ == SafetyState::STOP && ((stop_kind_ == StopKind::FAULT && kind != StopKind::FAULT) ||
+                                             (stop_kind_ == StopKind::REQUEST && kind == StopKind::TIMEOUT))) {
             return {false, StopEdge::NONE};
         }
         const bool first_edge = (safety_ != SafetyState::STOP);

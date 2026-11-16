@@ -1,0 +1,68 @@
+2026-11-16T09:31:54.8691442Z Summary: 677 tests, 0 errors, 0 failures, 0 skipped
+2026-11-16T09:32:23.9062522Z PASS startup_no_vehicle
+2026-11-16T09:32:24.6265477Z FAIL snapshot: {"at_steady_sec": 1.3815947130000268, "ros_sec": 101.36630741600004, "event": "failure_snapshot", "monitor_stop": false, "monitor_receive_age_sec": 0.07042098599993096, "task": 0, "stop_kind": 0, "can_drive": false, "pedal": 0, "brake": 80, "monitor_inputs": null}
+2026-11-16T09:32:24.6282087Z     raise AssertionError(f"condition timed out after {budget}s")
+2026-11-16T09:32:24.6282475Z AssertionError: condition timed out after 0.6499999999999999s
+2026-11-16T09:32:24.7928288Z EXPECTED RED: 原始监控在单帧定位+持续规划场景失败
+2026-11-16T09:32:26.8446948Z PASS startup_no_vehicle
+2026-11-16T09:32:27.5670545Z PASS one_vehicle_frame_continuous_path
+2026-11-16T09:32:28.2648615Z PASS healthy_and_explicit_arm_start
+2026-11-16T09:32:28.9650978Z PASS vehicle_only_lost_while_driving
+2026-11-16T09:32:30.0048315Z PASS path_only_lost_while_driving
+2026-11-16T09:32:30.9070570Z PASS both_lost
+2026-11-16T09:32:32.5248301Z PASS path_recovers_before_vehicle
+2026-11-16T09:32:34.1447638Z PASS vehicle_recovers_before_path
+2026-11-16T09:32:35.1245272Z PASS nonfinite_vehicle_x
+2026-11-16T09:32:36.0848516Z PASS nonfinite_vehicle_y
+2026-11-16T09:32:37.0447443Z PASS nonfinite_vehicle_theta
+2026-11-16T09:32:38.0047323Z PASS nonfinite_vehicle_v
+2026-11-16T09:32:39.0048060Z PASS invalid_path_empty
+2026-11-16T09:32:40.0046682Z PASS invalid_path_old
+2026-11-16T09:32:41.1246897Z PASS invalid_path_future
+2026-11-16T09:32:41.9246807Z PASS request_latch_survives_healthy_data
+2026-11-16T09:32:42.5648093Z PASS fault_latch_survives_healthy_data
+2026-11-16T09:32:43.3246819Z PASS arbiter_restart_no_permission
+2026-11-16T09:32:48.9047481Z PASS monitor_restart_timeout_and_fault_latch
+2026-11-16T09:32:49.8446915Z PASS paused_ros_clock_vehicle_timeout
+2026-11-16T09:32:50.5245486Z PASS ros_clock_rollback_needs_both_sources
+2026-11-16T09:33:02.3220045Z Closed-loop contract/QoS integration smoke: PASS ✔
+2026-11-16T09:33:07.4153384Z OK   5 个节点已注册，开始数据面断言
+2026-11-16T09:33:15.1487173Z   vehicle_state 消息 : 508        峰值车速 1.35 m/s (需 >= 0.5)
+2026-11-16T09:33:15.1487879Z   vehicle_command    : 248  坏帧 0  坏校验和 0  纯制动 False
+2026-11-16T09:33:18.3254554Z Closed-loop simulation smoke: PASS ✔  （容差型集成门禁，不要求位级一致）
+2026-11-16T09:38:29.8695171Z 闭环故障冒烟 PASS ✔  （越界/持续碰撞/反向/未完赛/超时 均在闭环内被 KpiEvaluator 识别）
+2026-11-16T09:38:31.0640941Z PASS startup_no_vehicle
+2026-11-16T09:38:31.8041256Z PASS one_vehicle_frame_continuous_path
+2026-11-16T09:38:32.5020263Z PASS healthy_and_explicit_arm_start
+2026-11-16T09:38:33.2219051Z PASS vehicle_only_lost_while_driving
+2026-11-16T09:38:34.2819062Z PASS path_only_lost_while_driving
+2026-11-16T09:38:35.1620780Z PASS both_lost
+2026-11-16T09:38:36.7818512Z PASS path_recovers_before_vehicle
+2026-11-16T09:38:38.3816396Z PASS vehicle_recovers_before_path
+2026-11-16T09:38:39.3619183Z PASS nonfinite_vehicle_x
+2026-11-16T09:38:40.2619638Z PASS nonfinite_vehicle_y
+2026-11-16T09:38:41.2219516Z PASS nonfinite_vehicle_theta
+2026-11-16T09:38:42.1820119Z PASS nonfinite_vehicle_v
+2026-11-16T09:38:43.2418997Z PASS invalid_path_empty
+2026-11-16T09:38:44.3418699Z PASS invalid_path_old
+2026-11-16T09:38:45.3419179Z PASS invalid_path_future
+2026-11-16T09:38:46.1419701Z PASS request_latch_survives_healthy_data
+2026-11-16T09:38:46.7822267Z PASS fault_latch_survives_healthy_data
+2026-11-16T09:38:47.5421298Z PASS arbiter_restart_no_permission
+2026-11-16T09:38:53.1782336Z PASS monitor_restart_timeout_and_fault_latch
+2026-11-16T09:38:54.0984982Z PASS paused_ros_clock_vehicle_timeout
+2026-11-16T09:38:54.7782583Z PASS ros_clock_rollback_needs_both_sources
+2026-11-16T09:39:43.9044667Z OK   01_baseline_drive: task=2 safety=0 kind=0 reason=0 winner=1 A=0 B=1 pedal=4 brake=0 v=1.382
+2026-11-16T09:39:43.9047759Z OK   02_path_lost: task=2 safety=2 kind=1 reason=1 winner=0 A=0 B=1 pedal=0 brake=80 v=0.0
+2026-11-16T09:39:43.9048493Z OK   03_empty_path: task=2 safety=2 kind=1 reason=1 winner=0 A=0 B=1 pedal=0 brake=80 v=0.0
+2026-11-16T09:39:43.9049058Z OK   04_tampered_source_frame: task=2 safety=0 kind=0 reason=0 winner=1 A=0 B=3 pedal=5 brake=0 v=0.969
+2026-11-16T09:39:43.9049613Z OK   05_external_stop_and_resume: task=2 safety=0 kind=0 reason=0 winner=1 A=0 B=3 pedal=5 brake=0 v=1.32
+2026-11-16T09:39:43.9050112Z OK   06_abort_is_latched: task=4 safety=2 kind=3 reason=1 winner=0 A=0 B=3 pedal=0 brake=80 v=0.0
+2026-11-16T09:39:43.9050596Z OK   07_repeat_stop_idempotent: task=4 safety=2 kind=3 reason=1 winner=0 A=0 B=3 pedal=0 brake=80 v=0.0
+2026-11-16T09:39:43.9051303Z OK   08_manual_reset_no_permission: task=0 safety=0 kind=0 reason=2 winner=0 A=0 B=3 pedal=0 brake=80 v=0.0
+2026-11-16T09:39:43.9052012Z OK   09_monitor_exit: task=4 safety=2 kind=3 reason=1 winner=0 A=0 B=3 pedal=0 brake=80 v=0.0
+2026-11-16T09:39:43.9052954Z OK   10_arbiter_restart_late_join: task=4 safety=2 kind=3 reason=1 winner=0 A=0 B=1 pedal=0 brake=80 v=0.0
+2026-11-16T09:39:45.0812784Z Fault injection smoke: PASS ✔ （10 个软故障场景终态自动判定；硬件急停/VCU 断连仍需台架实车）
+2026-11-16T09:39:54.8850272Z OK   6 个节点进程已就绪，开始数据面断言
+2026-11-16T09:40:57.2456436Z Skidpad finish closed-loop smoke: PASS ✔  （ENABLE_FINISH_EVENT=1 REQUIRED_LAPS=2）
+2026-11-16T09:41:09.8370512Z OK   6 个节点进程已就绪，开始数据面断言

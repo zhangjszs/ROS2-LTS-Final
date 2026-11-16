@@ -67,7 +67,7 @@ ros2 run velocity_profiler velocity_profiler_node >build/qcc_profiler.log 2>&1 &
 ros2 run pure_pursuit pure_pursuit_controller --ros-args -p topics.vehicle_command:="$TOPIC_COMMAND" \
     >build/qcc_pp.log 2>&1 & PIDS+=($!)
 # #16：最终指令仲裁器——订阅 PP/MPC 源 + 锁存 stop，在独立输出话题上产出单一最终指令。
-ros2 run safety_monitor command_arbiter_node --ros-args -p topics.output:="$TOPIC_ARB_OUT" \
+ros2 run safety_monitor command_arbiter_node --ros-args -p deployment.mode:=simulation -p topics.output:="$TOPIC_ARB_OUT" \
     >build/qcc_arbiter.log 2>&1 & PIDS+=($!)
 
 # 等五节点上节点图（最多 ~25s；单次查询限时，避免 CLI/daemon 异常时无限阻塞）
@@ -151,6 +151,17 @@ for t in "$TOPIC_STATE" "$TOPIC_PATH" "$TOPIC_COMMAND"; do
         echo "OK   $t RELIABLE"
     else
         echo "FAIL $t 非 RELIABLE"
+        fail=1
+    fi
+done
+
+# #107：监控必须实际订阅两个独立输入，不可仅靠规划端点存在就声称定位受保护。
+for t in "$TOPIC_STATE" "$TOPIC_PATH"; do
+    out="$(info_of "$t")"
+    if grep -q 'Node name: safety_monitor' <<<"$out"; then
+        echo "OK   $t has safety_monitor endpoint (contract QoS)"
+    else
+        echo "FAIL $t missing safety_monitor endpoint"
         fail=1
     fi
 done

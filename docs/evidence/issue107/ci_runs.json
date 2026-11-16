@@ -1,0 +1,156 @@
+{
+  "schema": "fsac.issue107.ci-evidence/v1",
+  "baseline_sha": "8d9479ef930e75192a3391259b1c8486d03a3f79",
+  "validated_code_sha": "d903b10262ba6777dc548a96063fb8e50633e5af",
+  "raw_artifact_retention_days": 14,
+  "runs": [
+    {
+      "run": 43830539804,
+      "sha": "b290425bdc3971ba54797f44ba0770fc0b8a395b",
+      "note": "构建/677包测通过；恢复顺序夹具未等待双源过期，7 PASS后FAIL。",
+      "url": "https://github.com/zhangjszs/ROS2-LTS-Final/actions/runs/43830539804",
+      "artifacts": [
+        {
+          "id": 14207929291,
+          "sha256": "9de0b9e8646178d1c712f579ae150c4a501f1d49d20fab68743324af7b383c02",
+          "url": "https://github.com/zhangjszs/ROS2-LTS-Final/actions/runs/43830539804/artifacts/14207929291"
+        },
+        {
+          "id": 14209135643,
+          "sha256": "3d6d8b269cd5583e9ed496f8c89343e7987390a6bdc58e9fa67a34936bc0024c",
+          "url": "https://github.com/zhangjszs/ROS2-LTS-Final/actions/runs/43830539804/artifacts/14209135643"
+        }
+      ],
+      "raw_json_location": "benchmark-regression artifact ZIP: *summary.json, *timeline.json"
+    },
+    {
+      "run": 43832014790,
+      "sha": "09db7a7c9ce6fe0dc6e61c78b0047e476b5a58ba",
+      "note": "15 PASS后REQUEST显式复位测试假设与既有状态机不符。",
+      "url": "https://github.com/zhangjszs/ROS2-LTS-Final/actions/runs/43832014790",
+      "artifacts": [
+        {
+          "id": 14208844234,
+          "sha256": "66697d63cb3b09200b4ad94401bafc751b79be73dd5c1a243191a2a3924f4fab",
+          "url": "https://github.com/zhangjszs/ROS2-LTS-Final/actions/runs/43832014790/artifacts/14208844234"
+        },
+        {
+          "id": 14210565069,
+          "sha256": "2593ea189ef4d4c0b1147431798c98bd3ac2ee9b15eca5c64811c05561bba85e",
+          "url": "https://github.com/zhangjszs/ROS2-LTS-Final/actions/runs/43832014790/artifacts/14210565069"
+        }
+      ],
+      "raw_json_location": "benchmark-regression artifact ZIP: *summary.json, *timeline.json"
+    },
+    {
+      "run": 43832684378,
+      "sha": "6d402f012c2728839a45e98158e569517d28aea5",
+      "note": "真实基线RED已命中；GREEN前15项通过，REQUEST夹具失败。",
+      "url": "https://github.com/zhangjszs/ROS2-LTS-Final/actions/runs/43832684378",
+      "artifacts": [
+        {
+          "id": 14210171599,
+          "sha256": "99ed9c7cc4c3b44acc8fc50c4db561224ad7a519523b0e5c9e7da431d1c39ea4",
+          "url": "https://github.com/zhangjszs/ROS2-LTS-Final/actions/runs/43832684378/artifacts/14210171599"
+        },
+        {
+          "id": 14209029887,
+          "sha256": "b7e0c98f79216b50d55a945a64d87ab73c9ee8b8b4bb1ecac12e67a8929eab8c",
+          "url": "https://github.com/zhangjszs/ROS2-LTS-Final/actions/runs/43832684378/artifacts/14209029887"
+        }
+      ],
+      "raw_json_location": "benchmark-regression artifact ZIP: *summary.json, *timeline.json"
+    },
+    {
+      "run": 43834129241,
+      "sha": "4070a10ed7a968aa790d51e22059b26c401702c6",
+      "note": "真实RED→GREEN、21场景、677包测通过；旧闭环夹具时钟域错误，整体FAIL。",
+      "url": "https://github.com/zhangjszs/ROS2-LTS-Final/actions/runs/43834129241",
+      "artifacts": [
+        {
+          "id": 14210337766,
+          "sha256": "6739dc3a34ce590b36441617ec068a28bfa14341f00d91378e55d64e8e60f818",
+          "url": "https://github.com/zhangjszs/ROS2-LTS-Final/actions/runs/43834129241/artifacts/14210337766"
+        },
+        {
+          "id": 14210457640,
+          "sha256": "b4bc9579201d89f5a24ced5d189d6ad863c1fcecb0092106bede9e497226c17d",
+          "url": "https://github.com/zhangjszs/ROS2-LTS-Final/actions/runs/43834129241/artifacts/14210457640"
+        }
+      ],
+      "raw_json_location": "benchmark-regression artifact ZIP: *summary.json, *timeline.json"
+    },
+    {
+      "run": 43836052900,
+      "sha": "b85d0c6351613970ee196bd661880bb360a9474e",
+      "note": "重启测试缺少跨Topic确认而失败；后续已补reset ACK和新监控双Absent确认。",
+      "url": "https://github.com/zhangjszs/ROS2-LTS-Final/actions/runs/43836052900",
+      "artifacts": [
+        {
+          "id": 14211337388,
+          "sha256": "d9fc63da97d21aec4c327d8887ba8192f50f7ed5d4ad095680264d663743f141",
+          "url": "https://github.com/zhangjszs/ROS2-LTS-Final/actions/runs/43836052900/artifacts/14211337388"
+        },
+        {
+          "id": 14212005926,
+          "sha256": "de4385f0e493a7a586d1e23a70cf31dcd357864c18ee4066618c5b74a8b8eb28",
+          "url": "https://github.com/zhangjszs/ROS2-LTS-Final/actions/runs/43836052900/artifacts/14212005926"
+        }
+      ],
+      "raw_json_location": "benchmark-regression artifact ZIP: *summary.json, *timeline.json"
+    },
+    {
+      "run": 43836143013,
+      "sha": "9197772172dbb1234c238d8e11bba279cb70faae",
+      "note": "重复运行新增21项通过；旧10项9 PASS，晚加入预期未保留失联FAULT优先级。",
+      "url": "https://github.com/zhangjszs/ROS2-LTS-Final/actions/runs/43836143013",
+      "artifacts": [
+        {
+          "id": 14211811768,
+          "sha256": "a95a1d2ce07ca16a3054e54b6d6698b76bb866b85bfbbb3a6f8b6d9d5f678c75",
+          "url": "https://github.com/zhangjszs/ROS2-LTS-Final/actions/runs/43836143013/artifacts/14211811768"
+        },
+        {
+          "id": 14212430420,
+          "sha256": "12eedb575f6c07d852932f5dd5cf1a03d5400eb5b7523f1d97cc7f5339b4e0a6",
+          "url": "https://github.com/zhangjszs/ROS2-LTS-Final/actions/runs/43836143013/artifacts/14212430420"
+        }
+      ],
+      "raw_json_location": "benchmark-regression artifact ZIP: *summary.json, *timeline.json"
+    },
+    {
+      "run": 43838142995,
+      "sha": "0ced8f225434ab0358e529ee50225138c341263b",
+      "note": "重启期间旧缓存就绪误判；d903b10补新实例epoch确认和失败快照。",
+      "url": "https://github.com/zhangjszs/ROS2-LTS-Final/actions/runs/43838142995",
+      "artifacts": [
+        {
+          "id": 14212845876,
+          "sha256": "6181e1ddc65de184c5bbf74aa68bf3ac3b6d1975d9775eaa9b2a3a0227c85745",
+          "url": "https://github.com/zhangjszs/ROS2-LTS-Final/actions/runs/43838142995/artifacts/14212845876"
+        },
+        {
+          "id": 14211893509,
+          "sha256": "b2332e1f11b3c6a9b952581c04c8b71fa280eb2c0482745c923b4d615fd87fb8",
+          "url": "https://github.com/zhangjszs/ROS2-LTS-Final/actions/runs/43838142995/artifacts/14211893509"
+        }
+      ],
+      "raw_json_location": "benchmark-regression artifact ZIP: *summary.json, *timeline.json"
+    },
+    {
+      "run": 43839420046,
+      "sha": "d903b10262ba6777dc548a96063fb8e50633e5af",
+      "url": "https://github.com/zhangjszs/ROS2-LTS-Final/actions/runs/43839420046",
+      "conclusion": "success",
+      "note": "全量工作流通过：真实监控RED→GREEN、21新场景、旧10故障、677包测、36核心、lint/QoS/闭环/八字正负样本。",
+      "artifacts": [
+        {
+          "id": 14213268083,
+          "sha256": "a07238a54683be79350f3f4d7e6be65b2f61516a2a3f99bd54fde545ed71c884",
+          "url": "https://github.com/zhangjszs/ROS2-LTS-Final/actions/runs/43839420046/artifacts/14213268083"
+        }
+      ],
+      "raw_json_location": "benchmark-regression ZIP: vehicle_state_lease_red_green/{red,green}/{summary,timeline}.json + fault_injection/*.json"
+    }
+  ]
+}

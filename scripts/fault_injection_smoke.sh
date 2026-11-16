@@ -29,6 +29,10 @@
 # safety_monitor 锁存 stop 传播的用例照常断言。
 # ==============================================================================
 set -uo pipefail
+# #107 独立注入先运行；不依赖 PP 的私有状态 watchdog，也不与下方仿真域混跑。
+if [ "${CHAIN:-arbiter}" = "arbiter" ]; then
+    bash "$(dirname "${BASH_SOURCE[0]}")/vehicle_state_lease_smoke.sh" "${1:-build/fault_injection}/vehicle_state_lease" || exit "$?"
+fi
 export ROS_LOCALHOST_ONLY=1
 : "${ROS_HOME:=$PWD/build/.ros}"
 export ROS_HOME
@@ -45,6 +49,8 @@ mkdir -p "$TMPDIR"
 # 先停一次 daemon：残留/空转的 daemon 会让 node list 恒空；停掉后首次调用会按当前
 # ROS_HOME/TMPDIR 重建（CI 上本来就没有旧 daemon，等于空操作）。CI 契约，勿为迁就单机改回。
 timeout 20 ros2 daemon stop >/dev/null 2>&1 || true
+ros2 daemon start >/dev/null 2>&1
+sleep 3
 
 CHAIN="${CHAIN:-arbiter}"
 if [ "$CHAIN" != "arbiter" ] && [ "$CHAIN" != "direct" ]; then
@@ -100,7 +106,8 @@ start() {
 
 start "$OUT_DIR/sim.log" ros2 run vehicle_simulator vehicle_simulator_node --ros-args \
     -p use_sim_time:=true -p publish_clock:=true -p seed:=42
-start "$OUT_DIR/safety.log" ros2 run safety_monitor safety_monitor --ros-args -p use_sim_time:=true
+start "$OUT_DIR/safety.log" ros2 run safety_monitor safety_monitor --ros-args -p use_sim_time:=true \
+    -p stop_request_topic:=/planning/track/stop_request -p reset_stop_topic:=/system/reset_stop
 start "$OUT_DIR/profiler.log" ros2 run velocity_profiler velocity_profiler_node --ros-args \
     -p use_sim_time:=true
 # PP 改发源话题 A；最终出口由仲裁器独占（单一权威，控制器不得绕过）
@@ -157,6 +164,7 @@ import time
 
 import rclpy
 from rclpy.node import Node
+from rclpy.parameter import Parameter
 
 from common_msgs.msg import HuatPathLimits, HuatStop, HuatSystemState, HuatVehicleCmd
 from geometry_msgs.msg import Point
@@ -171,7 +179,7 @@ SRC_A, SRC_B, OUT_CMD = "/control/vehicle_command", "/mpc/vehicle_command", "/ve
 STATE, EVENT, RAW_PATH, STOP = "/system/state", "/system/task_event", "/planning/raw_pathlimits", "/system/stop"
 
 # 与 HuatSystemState 常量一致的编码（msg 侧另有 static_assert 锁定）
-TASK_IDLE, TASK_RUNNING = 0, 2
+TASK_IDLE, TASK_RUNNING, TASK_FAULT = 0, 2, 4
 SAFETY_STOP, SAFETY_NORMAL = 2, 0
 KIND_NONE, KIND_TIMEOUT, KIND_REQUEST, KIND_FAULT = 0, 1, 2, 3
 SRC_NONE, SRC_PP, SRC_MPC = 0, 1, 2
@@ -183,7 +191,7 @@ class Harness(Node):
     """场景驱动器：注入故障 + 记录时间线 + 自动判定预期终态。"""
 
     def __init__(self):
-        super().__init__("fault_injection_harness")
+        super().__init__("fault_injection_harness", parameter_overrides=[Parameter("use_sim_time", value=True)])
         self.last_state = None
         self.last_cmd = None
         self.last_stop = None
@@ -207,6 +215,8 @@ class Harness(Node):
                               durability=QoSDurabilityPolicy.TRANSIENT_LOCAL)
         self.pub_stop = self.create_publisher(HuatStop, STOP, stop_qos)
         self.pub_event = self.create_publisher(String, EVENT, 10)
+        self.pub_request = self.create_publisher(HuatStop, "/planning/track/stop_request", 10)
+        self.pub_reset = self.create_publisher(HuatStop, "/system/reset_stop", 1)
         self.create_timer(0.1, self.tick_path)
 
     def tick_path(self):
@@ -386,10 +396,16 @@ def c04(tl, f, extra):
 
 
 def d05(h):
-    h.publish_stop(True)            # 外部（监控类）停车
+    # 监控现在是周期心跳的唯一来源；通过请求入口注入，不与监控争发 stop。
+    h.pub_request.publish(HuatStop(stop=True))
     h.spin_for(1.0)
     ext = snap(h, "external_stop")
-    h.publish_stop(False)           # 释放 → 可恢复类应解除
+    h.pub_request.publish(HuatStop(stop=False))
+    h.spin_for(0.5)
+    h.pub_reset.publish(HuatStop(stop=False))
+    h.spin_for(0.5)
+    if not DIRECT:
+        h.event("reset")
     h.spin_for(2.0)
     return {"external_stop": ext}
 
@@ -398,7 +414,7 @@ def c05(tl, f, extra):
     ext = extra.get("external_stop", {})
     expect(bool(ext.get("stop_active")), "外部停车请求未生效", f)
     expect(stopped_ok(ext), "外部停车期间出口未回到制动", f)
-    expect(not tl.get("stop_active"), "监控释放后仍可恢复类停车未解除（TIMEOUT 应可恢复）", f)
+    expect(not tl.get("stop_active"), "明确撤销请求并复位后停车未解除", f)
 
 
 def d06(h):
@@ -462,9 +478,12 @@ def d10(h):
 
 
 def c10(tl, f, extra):
-    expect(tl.get("task_state") == TASK_IDLE, "重启后的仲裁器不处于 IDLE", f)
+    # d09 已杀监控：晚加入者可因心跳仍失联进入 FAULT，安全等级不能被 IDLE 字面值覆盖。
+    expect(tl.get("task_state") in (TASK_IDLE, TASK_FAULT), "重启后意外授予任务许可", f)
+    if tl.get("task_state") == TASK_FAULT:
+        expect(tl.get("stop_kind") == KIND_FAULT, "失联 FAULT 的来源不一致", f)
     expect(not tl.get("can_drive"), "晚加入者意外授予了行驶许可", f)
-    expect((tl.get("out_pedal") or 0) == 0, "晚加入者出口不是零油门", f)
+    expect(stopped_ok(tl), "晚加入者出口不是零油门+有效制动", f)
 
 
 CASES = [

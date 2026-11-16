@@ -1,0 +1,10 @@
+2026-11-16T08:28:18.9860729Z Summary: 677 tests, 0 errors, 0 failures, 0 skipped
+2026-11-16T08:28:37.4908544Z PASS startup_no_vehicle
+2026-11-16T08:28:38.2130262Z PASS one_vehicle_frame_continuous_path
+2026-11-16T08:28:38.9308341Z PASS healthy_and_explicit_arm_start
+2026-11-16T08:28:39.6108882Z PASS vehicle_only_lost_while_driving
+2026-11-16T08:28:40.6508655Z PASS path_only_lost_while_driving
+2026-11-16T08:28:41.5330239Z PASS both_lost
+2026-11-16T08:28:42.2908572Z PASS path_recovers_before_vehicle
+2026-11-16T08:28:42.5972512Z AssertionError: safety invariant violated during sustained observation
+2026-11-16T08:28:42.7390559Z ##[error]Process completed with exit code 1.
