@@ -199,7 +199,7 @@ start pure_pursuit "$OUT_DIR/pp.log" ros2 run pure_pursuit pure_pursuit_controll
     -p algorithm.throttle.speed_high_threshold:=10.0
 
 start command_arbiter_node "$OUT_DIR/arbiter.log" ros2 run safety_monitor command_arbiter_node --ros-args \
-    -p use_sim_time:=true -p task.autostart:=true -p arbitration.source_timeout_sec:=0.5
+    -p use_sim_time:=true -p deployment.mode:=simulation -p task.autostart:=true -p arbitration.source_timeout_sec:=0.5
 
 EXPECT_NODES="vehicle_simulator safety_monitor velocity_profiler pure_pursuit command_arbiter_node"
 if [ "$ENABLE_PLANNER" = "1" ]; then
