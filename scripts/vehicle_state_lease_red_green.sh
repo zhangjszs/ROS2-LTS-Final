@@ -31,12 +31,21 @@ fi
 # 依赖缺失、未发现节点、编译错误等均不能冒充 RED。
 python3 - "$OUT/red/summary.json" <<'PY'
 import json
+from pathlib import Path
 import sys
-r = json.load(open(sys.argv[1]))
+result_path = Path(sys.argv[1])
+r = json.loads(result_path.read_text())
 failed = [c for c in r.get("cases", []) if c["status"] == "FAIL"]
 assert r["status"] == "FAIL" and len(failed) == 1, r
 assert failed[0]["case"] == "one_vehicle_frame_continuous_path", failed
 assert any(c["case"] == "startup_no_vehicle" and c["status"] == "PASS" for c in r["cases"]), r
+assert failed[0]["reason"].startswith("condition timed out after"), failed
+all_events = json.loads(result_path.with_name("timeline.json").read_text())["events"]
+events = all_events[failed[0]["timeline_start"]:]
+clears = [e["at_steady_sec"] for e in events if e["event"] == "system_stop" and not e["stop"]]
+assert len([e for e in events if e["event"] == "vehicle_input"]) == 1, "不是单帧定位"
+assert len([e for e in events if e["event"] == "path_input" and e["kind"] == "valid"]) >= 5, "路径未持续"
+assert clears and clears[-1] - clears[0] > r["state_timeout_sec"], "未证明先释放 TIMEOUT 后持续错误健康"
 print("EXPECTED RED: 原始监控在单帧定位+持续规划场景失败")
 PY
 cp "$BACKUP" "$SOURCE"
