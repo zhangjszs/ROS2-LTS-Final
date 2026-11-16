@@ -29,6 +29,10 @@
 # safety_monitor 锁存 stop 传播的用例照常断言。
 # ==============================================================================
 set -uo pipefail
+# #107 独立注入先运行；不依赖 PP 的私有状态 watchdog，也不与下方仿真域混跑。
+if [ "${CHAIN:-arbiter}" = "arbiter" ]; then
+    bash "$(dirname "${BASH_SOURCE[0]}")/vehicle_state_lease_smoke.sh" "${1:-build/fault_injection}/vehicle_state_lease" || exit "$?"
+fi
 export ROS_LOCALHOST_ONLY=1
 : "${ROS_HOME:=$PWD/build/.ros}"
 export ROS_HOME

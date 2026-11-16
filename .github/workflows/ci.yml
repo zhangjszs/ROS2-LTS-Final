@@ -4,7 +4,7 @@ on:
   push:
     branches: [ main ]
   pull_request:
-    branches: [ main ]
+    branches: [ main, fix/fsac-fail-closed-arbiter-20261115 ]
 
 jobs:
   build-test-lint:
@@ -98,6 +98,13 @@ jobs:
           source install/setup.bash
           bash scripts/headless_smoke.sh
 
+      - name: Vehicle state lease integration (#107, isolated software only)
+        timeout-minutes: 4
+        run: |
+          source "/opt/ros/${ROS_DISTRO}/setup.bash"
+          source install/setup.bash
+          bash scripts/vehicle_state_lease_smoke.sh build/vehicle_state_lease
+
       - name: Interface contract runtime QoS check (#14)
         timeout-minutes: 5
         run: |
@@ -161,7 +168,8 @@ jobs:
             build/benchmark_regression/**/*.json
             build/closed_loop_smoke/*.json
             build/closed_loop_fault/*.json
-            build/fault_injection/*.json
+            build/fault_injection/**/*.json
+            build/vehicle_state_lease/*.json
           if-no-files-found: ignore
           retention-days: 14
 

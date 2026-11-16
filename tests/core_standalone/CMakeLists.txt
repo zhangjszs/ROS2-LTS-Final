@@ -163,10 +163,13 @@ add_core_test(test_skidpad_finish_judge
         "${REPO_ROOT}/src/simulation/track_benchmark/src/track_generator.cpp")
 
 # 安全：停车状态机（锁存/重启语义，纯 std 共用层）
+add_library(stop_state_machine_core STATIC
+    "${REPO_ROOT}/src/safety/safety_monitor/src/state_machine/stop_state_machine.cpp")
+target_include_directories(stop_state_machine_core PUBLIC "${REPO_ROOT}/src/safety/safety_monitor/include")
 add_core_test(test_stop_state_machine
     SOURCES
-        "${REPO_ROOT}/src/safety/safety_monitor/test/test_stop_state_machine.cpp"
-        "${REPO_ROOT}/src/safety/safety_monitor/src/state_machine/stop_state_machine.cpp")
+        "${REPO_ROOT}/src/safety/safety_monitor/test/test_stop_state_machine.cpp")
+target_link_libraries(test_stop_state_machine PRIVATE stop_state_machine_core)
 
 # 感知：锥桶去重算法与融合工具（均不依赖 PCL/msgs）
 add_core_test(test_cone_dedup_algo
@@ -256,3 +259,4 @@ add_core_test(test_geodetic_core
 
 add_core_test(test_input_freshness
     SOURCES "${REPO_ROOT}/src/safety/safety_monitor/test/test_input_freshness.cpp")
+target_link_libraries(test_input_freshness PRIVATE stop_state_machine_core)
