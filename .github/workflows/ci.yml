@@ -63,6 +63,7 @@ jobs:
         run: bash scripts/core_standalone_check.sh
 
       - name: Build (Release, C++20, mold + ccache, tests on)
+        id: workspace-build
         run: |
           source "/opt/ros/${ROS_DISTRO}/setup.bash"
           # --cmake-args below re-states the colcon_defaults.yaml cmake-args
@@ -140,6 +141,8 @@ jobs:
           bash scripts/closed_loop_fault_smoke.sh
 
       - name: Fault injection smoke (#16, software-observable subset)
+        # #107：已构建时独立运行关键故障矩阵，不让无关 KPI/闭环失败掩盖它。
+        if: ${{ !cancelled() && steps.workspace-build.outcome == 'success' }}
         timeout-minutes: 8
         run: |
           source "/opt/ros/${ROS_DISTRO}/setup.bash"
