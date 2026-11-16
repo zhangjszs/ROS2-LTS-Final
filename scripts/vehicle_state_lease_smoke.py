@@ -188,6 +188,22 @@ class Harness(Node):
         self.pub_event.publish(String(data=event))
         self.pump(0.08)
 
+    def event_until(self, event, acknowledged, budget=3.0):
+        # 不同 Topic 无跨通道顺序保证：harness 先看到 stop=false，不代表仲裁器已处理。
+        # 显式命令按既有幂等语义重发，只有状态遥测确认才成功；不用固定 sleep 猜调度。
+        deadline = time.monotonic() + budget
+        next_send = 0.0
+        while time.monotonic() < deadline:
+            now = time.monotonic()
+            if now >= next_send:
+                self.record("task_event", value=event, retry_until_ack=True)
+                self.pub_event.publish(String(data=event))
+                next_send = now + 0.1
+            self.pump(0.01)
+            if acknowledged():
+                return
+        raise AssertionError(f"task event {event} not acknowledged after {budget}s")
+
     def drive(self):
         self.wait(self.ready)
         self.event("arm")
@@ -332,15 +348,13 @@ def run(h):
         h.pump(0.1)
         h.pub_reset.publish(HuatStop(stop=False))
         h.wait(lambda: h.stop is False)
-        h.event("reset")
         # 现有任务契约：REQUEST 的显式 reset 保留先前 RUNNING；健康数据本身不能清锁。
-        h.wait(lambda: h.ready() and h.state.can_drive and h.command.pedal_ratio > 0)
+        h.event_until("reset", lambda: h.ready() and h.state.can_drive and h.command.pedal_ratio > 0)
         assert h.state.task_state == HuatSystemState.TASK_RUNNING
         # FINISHED / FAULT 的 reset 则回 IDLE，必须重新 ARM→START 才可起步。
         h.event("finish")
         h.wait(h.braked)
-        h.event("reset")
-        h.wait(h.ready)
+        h.event_until("reset", h.ready)
         assert h.state.task_state == HuatSystemState.TASK_IDLE
         assert not h.state.can_drive and h.command.pedal_ratio == 0
     h.case("request_latch_survives_healthy_data", request)
@@ -350,8 +364,7 @@ def run(h):
         h.wait(h.braked)
         h.pump(0.5, h.braked)
         assert h.state.stop_kind == HuatSystemState.STOPKIND_FAULT
-        h.event("reset")
-        h.wait(h.ready)
+        h.event_until("reset", h.ready)
         assert not h.state.can_drive and h.command.pedal_ratio == 0
     h.case("fault_latch_survives_healthy_data", fault)
 
@@ -379,8 +392,7 @@ def run(h):
         h.wait(lambda: h.stop is False)
         h.pump(0.4)
         assert h.state.stop_kind == HuatSystemState.STOPKIND_FAULT and h.command.pedal_ratio == 0
-        h.event("reset")
-        h.wait(h.ready)
+        h.event_until("reset", h.ready)
     h.case("monitor_restart_timeout_and_fault_latch", monitor_restart)
 
     def clock_pause():
