@@ -98,12 +98,12 @@ jobs:
           source install/setup.bash
           bash scripts/headless_smoke.sh
 
-      - name: Vehicle state lease integration (#107, isolated software only)
-        timeout-minutes: 4
+      - name: Vehicle state lease RED-GREEN integration (#107, isolated software only)
+        timeout-minutes: 6
         run: |
           source "/opt/ros/${ROS_DISTRO}/setup.bash"
           source install/setup.bash
-          bash scripts/vehicle_state_lease_smoke.sh build/vehicle_state_lease
+          bash scripts/vehicle_state_lease_red_green.sh build/vehicle_state_lease_red_green
 
       - name: Interface contract runtime QoS check (#14)
         timeout-minutes: 5
@@ -170,6 +170,8 @@ jobs:
             build/closed_loop_fault/*.json
             build/fault_injection/**/*.json
             build/vehicle_state_lease/*.json
+            build/vehicle_state_lease_red_green/**/*.json
+            build/vehicle_state_lease_red_green/**/*.log
           if-no-files-found: ignore
           retention-days: 14
 
