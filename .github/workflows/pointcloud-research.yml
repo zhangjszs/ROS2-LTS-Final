@@ -1,0 +1,30 @@
+name: Offline Point Cloud Research
+
+on:
+  push:
+    branches:
+      - research/ros1-pointcloud-shift
+    paths:
+      - 'research/pointcloud_shift/**'
+      - '.github/workflows/pointcloud-research.yml'
+  pull_request:
+    paths:
+      - 'research/pointcloud_shift/**'
+      - '.github/workflows/pointcloud-research.yml'
+
+jobs:
+  synthetic-and-decoder:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Test ROS-independent decoder and benchmark logic
+        run: python3 -m unittest discover -s research/pointcloud_shift/tests -v
+      - name: Run deterministic synthetic domain-shift smoke
+        run: |
+          python3 research/pointcloud_shift/run.py synthetic --seed 42 --frames 4 --out /tmp/pointcloud-shift.json
+          python3 -c "import json; r=json.load(open('/tmp/pointcloud-shift.json')); assert r['ground_truth_available'] and set(r['results']) == {'clean','xyz_noise','dropout','far_sparse'}"
+      # No real ROS1/ROS2 bag is available in this repository; do not claim an integration pass.

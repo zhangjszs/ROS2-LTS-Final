@@ -1,0 +1,9 @@
+# 真实传感器数据、研究输出及个人本机路径均不提交。
+data/
+results/
+*.jsonl
+*.pcd
+*.ply
+*.bag
+*.db3
+*.mcap
