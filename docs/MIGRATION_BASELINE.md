@@ -43,7 +43,7 @@
 
 | 能力项 | ROS 1 入口 (`路径:行`) | ROS 2 入口 (`路径:行`) | 消息与参数差异 | 坐标/时间语义 | 外部依赖 | 验证证据 | 状态 | 对应 Issue |
 |---|---|---|---|---|---|---|---|---|
-| 惯导数据坐标转换 | `src/vehicle_interface_ros/scripts/ins_bridge.py:1` | `src/localization/vehicle_state/src/vehicle_state_estimator.cpp:51` | ROS 1 通过 Python 脚本桥接 INS；ROS 2 实现 C++20 `GeodeticToEnu` 高性能大地坐标向局部 ENU 坐标转换并发布 `HuatCarstate` | WGS84 经纬高 → 局部站心切平面 ENU 笛卡尔坐标；时间戳透传自 INS 硬件戳 | 硬件惯导驱动/消息 | `src/localization/vehicle_state/test` 或节点离线转换测试 | `替换` | #23 |
+| 惯导数据坐标转换 | `src/vehicle_interface_ros/scripts/ins_bridge.py:1` | `src/localization/vehicle_state/src/vehicle_state_estimator.cpp:51` | ROS 1 通过 Python 脚本桥接 INS；ROS 2 实现 C++20 `GeodeticToEnu` 高性能大地坐标向局部 ENU 坐标转换并发布 `HuatCarstate` | ROS 2 从 WGS84 经纬高换算到局部 ENU，再按初始航向旋转到 `map`；两侧所列入口的消息头取发布时刻 | 硬件惯导驱动/消息 | `src/localization/vehicle_state/test` 或节点离线转换测试 | `替换` | #23 |
 | 锥桶地图构建与匹配 | `src/localization_core/src/location_mapper.cpp:42` | 未找到 | ROS 1 具备 `LocationMapper` 进行锥桶全局地图与局部感知的相关性匹配与回环；ROS 2 源码中无此实现 | 局部锥桶系到全局 map 系对齐 | 激光/视觉锥桶检测话题 | ROS 2 仓库代码检索（无对应文件） | `未找到`；**处置引用 D-015**（2026-10-20 用户亲选：暂缓全部复杂定位后端、纯 INS 基线——属“已决策不做”，非“实现缺失待补”） | #23 |
 | ESKF 状态估计滤波 | `src/localization_core/src/imu_state_estimator.cpp:10` | 未找到 | ROS 1 包含基于误差状态卡尔曼滤波（ESKF）的 IMU 与里程计融合估计器；ROS 2 仅有原始 INS 坐标转换，未包含 ESKF 融合层 | 状态向量包含位置、速度、姿态、IMU 零偏 | IMU 原始高频数据与轮速反馈 | ROS 2 仓库代码检索（仅有简单 vehicle_state_estimator） | `证据不足`（缺真实 bag 与传感器数据输入）；**处置引用 D-015**（暂缓 ESKF，未来切换后端的前置输入是 #18 真实 bag） | #18, #23 |
 | 因子图优化后端 | `src/localization_core/src/factor_graph_optimizer.cpp:48` | 未找到 | ROS 1 引入 GTSAM 因子图优化后端，综合位姿图、回环约束与圆约束；ROS 2 未引入 GTSAM 依赖与因子图代码 | 全局非线性最小二乘位姿优化 | GTSAM 库 | ROS 2 仓库代码检索；CMakeLists 无 GTSAM 依赖 | `暂缓`（依路线图不强迁高复杂度因子图）；**处置引用 D-015**（同上，用户亲选） | #23 |
@@ -104,3 +104,54 @@
    - 在缺乏 Noetic 运行时与真实 bag 的约束下，参照 #24 模式为 `vehicle_state` 编写基于已知轨迹和合成惯导信号的无 ROS 核心单元测试（纯 std 坐标转换断言与边界守卫）。
 3. **子任务建议 C（赛制适配分层）**：
    - **（2026-10-21 更新）赛制决策已由 D-014 落定 = 直线加速**，且 S2a 直线加速事件闭环已达成（#81/#80/#82）；现行 `vehicle_state`（纯 INS）即该赛制的定位基线（D-015）。若未来扩展到八字绕环/高速循迹（S2b/S3），需先解 D-015 约束或经用户新事实重新定义范围。
+
+## 五、离线定位回放对照（#24）
+
+冻结一份场景文件，分别运行两侧的采集与归一化，再用同一个 Python 标准库 CLI 读回结果。
+每个输入步有一条独立参考，工具分别判定 ROS 1 和 ROS 2 是否符合参考，并同时报告两侧的数值差。
+因此两边同时把西向写成东向时仍会失败。当前实现验证比较器及合成夹具。适配器采集、真实 bag 回放和整栈验收
+仍需各自的环境与数据，进度见 [#24](https://github.com/zhangjszs/ROS2-LTS-Final/issues/24)。
+
+```bash
+python3 -m unittest discover -s tests -p test_vehicle_state_replay_diff.py
+python3 scripts/vehicle_state_replay_diff.py case.json \
+  --ros1 ros1.json --ros2 ros2.json > replay-report.json
+```
+
+场景文件 `case.json` 的最小示例保留固定输入、参考来源、逐字段绝对容差及预期输出。`step` 是双方事先约定的重放输入序号。
+`input` 用来冻结场景设定。使用外部输入文件时，在此记录文件 SHA-256、回放顺序、时钟来源、速率和参数。
+
+```json
+{
+  "schema": "fsac.vehicle_state_replay_case/v1",
+  "scenario": "stationary-at-origin",
+  "frame": "enu",
+  "reference_source": "At the ENU origin, stationary and facing east after warmup.",
+  "input": {"origin_wgs84_deg_m": [30.0, 110.0, 0.0], "step_offsets_ns": [0, 100000000]},
+  "abs_tolerances": {"east_m": 0.01, "north_m": 0.01, "heading_rad": 0.01, "speed_mps": 0.01},
+  "expected": [
+    {"step": 0, "state": null},
+    {"step": 1, "state": {"east_m": 0, "north_m": 0, "heading_rad": 0, "speed_mps": 0}}
+  ]
+}
+```
+
+每侧记录的 `schema` 为 `fsac.vehicle_state_replay_trace/v1`，`ros_version` 填 `ros1` 或 `ros2`，
+`frame` 填 `enu`，`case_sha256` 填 `sha256sum case.json` 输出的哈希。`samples` 使用与 `expected`
+相同的行结构。采集到静默的输入步写 `state: null`，采集缺失的步省略整行。两种数组的 `step` 均为严格递增的非负整数。
+实测适配器输出填 `kind: "adapter"`，同时填写完整 Git SHA `source_revision`、实际配置 `config_sha256`、
+`command` 和 `environment`。手写夹具填 `kind: "synthetic"`，两种记录分别比较。文件哈希可用于复跑及比对，
+其中的采集来源和命令由导出端记录。
+
+坐标归一化使用同一个 WGS84 原点，位置以东、北分量的米计，航向以东为零、逆时针为正，弧度范围为 `[-π, π]`。
+两侧的水平速度使用 `m/s`。ROS 2 当前的 `map` 位置经过初始方位角旋转，`car_state.theta` 也以初始航向为参考。
+采集端需要恢复到约定的 ENU 口径。若拿不到旋转参数或不能可靠关联输入步，保留缺失记录。
+ROS 2 消息头取节点发布时刻，ROS 1 INS 桥同样使用发布时刻。本工具按输入步比较，设备测量时间、ROS 发布时间和
+传输延迟需分别取证。`ros2_minus_ros1` 用于定位差异，判定基于每侧到独立参考的差值，航向差取最短角差。
+
+| 退出码 | 结果 |
+| --- | --- |
+| `0` | 两侧所有预期步都符合独立参考，且没有额外步 |
+| `1` | 至少一侧有超差字段、提前发布或未按预期发布。逐步报告同时保留采集缺口 |
+| `2` | 无法读入或校验格式、场景哈希、坐标系、采集来源等信息。错误写到 stderr |
+| `3` | 缺失采集或有无法关联的额外步，当前没有已确认的参考值冲突 |

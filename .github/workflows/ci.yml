@@ -62,6 +62,10 @@ jobs:
         timeout-minutes: 5
         run: bash scripts/core_standalone_check.sh
 
+      - name: Vehicle-state replay comparison fixtures (no ROS, #24)
+        timeout-minutes: 1
+        run: python3 -m unittest discover -s tests -p test_vehicle_state_replay_diff.py
+
       - name: Build (Release, C++20, mold + ccache, tests on)
         id: workspace-build
         run: |
