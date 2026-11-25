@@ -122,6 +122,7 @@ fi
 run_gate lint 1 bash -c 'bash scripts/lint_cpp.sh && bash scripts/lint_shell.sh'
 run_gate cpp20 1 bash scripts/check_cpp20.sh
 run_gate core-standalone 1 bash scripts/core_standalone_check.sh
+run_gate vehicle-state-replay-diff 1 python3 -m unittest discover -s tests -p test_vehicle_state_replay_diff.py
 run_gate benchmark 1 bash scripts/benchmark_regression.sh
 # #48：调参声明机检——预检单测 + 文档/声明一致性 + 参考配置可满足性（实跑两场参考）。
 # 声明与准则只在调参轮使用，但它把“准则焊死/随手放宽”两类作弊在开跑前就卡住。
